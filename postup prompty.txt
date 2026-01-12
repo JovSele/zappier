@@ -27,3 +27,8 @@ POWER PROMPTS
         based on this JSON output.
         No technical jargon.
 
+
+
+Comitnut:
+do codespace: git pull origin main
+potom do mai: git push origin main
