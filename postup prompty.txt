@@ -1,0 +1,29 @@
+**********************
+_1_Inicializačný prompt pre Cline (Skopíruj do chatu):
+Keď už máš tieto súbory v priečinku .cline/, spusti projekt týmto v slovenčine:
+    "Cline, pozri si pravidlá v .cline/. Ideme stavať Zapier Local Audit Tool.
+    Inicializuj Vite projekt s TypeScriptom (vanilla).
+    Priprav štruktúru pre Rust/WASM v priečinku /src-wasm.
+    Navrhni základný HTML/Tailwind layout pre 'Dropzone', kde používateľ nahrá Zapier ZIP.
+    Komunikuj so mnou po slovensky, ale všetok kód a UI musí byť v angličtine podľa našich pravidiel.
+    Ukáž mi najprv plán, než začneš generovať súbory."
+
+********************
+
+
+POWER PROMPTS
+    Audit feature
+        Scan the project.
+        Find where Make heuristics are implemented.
+        Design an equivalent Zapier analyzer.
+        Explain cost implications.
+        Then implement step by step.
+    Refactor
+        Refactor this module.
+        Preserve output.
+        Add comments explaining each heuristic.
+    Report engine
+        Generate a consultant-ready explanation
+        based on this JSON output.
+        No technical jargon.
+
