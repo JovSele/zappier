@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* Ak chceš zachovať naše predchádzajúce štýly pre dropzone, pridaj ich pod import: */
+@theme {
+  --color-brand-blue: #3b82f6;
+}
+
+@layer components {
+  .dropzone {
+    @apply border-2 border-dashed border-slate-300 rounded-xl p-12 
+           transition-all duration-200 ease-in-out bg-slate-50
+           hover:border-blue-400 hover:bg-blue-50 cursor-pointer
+           flex flex-col items-center justify-center text-center;
+  }
+
+  .stat-card {
+    @apply bg-white rounded-xl p-6 border border-slate-200 shadow-sm
+           hover:shadow-md transition-shadow duration-200;
+  }
+}

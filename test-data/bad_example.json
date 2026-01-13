@@ -1,0 +1,146 @@
+{
+  "metadata": {
+    "version": "1.0"
+  },
+  "zaps": [
+    {
+      "id": 1001,
+      "title": "RSS to Slack - Polling Issue",
+      "status": "on",
+      "nodes": {
+        "1": {
+          "id": 1,
+          "account_id": 1000,
+          "customuser_id": 5000,
+          "paused": false,
+          "type_of": "read",
+          "params": {},
+          "meta": {},
+          "triple_stores": {
+            "copied_from": null,
+            "created_by": null,
+            "polling_interval_override": 15,
+            "block_and_release_limit_override": 0,
+            "spread_tasks": 0
+          },
+          "folders": null,
+          "parent_id": null,
+          "root_id": null,
+          "action": "get_new_items",
+          "selected_api": "RSSCLIAPI@2.0.0",
+          "title": "New Item in Feed",
+          "authentication_id": 12345,
+          "created_at": "2024-01-01T00:00:00Z",
+          "last_changed": "2024-01-01T00:00:00Z"
+        },
+        "2": {
+          "id": 2,
+          "account_id": 1000,
+          "customuser_id": 5000,
+          "paused": false,
+          "type_of": "write",
+          "params": {},
+          "meta": {},
+          "triple_stores": {
+            "copied_from": null,
+            "created_by": null,
+            "polling_interval_override": 0,
+            "block_and_release_limit_override": 0,
+            "spread_tasks": 0
+          },
+          "folders": null,
+          "parent_id": 1,
+          "root_id": 1,
+          "action": "send_channel_message",
+          "selected_api": "SlackCLIAPI@1.48.0",
+          "title": "Send Channel Message",
+          "authentication_id": 67890,
+          "created_at": "2024-01-01T00:00:00Z",
+          "last_changed": "2024-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "id": 1002,
+      "title": "Webhook to Slack with Late Filter",
+      "status": "on",
+      "nodes": {
+        "1": {
+          "id": 1,
+          "account_id": 1000,
+          "customuser_id": 5000,
+          "paused": false,
+          "type_of": "read",
+          "params": {},
+          "meta": {},
+          "triple_stores": {
+            "copied_from": null,
+            "created_by": null,
+            "polling_interval_override": 0,
+            "block_and_release_limit_override": 0,
+            "spread_tasks": 0
+          },
+          "folders": null,
+          "parent_id": null,
+          "root_id": null,
+          "action": "catch_hook",
+          "selected_api": "WebhooksCLIAPI@1.0.9",
+          "title": "Catch Hook",
+          "authentication_id": null,
+          "created_at": "2024-01-01T00:00:00Z",
+          "last_changed": "2024-01-01T00:00:00Z"
+        },
+        "2": {
+          "id": 2,
+          "account_id": 1000,
+          "customuser_id": 5000,
+          "paused": false,
+          "type_of": "write",
+          "params": {},
+          "meta": {},
+          "triple_stores": {
+            "copied_from": null,
+            "created_by": null,
+            "polling_interval_override": 0,
+            "block_and_release_limit_override": 0,
+            "spread_tasks": 0
+          },
+          "folders": null,
+          "parent_id": 1,
+          "root_id": 1,
+          "action": "send_channel_message",
+          "selected_api": "SlackCLIAPI@1.48.0",
+          "title": "Send Channel Message to #alerts",
+          "authentication_id": 67890,
+          "created_at": "2024-01-01T00:00:00Z",
+          "last_changed": "2024-01-01T00:00:00Z"
+        },
+        "3": {
+          "id": 3,
+          "account_id": 1000,
+          "customuser_id": 5000,
+          "paused": false,
+          "type_of": "read",
+          "params": {},
+          "meta": {},
+          "triple_stores": {
+            "copied_from": null,
+            "created_by": null,
+            "polling_interval_override": 0,
+            "block_and_release_limit_override": 0,
+            "spread_tasks": 0
+          },
+          "folders": null,
+          "parent_id": 2,
+          "root_id": 1,
+          "action": "filter",
+          "selected_api": "FilterCLIAPI@1.0.2",
+          "title": "Only continue if Priority is High",
+          "authentication_id": null,
+          "created_at": "2024-01-01T00:00:00Z",
+          "last_changed": "2024-01-01T00:00:00Z"
+        }
+      }
+    }
+  ]
+}
