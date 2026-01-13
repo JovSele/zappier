@@ -37,4 +37,8 @@ potom do mai: git push origin
 Skompiluj Rust do WASM:
     npm run build:wasm
 Spusti vývojový server:
-    npm run dev
+    npm run 
+    
+    ----
+
+    https://platform.claude.com/dashboard

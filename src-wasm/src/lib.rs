@@ -68,6 +68,7 @@ struct ParseResult {
     apps: Vec<AppInfo>,
     efficiency_flags: Vec<EfficiencyFlag>,
     efficiency_score: u32,
+    estimated_savings: f32,
 }
 
 // App information for inventory
@@ -183,6 +184,9 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
     // Calculate efficiency score
     let efficiency_score = calculate_efficiency_score(&efficiency_flags);
 
+    // Calculate estimated savings
+    let estimated_savings = calculate_estimated_savings(&efficiency_flags);
+
     // Return success result
     let result = ParseResult {
         success: true,
@@ -195,6 +199,7 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
         apps,
         efficiency_flags,
         efficiency_score,
+        estimated_savings,
     };
 
     serde_json::to_string(&result).unwrap_or_else(|_| r#"{"success":true,"zap_count":0,"message":"Unknown"}"#.to_string())
@@ -409,6 +414,23 @@ fn calculate_efficiency_score(flags: &[EfficiencyFlag]) -> u32 {
     score.max(0) as u32
 }
 
+/// Calculate estimated monthly savings based on efficiency flags
+/// High severity (late filter): $15/month per affected Zap
+/// Medium severity (polling): $5/month per affected Zap
+fn calculate_estimated_savings(flags: &[EfficiencyFlag]) -> f32 {
+    let mut total_savings: f32 = 0.0;
+    
+    for flag in flags {
+        match (flag.flag_type.as_str(), flag.severity.as_str()) {
+            ("late_filter_placement", "high") => total_savings += 15.0,
+            ("polling_trigger", "medium") => total_savings += 5.0,
+            _ => {}
+        }
+    }
+    
+    total_savings
+}
+
 /// Parse zapfile.json directly (for testing without ZIP)
 #[wasm_bindgen]
 pub fn parse_zapfile_json(json_content: &str) -> String {
@@ -442,6 +464,9 @@ pub fn parse_zapfile_json(json_content: &str) -> String {
     // Calculate efficiency score
     let efficiency_score = calculate_efficiency_score(&efficiency_flags);
 
+    // Calculate estimated savings
+    let estimated_savings = calculate_estimated_savings(&efficiency_flags);
+
     // Return success result
     let result = ParseResult {
         success: true,
@@ -454,6 +479,7 @@ pub fn parse_zapfile_json(json_content: &str) -> String {
         apps,
         efficiency_flags,
         efficiency_score,
+        estimated_savings,
     };
 
     serde_json::to_string(&result).unwrap_or_else(|_| r#"{"success":true,"zap_count":0,"message":"Unknown"}"#.to_string())

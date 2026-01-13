@@ -162,6 +162,7 @@ function displayResults(result: {
     details: string;
   }>;
   efficiency_score: number;
+  estimated_savings: number;
 }) {
   const resultsEl = document.getElementById('results')
   if (!resultsEl) return
@@ -221,8 +222,19 @@ function displayResults(result: {
                   </span>
                 </div>
                 <p class="text-sm font-semibold text-slate-700 mb-2">${flag.message}</p>
-                <p class="text-sm text-slate-600">${flag.details}</p>
-                <p class="text-xs text-slate-400 mt-2 font-mono">Zap ID: ${flag.zap_id}</p>
+                <p class="text-sm text-slate-600 mb-3">${flag.details}</p>
+                <div class="flex items-center justify-between mt-3">
+                  <p class="text-xs text-slate-400 font-mono">Zap ID: ${flag.zap_id}</p>
+                  <a href="${flag.flag_type === 'late_filter_placement' ? 'https://help.zapier.com/hc/en-us/articles/8496288555917-Add-conditions-to-Zaps-with-Filter' : 'https://help.zapier.com/hc/en-us/articles/8496181725453-Trigger-Zaps-instantly'}" 
+                     target="_blank" 
+                     rel="noopener noreferrer"
+                     class="inline-flex items-center gap-1 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-md transition-colors">
+                    📖 How to fix
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -249,12 +261,56 @@ function displayResults(result: {
   const scoreColor = getScoreColor(result.efficiency_score);
   const scoreMessage = getScoreMessage(result.efficiency_score);
   
+  // Helper function to generate gauge SVG
+  const generateGaugeSVG = (score: number) => {
+    const radius = 80;
+    const strokeWidth = 12;
+    const normalizedRadius = radius - strokeWidth / 2;
+    const circumference = normalizedRadius * Math.PI; // Half circle
+    const offset = circumference - (score / 100) * circumference;
+    
+    let gaugeColor = '#ef4444'; // red
+    if (score >= 71) gaugeColor = '#10b981'; // green
+    else if (score >= 41) gaugeColor = '#f59e0b'; // amber
+    
+    return `
+      <svg width="180" height="100" viewBox="0 0 180 100" class="gauge-chart">
+        <!-- Background arc -->
+        <path d="M 20 90 A 70 70 0 0 1 160 90" 
+          fill="none" 
+          stroke="#e5e7eb" 
+          stroke-width="${strokeWidth}" 
+          stroke-linecap="round"/>
+        <!-- Progress arc -->
+        <path d="M 20 90 A 70 70 0 0 1 160 90" 
+          fill="none" 
+          stroke="${gaugeColor}" 
+          stroke-width="${strokeWidth}" 
+          stroke-linecap="round"
+          stroke-dasharray="${circumference}"
+          stroke-dashoffset="${offset}"
+          style="transition: stroke-dashoffset 1s ease-in-out;"/>
+        <!-- Score text -->
+        <text x="90" y="75" text-anchor="middle" class="text-4xl font-black" fill="${gaugeColor}">${score}</text>
+        <text x="90" y="92" text-anchor="middle" class="text-xs font-semibold" fill="#64748b">out of 100</text>
+      </svg>
+    `;
+  };
+  
   resultsEl.innerHTML = `
     <div class="mt-10">
-      <h3 class="text-2xl font-bold text-slate-900 mb-6">Analysis Results</h3>
+      <div class="flex items-center justify-between mb-6 opacity-0 animate-fade-in-up">
+        <h3 class="text-2xl font-bold text-zinc-900" style="letter-spacing: -0.02em;">Analysis Results</h3>
+        <button id="copy-report-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white text-sm font-semibold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          Copy Report
+        </button>
+      </div>
       
       <!-- Efficiency Score Hero Card -->
-      <div class="stat-card mb-8 bg-gradient-to-br from-slate-900 to-slate-800 border-2 ${scoreColor.border}">
+      <div class="stat-card mb-8 bg-gradient-to-br from-slate-900 to-slate-800 border-2 ${scoreColor.border} opacity-0 animate-fade-in-up stagger-1">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">Overall Efficiency Score</p>
@@ -302,6 +358,37 @@ function displayResults(result: {
           </div>
         `}
       </div>
+      
+      <!-- Estimated Annual Savings Card -->
+      ${result.estimated_savings > 0 ? `
+        <div class="stat-card mb-8 bg-gradient-to-br from-emerald-500 to-emerald-600 border-2 border-emerald-400">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-bold text-emerald-100 uppercase tracking-wider mb-3">💸 Estimated Annual Savings</p>
+              <div class="flex items-baseline gap-3 mb-2">
+                <span class="text-6xl font-black text-white animate-pulse-scale">$${(result.estimated_savings * 12).toFixed(0)}</span>
+                <span class="text-2xl font-bold text-emerald-100">/year</span>
+              </div>
+              <p class="text-sm text-emerald-50 mt-3">
+                Monthly: $${result.estimated_savings.toFixed(0)} • Based on fixing all detected issues
+              </p>
+            </div>
+            <div class="hidden md:block text-white opacity-20">
+              <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z"/>
+              </svg>
+            </div>
+          </div>
+          <div class="mt-6 pt-6 border-t border-emerald-400">
+            <p class="text-xs text-emerald-50 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Based on average Zapier task pricing ($0.03/task) and typical usage patterns
+            </p>
+          </div>
+        </div>
+      ` : ''}
       
       <!-- Results Grid using .stat-card -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -381,6 +468,64 @@ function displayResults(result: {
       </div>
     </div>
   `
+  
+  // Setup copy report button
+  setTimeout(() => {
+    const copyBtn = document.getElementById('copy-report-btn')
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        const reportText = `
+ZAPIER LIGHTHOUSE AUDIT REPORT
+
+Efficiency Score: ${result.efficiency_score}/100 (${scoreMessage})
+Zaps Found: ${result.zap_count}
+Total Steps: ${result.total_nodes}
+${result.estimated_savings > 0 ? `Estimated Annual Savings: $${(result.estimated_savings * 12).toFixed(0)}/year` : ''}
+
+${result.efficiency_flags.length > 0 ? `EFFICIENCY FLAGS (${result.efficiency_flags.length})
+${'='.repeat(50)}
+${result.efficiency_flags.map((flag, i) => `
+${i + 1}. ${flag.zap_title} [${flag.severity.toUpperCase()}]
+   Issue: ${flag.message}
+   Details: ${flag.details}
+   Zap ID: ${flag.zap_id}
+`).join('\n')}` : 'No efficiency issues detected!'}
+
+APP INVENTORY (${result.apps.length})
+${'='.repeat(50)}
+${result.apps.map((app, i) => `${i + 1}. ${app.name} - ${app.count} use${app.count === 1 ? '' : 's'}`).join('\n')}
+
+---
+Generated by Zapier Lighthouse - Local Audit Engine
+        `.trim()
+        
+        try {
+          await navigator.clipboard.writeText(reportText)
+          copyBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Copied!
+          `
+          copyBtn.classList.remove('bg-slate-700', 'hover:bg-slate-800')
+          copyBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700')
+          
+          setTimeout(() => {
+            copyBtn.innerHTML = `
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy Report
+            `
+            copyBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700')
+            copyBtn.classList.add('bg-slate-700', 'hover:bg-slate-800')
+          }, 2000)
+        } catch (err) {
+          console.error('Failed to copy:', err)
+        }
+      })
+    }
+  }, 100)
 }
 
 // Setup drag and drop zone
@@ -438,14 +583,14 @@ function renderUI() {
   const app = document.querySelector<HTMLDivElement>('#app')!
   
   app.innerHTML = `
-    <div class="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50">
+    <div class="min-h-screen bg-[#fafafa]">
       <div class="container mx-auto px-6 py-12 max-w-4xl">
         <!-- Header -->
         <header class="text-center mb-12">
-          <h1 class="text-5xl font-bold text-slate-900 mb-3 tracking-tight">
+          <h1 class="text-5xl font-black text-zinc-900 mb-3" style="letter-spacing: -0.02em;">
             Zapier Lighthouse
           </h1>
-          <p class="text-lg text-slate-500 font-medium">Local Audit Engine - Privacy-First Analysis</p>
+          <p class="text-lg text-zinc-500 font-medium">Local Audit Engine • Privacy-First Analysis</p>
         </header>
         
         <!-- WASM Status Indicator -->
@@ -491,16 +636,9 @@ function renderUI() {
         <div id="results"></div>
         
         <!-- Footer -->
-        <footer class="mt-16 pt-8 border-t border-slate-200 text-center">
-          <p class="text-sm text-slate-500 font-medium">
-            <span class="inline-flex items-center">
-              <span class="text-lg mr-2">🔒</span>
-              <span class="font-mono">100% Local Processing</span>
-            </span>
-            <span class="mx-3 text-slate-300">•</span>
-            <span class="font-mono">No Data Uploaded</span>
-            <span class="mx-3 text-slate-300">•</span>
-            <span class="font-mono">Open Source</span>
+        <footer class="mt-16 pt-8 border-t border-zinc-200 text-center">
+          <p class="text-sm text-zinc-500 font-medium">
+            Zapier Lighthouse • Privacy-First Audit • Built with Rust & WASM
           </p>
         </footer>
       </div>
