@@ -1,5 +1,7 @@
 import './style.css'
 import init, { hello_world, parse_zapier_export, parse_zapfile_json } from '../src-wasm/pkg/zapier_lighthouse_wasm'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 // Initialize WASM module
 let wasmReady = false
@@ -147,23 +149,294 @@ async function loadTestData() {
   }
 }
 
-// Display parsing results
-function displayResults(result: { 
-  zap_count: number; 
-  total_nodes: number; 
+// PDF generation configuration
+interface PDFConfig {
+  agencyName: string;
+  agencyLogo?: string; // Base64 or URL
+  clientName: string;
+  reportDate: string;
+}
+
+// Generate professional PDF report
+async function generatePDFReport(result: ParseResult, config: PDFConfig) {
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 20;
+  const contentWidth = pageWidth - 2 * margin;
+  
+  let yPos = margin;
+  
+  // Helper function to add a new page if needed
+  const checkPageBreak = (requiredSpace: number) => {
+    if (yPos + requiredSpace > pageHeight - margin) {
+      pdf.addPage();
+      yPos = margin;
+      return true;
+    }
+    return false;
+  };
+  
+  // Header with white-label branding
+  pdf.setFillColor(15, 23, 42); // slate-900
+  pdf.rect(0, 0, pageWidth, 50, 'F');
+  
+  if (config.agencyLogo) {
+    // Add agency logo (if provided)
+    try {
+      pdf.addImage(config.agencyLogo, 'PNG', margin, 10, 30, 30);
+    } catch (e) {
+      console.warn('Failed to add logo:', e);
+    }
+  }
+  
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(24);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('ZAPIER AUTOMATION AUDIT', pageWidth / 2, 25, { align: 'center' });
+  
+  pdf.setFontSize(12);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(`Prepared by ${config.agencyName}`, pageWidth / 2, 35, { align: 'center' });
+  
+  yPos = 60;
+  
+  // Client information
+  pdf.setTextColor(71, 85, 105); // slate-600
+  pdf.setFontSize(10);
+  pdf.text(`Client: ${config.clientName}`, margin, yPos);
+  pdf.text(`Report Date: ${config.reportDate}`, pageWidth - margin, yPos, { align: 'right' });
+  
+  yPos += 15;
+  
+  // Executive Summary Section
+  pdf.setFillColor(241, 245, 249); // slate-100
+  pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+  
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('EXECUTIVE SUMMARY', margin, yPos + 5);
+  
+  yPos += 20;
+  
+  // Key Metrics Grid
+  const metricBoxWidth = contentWidth / 3 - 5;
+  
+  // Efficiency Score Box
+  pdf.setFillColor(241, 245, 249);
+  pdf.roundedRect(margin, yPos, metricBoxWidth, 30, 3, 3, 'F');
+  pdf.setTextColor(71, 85, 105);
+  pdf.setFontSize(10);
+  pdf.text('EFFICIENCY SCORE', margin + metricBoxWidth / 2, yPos + 8, { align: 'center' });
+  
+  const scoreColor: [number, number, number] = result.efficiency_score >= 75 ? [16, 185, 129] : 
+                     result.efficiency_score >= 50 ? [245, 158, 11] : [239, 68, 68];
+  pdf.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+  pdf.setFontSize(28);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`${result.efficiency_score}`, margin + metricBoxWidth / 2, yPos + 22, { align: 'center' });
+  pdf.setFontSize(10);
+  pdf.text('/100', margin + metricBoxWidth / 2 + 10, yPos + 22);
+  
+  // Zaps Found Box
+  pdf.setFillColor(241, 245, 249);
+  pdf.roundedRect(margin + metricBoxWidth + 5, yPos, metricBoxWidth, 30, 3, 3, 'F');
+  pdf.setTextColor(71, 85, 105);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('ZAPS ANALYZED', margin + metricBoxWidth + 5 + metricBoxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(28);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`${result.zap_count}`, margin + metricBoxWidth + 5 + metricBoxWidth / 2, yPos + 22, { align: 'center' });
+  
+  // Total Steps Box
+  pdf.setFillColor(241, 245, 249);
+  pdf.roundedRect(margin + 2 * (metricBoxWidth + 5), yPos, metricBoxWidth, 30, 3, 3, 'F');
+  pdf.setTextColor(71, 85, 105);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('TOTAL STEPS', margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(28);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`${result.total_nodes}`, margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 22, { align: 'center' });
+  
+  yPos += 45;
+  
+  // Estimated Savings Highlight (if applicable)
+  if (result.estimated_savings > 0) {
+    checkPageBreak(40);
+    
+    pdf.setFillColor(16, 185, 129); // emerald-500
+    pdf.roundedRect(margin, yPos, contentWidth, 35, 3, 3, 'F');
+    
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('💰 ESTIMATED ANNUAL SAVINGS', margin + 5, yPos + 10);
+    
+    pdf.setFontSize(32);
+    pdf.text(`$${(result.estimated_savings * 12).toFixed(0)}`, margin + 5, yPos + 25);
+    
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Monthly: $${result.estimated_savings.toFixed(0)} • Based on optimizing all detected issues`,
+             margin + 5, yPos + 32);
+    
+    yPos += 45;
+  }
+  
+  // Findings Section
+  checkPageBreak(20);
+  
+  pdf.setFillColor(241, 245, 249);
+  pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+  
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('DETAILED FINDINGS', margin, yPos + 5);
+  
+  yPos += 20;
+  
+  if (result.efficiency_flags.length === 0) {
+    pdf.setTextColor(16, 185, 129);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('✓ No efficiency issues detected. Your Zaps are highly optimized!', margin, yPos);
+    yPos += 15;
+  } else {
+    // Group flags by type - prioritize error_loop
+    const errorLoops = result.efficiency_flags.filter(f => f.flag_type === 'error_loop');
+    const otherFlags = result.efficiency_flags.filter(f => f.flag_type !== 'error_loop');
+    const sortedFlags = [...errorLoops, ...otherFlags];
+    
+    sortedFlags.forEach((flag, index) => {
+      checkPageBreak(45);
+      
+      // Flag box
+      const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 202, 202] : 
+                       flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
+      
+      pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
+      pdf.roundedRect(margin, yPos, contentWidth, 40, 2, 2, 'F');
+      
+      // Severity badge
+      const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] : 
+                        flag.severity === 'medium' ? [217, 119, 6] : [37, 99, 235];
+      pdf.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
+      pdf.roundedRect(margin + 3, yPos + 3, 20, 6, 1, 1, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(flag.severity.toUpperCase(), margin + 13, yPos + 7, { align: 'center' });
+      
+      // Flag title
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${index + 1}. ${flag.zap_title}`, margin + 26, yPos + 7);
+      
+      // Flag message
+      pdf.setTextColor(51, 65, 85);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      const messageLines = pdf.splitTextToSize(flag.message, contentWidth - 10);
+      pdf.text(messageLines, margin + 3, yPos + 15);
+      
+      // Flag details
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(71, 85, 105);
+      const detailLines = pdf.splitTextToSize(flag.details, contentWidth - 10);
+      pdf.text(detailLines, margin + 3, yPos + 15 + (messageLines.length * 4));
+      
+      yPos += 45;
+    });
+  }
+  
+  // App Inventory Section
+  checkPageBreak(20);
+  
+  if (yPos > pageHeight - 100 && result.apps.length > 5) {
+    pdf.addPage();
+    yPos = margin;
+  }
+  
+  pdf.setFillColor(241, 245, 249);
+  pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+  
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('APP INVENTORY', margin, yPos + 5);
+  
+  pdf.setTextColor(71, 85, 105);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(`${result.apps.length} unique applications detected`, pageWidth - margin, yPos + 5, { align: 'right' });
+  
+  yPos += 18;
+  
+  result.apps.forEach((app, index) => {
+    checkPageBreak(10);
+    
+    if (index % 2 === 0) {
+      pdf.setFillColor(249, 250, 251);
+      pdf.rect(margin - 2, yPos - 3, contentWidth + 4, 8, 'F');
+    }
+    
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(app.name, margin, yPos);
+    
+    pdf.setTextColor(148, 163, 184);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`${app.count} ${app.count === 1 ? 'use' : 'uses'}`, pageWidth - margin, yPos, { align: 'right' });
+    
+    yPos += 8;
+  });
+  
+  // Footer on all pages
+  const totalPages = pdf.internal.pages.length - 1;
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+    pdf.setTextColor(148, 163, 184);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Generated by Zapier Lighthouse | ${config.agencyName}`, 
+             pageWidth / 2, pageHeight - 10, { align: 'center' });
+    pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    pdf.text('Confidential', margin, pageHeight - 10);
+  }
+  
+  // Save PDF
+  pdf.save(`Zapier_Audit_Report_${config.clientName.replace(/\s+/g, '_')}_${config.reportDate}.pdf`);
+}
+
+// Type definition for parse result
+interface ParseResult {
+  zap_count: number;
+  total_nodes: number;
   message: string;
   apps: Array<{ name: string; raw_api: string; count: number }>;
-  efficiency_flags: Array<{ 
-    zap_id: number; 
-    zap_title: string; 
-    flag_type: string; 
-    severity: string; 
-    message: string; 
+  efficiency_flags: Array<{
+    zap_id: number;
+    zap_title: string;
+    flag_type: string;
+    severity: string;
+    message: string;
     details: string;
   }>;
   efficiency_score: number;
   estimated_savings: number;
-}) {
+}
+
+// Display parsing results
+function displayResults(result: ParseResult) {
   const resultsEl = document.getElementById('results')
   if (!resultsEl) return
   
@@ -301,12 +574,20 @@ function displayResults(result: {
     <div class="mt-10">
       <div class="flex items-center justify-between mb-6 opacity-0 animate-fade-in-up">
         <h3 class="text-2xl font-bold text-zinc-900" style="letter-spacing: -0.02em;">Analysis Results</h3>
-        <button id="copy-report-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white text-sm font-semibold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          Copy Report
-        </button>
+        <div class="flex gap-3">
+          <button id="copy-report-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white text-sm font-semibold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            Copy Report
+          </button>
+          <button id="download-pdf-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            Download PDF
+          </button>
+        </div>
       </div>
       
       <!-- Efficiency Score Hero Card -->
@@ -522,6 +803,60 @@ Generated by Zapier Lighthouse - Local Audit Engine
           }, 2000)
         } catch (err) {
           console.error('Failed to copy:', err)
+        }
+      })
+    }
+    
+    // Setup PDF download button
+    const pdfBtn = document.getElementById('download-pdf-btn')
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', async () => {
+        pdfBtn.innerHTML = `
+          <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Generating...
+        `
+        pdfBtn.classList.add('opacity-75', 'cursor-wait')
+        
+        try {
+          // Generate PDF with default white-label config
+          const today = new Date().toISOString().split('T')[0]
+          await generatePDFReport(result, {
+            agencyName: 'Zapier Lighthouse',
+            clientName: 'Client',
+            reportDate: today
+          })
+          
+          pdfBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Downloaded!
+          `
+          pdfBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'opacity-75', 'cursor-wait')
+          pdfBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700')
+          
+          setTimeout(() => {
+            pdfBtn.innerHTML = `
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+              </svg>
+              Download PDF
+            `
+            pdfBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700')
+            pdfBtn.classList.add('bg-blue-600', 'hover:bg-blue-700')
+          }, 2000)
+        } catch (err) {
+          console.error('Failed to generate PDF:', err)
+          pdfBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Error
+          `
+          pdfBtn.classList.remove('opacity-75', 'cursor-wait')
+          pdfBtn.classList.add('bg-rose-600')
         }
       })
     }

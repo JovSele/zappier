@@ -33,11 +33,14 @@ Comitnut:
 do codespace: git pull origin main
 potom do mai: git push origin 
 
+
+git add .
+
 -------
 Skompiluj Rust do WASM:
     npm run build:wasm
 Spusti vývojový server:
-    npm run 
+    npm run dev
     
     ----
 
