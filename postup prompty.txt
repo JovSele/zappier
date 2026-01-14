@@ -35,6 +35,9 @@ potom do mai: git push origin
 
 
 git add .
+git commit -m "feat: complete v1.0 MVP with premium UI, WASM engine, and technical status report"
+git push origin main
+
 
 -------
 Skompiluj Rust do WASM:
