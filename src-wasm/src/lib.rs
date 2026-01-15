@@ -45,6 +45,10 @@ struct UsageStats {
     error_count: u32,
     error_rate: f32, // Percentage (0-100)
     has_task_history: bool,
+    // Enhanced error analytics
+    most_common_error: Option<String>,
+    error_trend: Option<String>, // "increasing", "stable", "decreasing"
+    max_streak: u32, // Longest consecutive failure streak
 }
 
 // Zap (automation workflow)
@@ -101,6 +105,10 @@ struct EfficiencyFlag {
     severity: String,   // "low", "medium", "high"
     message: String,
     details: String,
+    // Enhanced error analytics (only for error_loop flags)
+    most_common_error: Option<String>,
+    error_trend: Option<String>,
+    max_streak: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -109,11 +117,19 @@ struct ErrorResult {
     message: String,
 }
 
-/// Parse CSV files to extract task history information
+/// Temporary structure to track execution records for analytics
+#[derive(Debug)]
+struct ExecutionRecord {
+    is_error: bool,
+    error_message: Option<String>,
+}
+
+/// Parse CSV files to extract task history information with enhanced error analytics
 /// Intelligently detects CSV files with task history data by examining headers
 /// Looks for files with 'zap_id' and 'status' columns (smart detection, not filename-based)
 fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
     let mut task_history_map: HashMap<u64, UsageStats> = HashMap::new();
+    let mut zap_executions: HashMap<u64, Vec<ExecutionRecord>> = HashMap::new();
     
     for csv_content in csv_contents {
         // Try to parse as CSV
@@ -138,6 +154,8 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
             // Find column indices
             let zap_id_idx = headers.iter().position(|h| h.to_lowercase() == "zap_id");
             let status_idx = headers.iter().position(|h| h.to_lowercase() == "status");
+            let error_msg_idx = headers.iter().position(|h| 
+                h.to_lowercase() == "error_message" || h.to_lowercase() == "error");
             
             if let (Some(zap_id_col), Some(status_col)) = (zap_id_idx, status_idx) {
                 // Process all records and aggregate by zap_id
@@ -149,6 +167,24 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
                                 // Extract status
                                 if let Some(status_str) = record.get(status_col) {
                                     let status = status_str.to_lowercase();
+                                    let is_error = status == "error" || status == "failed" || status == "failure";
+                                    
+                                    // Extract error message if available
+                                    let error_message = if is_error && error_msg_idx.is_some() {
+                                        record.get(error_msg_idx.unwrap())
+                                            .map(|s| s.to_string())
+                                            .filter(|s| !s.is_empty())
+                                    } else {
+                                        None
+                                    };
+                                    
+                                    // Track execution record for advanced analytics
+                                    zap_executions.entry(zap_id)
+                                        .or_insert_with(Vec::new)
+                                        .push(ExecutionRecord {
+                                            is_error,
+                                            error_message,
+                                        });
                                     
                                     // Get or create stats for this zap
                                     let stats = task_history_map.entry(zap_id).or_insert(UsageStats {
@@ -157,6 +193,9 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
                                         error_count: 0,
                                         error_rate: 0.0,
                                         has_task_history: true,
+                                        most_common_error: None,
+                                        error_trend: None,
+                                        max_streak: 0,
                                     });
                                     
                                     // Increment counters based on status
@@ -164,7 +203,7 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
                                     
                                     if status == "success" {
                                         stats.success_count += 1;
-                                    } else if status == "error" || status == "failed" || status == "failure" {
+                                    } else if is_error {
                                         stats.error_count += 1;
                                     }
                                 }
@@ -182,10 +221,64 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
         }
     }
     
-    // Calculate error rates for all zaps
-    for stats in task_history_map.values_mut() {
+    // Enhanced analytics: Calculate error rates, trends, streaks, and most common errors
+    for (zap_id, stats) in task_history_map.iter_mut() {
         if stats.total_runs > 0 {
             stats.error_rate = (stats.error_count as f32 / stats.total_runs as f32) * 100.0;
+        }
+        
+        // Only perform advanced analytics if we have execution records
+        if let Some(executions) = zap_executions.get(zap_id) {
+            if !executions.is_empty() {
+                // Calculate error trend (compare first half vs second half)
+                let mid_point = executions.len() / 2;
+                if mid_point > 0 {
+                    let first_half_errors = executions[..mid_point].iter()
+                        .filter(|e| e.is_error).count();
+                    let second_half_errors = executions[mid_point..].iter()
+                        .filter(|e| e.is_error).count();
+                    
+                    let first_half_rate = first_half_errors as f32 / mid_point as f32;
+                    let second_half_rate = second_half_errors as f32 / (executions.len() - mid_point) as f32;
+                    
+                    stats.error_trend = Some(
+                        if second_half_rate > first_half_rate * 1.2 {
+                            "increasing".to_string()
+                        } else if second_half_rate < first_half_rate * 0.8 {
+                            "decreasing".to_string()
+                        } else {
+                            "stable".to_string()
+                        }
+                    );
+                }
+                
+                // Calculate maximum error streak
+                let mut current_streak = 0;
+                let mut max_streak = 0;
+                for exec in executions {
+                    if exec.is_error {
+                        current_streak += 1;
+                        max_streak = max_streak.max(current_streak);
+                    } else {
+                        current_streak = 0;
+                    }
+                }
+                stats.max_streak = max_streak;
+                
+                // Find most common error message
+                let mut error_counts: HashMap<String, u32> = HashMap::new();
+                for exec in executions {
+                    if let Some(ref msg) = exec.error_message {
+                        *error_counts.entry(msg.clone()).or_insert(0) += 1;
+                    }
+                }
+                
+                if !error_counts.is_empty() {
+                    stats.most_common_error = error_counts.iter()
+                        .max_by_key(|(_, count)| *count)
+                        .map(|(msg, _)| msg.clone());
+                }
+            }
         }
     }
     

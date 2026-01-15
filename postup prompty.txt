@@ -1,3 +1,5 @@
+
+reset
 **********************
 _1_Inicializačný prompt pre Cline (Skopíruj do chatu):
 Keď už máš tieto súbory v priečinku .cline/, spusti projekt týmto v slovenčine:

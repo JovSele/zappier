@@ -566,6 +566,10 @@ interface ParseResult {
     severity: string;
     message: string;
     details: string;
+    // Enhanced error analytics (available for error_loop flags)
+    most_common_error?: string;
+    error_trend?: string; // "increasing", "stable", "decreasing"
+    max_streak?: number;
   }>;
   efficiency_score: number;
   estimated_savings: number;
