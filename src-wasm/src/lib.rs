@@ -110,8 +110,8 @@ struct ErrorResult {
 }
 
 /// Parse CSV files to extract task history information
-/// Currently handles task_history_download_urls.csv which contains URLs to task history files
-/// In the future, can be extended to parse actual task history JSON files if included in the ZIP
+/// Intelligently detects CSV files with task history data by examining headers
+/// Looks for files with 'zap_id' and 'status' columns (smart detection, not filename-based)
 fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
     let mut task_history_map: HashMap<u64, UsageStats> = HashMap::new();
     
@@ -128,40 +128,64 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
             Err(_) => continue,
         };
         
-        // Check if this is task_history_download_urls.csv
-        // This CSV contains references to task history but not the actual data
-        // We mark that task history is available but cannot populate actual stats
-        // without downloading external URLs (which violates privacy-first principle)
-        if headers.iter().any(|h| h.to_lowercase().contains("description") || 
-                                   h.to_lowercase().contains("url")) {
-            // This is likely the task_history_download_urls.csv
-            // We note that task history exists but cannot access it locally
-            // Future enhancement: if actual task history JSON files are included in ZIP,
-            // we would parse them here
-            continue;
-        }
+        // INTELLIGENT DETECTION: Check if this CSV contains task history data
+        // by looking for 'zap_id' and 'status' columns (not filename-based)
+        let has_zap_id = headers.iter().any(|h| h.to_lowercase() == "zap_id");
+        let has_status = headers.iter().any(|h| h.to_lowercase() == "status");
         
-        // Parse potential task history data CSV
-        // Looking for columns like: zap_id, zap_name, status, task_count, etc.
-        for result in reader.records() {
-            if let Ok(record) = result {
-                // Try to extract zap_id and usage data
-                // This is a placeholder for when actual task history data is available
-                if let Some(zap_id_str) = record.get(0) {
-                    if let Ok(zap_id) = zap_id_str.parse::<u64>() {
-                        // Extract usage statistics from CSV record
-                        // This would be populated when actual task history is in the ZIP
-                        let stats = UsageStats {
-                            total_runs: 0,
-                            success_count: 0,
-                            error_count: 0,
-                            error_rate: 0.0,
-                            has_task_history: true,
-                        };
-                        task_history_map.insert(zap_id, stats);
+        if has_zap_id && has_status {
+            // This is a task history CSV! Parse it to extract execution statistics
+            // Find column indices
+            let zap_id_idx = headers.iter().position(|h| h.to_lowercase() == "zap_id");
+            let status_idx = headers.iter().position(|h| h.to_lowercase() == "status");
+            
+            if let (Some(zap_id_col), Some(status_col)) = (zap_id_idx, status_idx) {
+                // Process all records and aggregate by zap_id
+                for result in reader.records() {
+                    if let Ok(record) = result {
+                        // Extract zap_id
+                        if let Some(zap_id_str) = record.get(zap_id_col) {
+                            if let Ok(zap_id) = zap_id_str.parse::<u64>() {
+                                // Extract status
+                                if let Some(status_str) = record.get(status_col) {
+                                    let status = status_str.to_lowercase();
+                                    
+                                    // Get or create stats for this zap
+                                    let stats = task_history_map.entry(zap_id).or_insert(UsageStats {
+                                        total_runs: 0,
+                                        success_count: 0,
+                                        error_count: 0,
+                                        error_rate: 0.0,
+                                        has_task_history: true,
+                                    });
+                                    
+                                    // Increment counters based on status
+                                    stats.total_runs += 1;
+                                    
+                                    if status == "success" {
+                                        stats.success_count += 1;
+                                    } else if status == "error" || status == "failed" || status == "failure" {
+                                        stats.error_count += 1;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
+        } else if headers.iter().any(|h| h.to_lowercase().contains("description") || 
+                                          h.to_lowercase().contains("url")) {
+            // This is task_history_download_urls.csv (external references)
+            // We skip this as it only contains URLs, not actual task data
+            // (privacy-first principle: we don't fetch external data)
+            continue;
+        }
+    }
+    
+    // Calculate error rates for all zaps
+    for stats in task_history_map.values_mut() {
+        if stats.total_runs > 0 {
+            stats.error_rate = (stats.error_count as f32 / stats.total_runs as f32) * 100.0;
         }
     }
     
@@ -530,6 +554,8 @@ fn calculate_efficiency_score(flags: &[EfficiencyFlag]) -> u32 {
         match (flag.flag_type.as_str(), flag.severity.as_str()) {
             ("polling_trigger", "medium") => score -= 10,
             ("late_filter_placement", "high") => score -= 25,
+            ("error_loop", "high") => score -= 30,  // Critical reliability issue
+            ("error_loop", "medium") => score -= 20, // Moderate reliability issue
             _ => {}
         }
     }

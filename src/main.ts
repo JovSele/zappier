@@ -275,45 +275,105 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('💰 ESTIMATED ANNUAL SAVINGS', margin + 5, yPos + 10);
+    pdf.text('ESTIMATED ANNUAL SAVINGS', margin + 5, yPos + 10);
     
     pdf.setFontSize(32);
     pdf.text(`$${(result.estimated_savings * 12).toFixed(0)}`, margin + 5, yPos + 25);
     
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Monthly: $${result.estimated_savings.toFixed(0)} • Based on optimizing all detected issues`,
+    pdf.text(`Monthly: $${result.estimated_savings.toFixed(0)} - Based on optimizing all detected issues`,
              margin + 5, yPos + 32);
     
     yPos += 45;
   }
   
-  // Findings Section
-  checkPageBreak(20);
-  
-  pdf.setFillColor(241, 245, 249);
-  pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
-  
-  pdf.setTextColor(15, 23, 42);
-  pdf.setFontSize(16);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('DETAILED FINDINGS', margin, yPos + 5);
-  
-  yPos += 20;
-  
-  if (result.efficiency_flags.length === 0) {
-    pdf.setTextColor(16, 185, 129);
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('✓ No efficiency issues detected. Your Zaps are highly optimized!', margin, yPos);
-    yPos += 15;
-  } else {
-    // Group flags by type - prioritize error_loop
-    const errorLoops = result.efficiency_flags.filter(f => f.flag_type === 'error_loop');
-    const otherFlags = result.efficiency_flags.filter(f => f.flag_type !== 'error_loop');
-    const sortedFlags = [...errorLoops, ...otherFlags];
+  // Reliability Section (if error_loop flags exist)
+  const reliabilityFlags = result.efficiency_flags.filter(f => f.flag_type === 'error_loop');
+  if (reliabilityFlags.length > 0) {
+    checkPageBreak(20);
     
-    sortedFlags.forEach((flag, index) => {
+    pdf.setFillColor(254, 202, 202); // rose-200
+    pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+    
+    pdf.setTextColor(220, 38, 38); // rose-600
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('[!] RELIABILITY CONCERNS', margin, yPos + 5);
+    
+    pdf.setTextColor(71, 85, 105);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`${reliabilityFlags.length} Zap${reliabilityFlags.length > 1 ? 's' : ''} with high error rates`, pageWidth - margin, yPos + 5, { align: 'right' });
+    
+    yPos += 20;
+    
+    reliabilityFlags.forEach((flag, index) => {
+      // Auto-paging: check if we need a new page (with smaller threshold for reliability items)
+      checkPageBreak(50);
+      
+      // Flag box
+      const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 202, 202] : [254, 243, 199];
+      pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
+      pdf.roundedRect(margin, yPos, contentWidth, 45, 2, 2, 'F');
+      
+      // Severity badge
+      const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] : [217, 119, 6];
+      pdf.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
+      pdf.roundedRect(margin + 3, yPos + 3, 20, 6, 1, 1, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(flag.severity.toUpperCase(), margin + 13, yPos + 7, { align: 'center' });
+      
+      // Flag title
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${index + 1}. ${flag.zap_title}`, margin + 26, yPos + 7);
+      
+      // Flag message
+      pdf.setTextColor(51, 65, 85);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      const messageLines = pdf.splitTextToSize(flag.message, contentWidth - 10);
+      pdf.text(messageLines, margin + 3, yPos + 15);
+      
+      // Flag details
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(71, 85, 105);
+      const detailLines = pdf.splitTextToSize(flag.details, contentWidth - 10);
+      pdf.text(detailLines, margin + 3, yPos + 15 + (messageLines.length * 4));
+      
+      yPos += 50;
+    });
+    
+    yPos += 5;
+  }
+  
+  // Efficiency Findings Section
+  const efficiencyFlags = result.efficiency_flags.filter(f => f.flag_type !== 'error_loop');
+  if (efficiencyFlags.length > 0) {
+    checkPageBreak(20);
+    
+    pdf.setFillColor(241, 245, 249);
+    pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+    
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('EFFICIENCY FINDINGS', margin, yPos + 5);
+    
+    pdf.setTextColor(71, 85, 105);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`${efficiencyFlags.length} optimization ${efficiencyFlags.length === 1 ? 'opportunity' : 'opportunities'}`, pageWidth - margin, yPos + 5, { align: 'right' });
+    
+    yPos += 20;
+    
+    efficiencyFlags.forEach((flag, index) => {
+      // Auto-paging: dynamically check space needed
       checkPageBreak(45);
       
       // Flag box
@@ -357,7 +417,28 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     });
   }
   
-  // App Inventory Section
+  // No findings case
+  if (result.efficiency_flags.length === 0) {
+    checkPageBreak(20);
+    
+    pdf.setFillColor(241, 245, 249);
+    pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+    
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DETAILED FINDINGS', margin, yPos + 5);
+    
+    yPos += 20;
+    
+    pdf.setTextColor(16, 185, 129);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('✓ No efficiency issues detected. Your Zaps are highly optimized!', margin, yPos);
+    yPos += 15;
+  }
+  
+  // App Inventory Section with intelligent grid layout
   checkPageBreak(20);
   
   if (yPos > pageHeight - 100 && result.apps.length > 5) {
@@ -380,25 +461,80 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   
   yPos += 18;
   
-  result.apps.forEach((app, index) => {
-    checkPageBreak(10);
+  // INTELLIGENT GRID LAYOUT: Use columns if many apps (better scalability)
+  if (result.apps.length > 15) {
+    // Multi-column grid layout for better space utilization
+    const numColumns = result.apps.length > 30 ? 3 : 2;
+    const columnWidth = contentWidth / numColumns - 5;
+    const itemHeight = 7;
+    let currentColumn = 0;
+    let startYPos = yPos;
     
-    if (index % 2 === 0) {
-      pdf.setFillColor(249, 250, 251);
-      pdf.rect(margin - 2, yPos - 3, contentWidth + 4, 8, 'F');
+    result.apps.forEach((app, index) => {
+      // Check if we need a new page
+      if (yPos + itemHeight > pageHeight - margin) {
+        pdf.addPage();
+        yPos = margin;
+        startYPos = yPos;
+        currentColumn = 0;
+      }
+      
+      // Calculate column position
+      const xPos = margin + currentColumn * (columnWidth + 5);
+      
+      // Alternating background for readability
+      if (index % 2 === 0) {
+        pdf.setFillColor(249, 250, 251);
+        pdf.rect(xPos - 2, yPos - 2, columnWidth + 4, itemHeight, 'F');
+      }
+      
+      // App name (truncated if too long)
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      const truncatedName = app.name.length > 25 ? app.name.substring(0, 22) + '...' : app.name;
+      pdf.text(truncatedName, xPos, yPos + 4);
+      
+      // Usage count
+      pdf.setTextColor(148, 163, 184);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.text(`${app.count}×`, xPos + columnWidth - 2, yPos + 4, { align: 'right' });
+      
+      // Move to next row or column
+      currentColumn++;
+      if (currentColumn >= numColumns) {
+        currentColumn = 0;
+        yPos += itemHeight;
+      }
+    });
+    
+    // Final yPos adjustment if not at start of new row
+    if (currentColumn > 0) {
+      yPos += itemHeight;
     }
-    
-    pdf.setTextColor(15, 23, 42);
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(app.name, margin, yPos);
-    
-    pdf.setTextColor(148, 163, 184);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`${app.count} ${app.count === 1 ? 'use' : 'uses'}`, pageWidth - margin, yPos, { align: 'right' });
-    
-    yPos += 8;
-  });
+  } else {
+    // Single-column list layout for smaller app inventories
+    result.apps.forEach((app, index) => {
+      checkPageBreak(10);
+      
+      if (index % 2 === 0) {
+        pdf.setFillColor(249, 250, 251);
+        pdf.rect(margin - 2, yPos - 3, contentWidth + 4, 8, 'F');
+      }
+      
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(app.name, margin, yPos);
+      
+      pdf.setTextColor(148, 163, 184);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`${app.count} ${app.count === 1 ? 'use' : 'uses'}`, pageWidth - margin, yPos, { align: 'right' });
+      
+      yPos += 8;
+    });
+  }
   
   // Footer on all pages
   const totalPages = pdf.internal.pages.length - 1;
