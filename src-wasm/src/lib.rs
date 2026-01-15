@@ -120,6 +120,7 @@ struct EfficiencyFlag {
     // Dynamic savings calculation
     estimated_monthly_savings: f32, // in USD
     savings_explanation: String, // How savings were calculated
+    is_fallback: bool, // true = using estimated fallback data, false = using actual execution data
 }
 
 #[derive(Serialize)]
@@ -378,6 +379,7 @@ fn detect_error_loop(zap: &Zap) -> Option<EfficiencyFlag> {
                 // Dynamic savings calculation
                 estimated_monthly_savings: monthly_savings,
                 savings_explanation,
+                is_fallback: false, // Error loop detection always uses actual execution data
             });
         }
     }
@@ -571,7 +573,7 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
                 // Only flag if there are actual action steps before the filter
                 if actions_before_filter > 0 {
                     // Calculate savings based on task history if available
-                    let (monthly_savings, savings_explanation) = if let Some(stats) = &zap.usage_stats {
+                    let (monthly_savings, savings_explanation, is_fallback) = if let Some(stats) = &zap.usage_stats {
                         if stats.total_runs > 0 {
                             // Calculate filter rejection rate from execution history
                             let filter_rejection_rate = if stats.success_count < stats.total_runs {
@@ -585,24 +587,23 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
                             let savings = wasted_tasks_per_month * TASK_PRICE;
                             
                             let explanation = format!(
-                                "Based on ${:.2} per task, {} actions before filter, and {:.0}% filter rejection rate from {} executions",
+                                "Based on ${:.2} per task, {} actions before filter, and {:.0}% actual filter rejection rate from {} executions",
                                 TASK_PRICE,
                                 actions_before_filter,
                                 filter_rejection_rate * 100.0,
                                 stats.total_runs
                             );
-                            (savings, explanation)
+                            (savings, explanation, false) // false = using actual data
                         } else {
-                            (0.0, "Insufficient execution data for savings calculation".to_string())
+                            (0.0, "Insufficient execution data for savings calculation".to_string(), true) // true = fallback
                         }
                     } else {
                         // Fallback calculation without task history (30% conservative estimate)
                         let explanation = format!(
-                            "Estimated savings based on ${:.2} per task and {}% conservative filter rejection rate (no execution data available)",
-                            TASK_PRICE,
+                            "Estimated using industry average {}% fallback (no execution data available)",
                             (LATE_FILTER_FALLBACK_RATE * 100.0) as u32
                         );
-                        (0.0, explanation) // Return 0 without data to be conservative
+                        (0.0, explanation, true) // true = using fallback estimate
                     };
                     
                     return Some(EfficiencyFlag {
@@ -626,6 +627,7 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
                         // Dynamic savings calculation
                         estimated_monthly_savings: monthly_savings,
                         savings_explanation,
+                        is_fallback, // Track whether we used actual data or fallback estimate
                     });
                 }
             }
@@ -666,21 +668,21 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
     
     if is_polling {
         // Calculate savings: 20% reduction from polling overhead
-        let (monthly_savings, savings_explanation) = if let Some(stats) = &zap.usage_stats {
+        // NOTE: Polling trigger savings are ALWAYS fallback/estimated (no way to measure actual overhead)
+        let (monthly_savings, savings_explanation, has_execution_data) = if let Some(stats) = &zap.usage_stats {
             if stats.total_runs > 0 {
                 let savings = (stats.total_runs as f32) * TASK_PRICE * POLLING_REDUCTION_RATE;
                 let explanation = format!(
-                    "Based on ${:.2} per task and estimated {}% reduction from {} polling executions",
-                    TASK_PRICE,
+                    "Estimated using industry average {}% fallback from {} polling executions",
                     (POLLING_REDUCTION_RATE * 100.0) as u32,
                     stats.total_runs
                 );
-                (savings, explanation)
+                (savings, explanation, true) // has execution count, but savings % is still estimate
             } else {
-                (0.0, "Insufficient execution data for savings calculation".to_string())
+                (0.0, "Insufficient execution data for savings calculation".to_string(), false)
             }
         } else {
-            (0.0, "Insufficient execution data for savings calculation".to_string())
+            (0.0, "Insufficient execution data for savings calculation".to_string(), false)
         };
         
         Some(EfficiencyFlag {
@@ -702,6 +704,7 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
             // Dynamic savings calculation
             estimated_monthly_savings: monthly_savings,
             savings_explanation,
+            is_fallback: !has_execution_data || monthly_savings > 0.0, // Always fallback for polling (no way to measure actual overhead)
         })
     } else {
         None
