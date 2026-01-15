@@ -210,13 +210,21 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   yPos += 15;
   
   // Executive Summary Section
-  pdf.setFillColor(241, 245, 249); // slate-100
-  pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+  const headerHeight = 12;
+  const headerY = yPos - 5;
   
+  // Background with rounded corners and border
+  pdf.setFillColor(241, 245, 249); // slate-100
+  pdf.setDrawColor(193, 199, 208); // darker slate (20% darker)
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(margin - 5, headerY, contentWidth + 10, headerHeight, 2, 2, 'FD');
+  
+  // Centered heading text
   pdf.setTextColor(15, 23, 42);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('EXECUTIVE SUMMARY', margin, yPos + 5);
+  const headerTextY = headerY + (headerHeight / 2) + 2; // Perfect vertical centering
+  pdf.text('EXECUTIVE SUMMARY', margin, headerTextY);
   
   yPos += 20;
   
@@ -293,18 +301,25 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   if (reliabilityFlags.length > 0) {
     checkPageBreak(20);
     
-    pdf.setFillColor(254, 202, 202); // rose-200
-    pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+    const relHeaderY = yPos - 5;
     
+    // Background with rounded corners and border
+    pdf.setFillColor(254, 202, 202); // rose-200
+    pdf.setDrawColor(203, 162, 162); // 20% darker rose
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(margin - 5, relHeaderY, contentWidth + 10, headerHeight, 2, 2, 'FD');
+    
+    // Centered heading text and secondary text on same baseline
     pdf.setTextColor(220, 38, 38); // rose-600
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('[!] RELIABILITY CONCERNS', margin, yPos + 5);
+    pdf.text('[!] RELIABILITY CONCERNS', margin, headerTextY);
     
+    // Secondary text aligned to right on same baseline
     pdf.setTextColor(71, 85, 105);
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`${reliabilityFlags.length} Zap${reliabilityFlags.length > 1 ? 's' : ''} with high error rates`, pageWidth - margin, yPos + 5, { align: 'right' });
+    pdf.text(`${reliabilityFlags.length} Zap${reliabilityFlags.length > 1 ? 's' : ''} with high error rates`, pageWidth - margin - 5, headerTextY, { align: 'right' });
     
     yPos += 20;
     
@@ -451,18 +466,25 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   if (efficiencyFlags.length > 0) {
     checkPageBreak(20);
     
-    pdf.setFillColor(241, 245, 249);
-    pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+    const effHeaderY = yPos - 5;
     
+    // Background with rounded corners and border
+    pdf.setFillColor(241, 245, 249);
+    pdf.setDrawColor(193, 199, 208);
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(margin - 5, effHeaderY, contentWidth + 10, headerHeight, 2, 2, 'FD');
+    
+    // Centered heading text and secondary text on same baseline
     pdf.setTextColor(15, 23, 42);
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('EFFICIENCY FINDINGS', margin, yPos + 5);
+    pdf.text('EFFICIENCY FINDINGS', margin, headerTextY);
     
+    // Secondary text aligned to right on same baseline
     pdf.setTextColor(71, 85, 105);
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`${efficiencyFlags.length} optimization ${efficiencyFlags.length === 1 ? 'opportunity' : 'opportunities'}`, pageWidth - margin, yPos + 5, { align: 'right' });
+    pdf.text(`${efficiencyFlags.length} optimization ${efficiencyFlags.length === 1 ? 'opportunity' : 'opportunities'}`, pageWidth - margin - 5, headerTextY, { align: 'right' });
     
     yPos += 20;
     
@@ -557,18 +579,25 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     yPos = margin;
   }
   
-  pdf.setFillColor(241, 245, 249);
-  pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+  const appHeaderY = yPos - 5;
   
+  // Background with rounded corners and border
+  pdf.setFillColor(241, 245, 249);
+  pdf.setDrawColor(193, 199, 208);
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(margin - 5, appHeaderY, contentWidth + 10, headerHeight, 2, 2, 'FD');
+  
+  // Centered heading text and secondary text on same baseline
   pdf.setTextColor(15, 23, 42);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('APP INVENTORY', margin, yPos + 5);
+  pdf.text('APP INVENTORY', margin, headerTextY);
   
+  // Secondary text aligned to right on same baseline
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
-  pdf.text(`${result.apps.length} unique applications detected`, pageWidth - margin, yPos + 5, { align: 'right' });
+  pdf.text(`${result.apps.length} unique applications detected`, pageWidth - margin - 5, headerTextY, { align: 'right' });
   
   yPos += 18;
   
