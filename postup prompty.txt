@@ -1,14 +1,18 @@
 
 reset
 **********************
-_1_Inicializačný prompt pre Cline (Skopíruj do chatu):
-Keď už máš tieto súbory v priečinku .cline/, spusti projekt týmto v slovenčine:
-    "Cline, pozri si pravidlá v .cline/. Ideme stavať Zapier Local Audit Tool.
-    Inicializuj Vite projekt s TypeScriptom (vanilla).
-    Priprav štruktúru pre Rust/WASM v priečinku /src-wasm.
-    Navrhni základný HTML/Tailwind layout pre 'Dropzone', kde používateľ nahrá Zapier ZIP.
-    Komunikuj so mnou po slovensky, ale všetok kód a UI musí byť v angličtine podľa našich pravidiel.
-    Ukáž mi najprv plán, než začneš generovať súbory."
+"Cline, vitaj v novom Codespace. Predtým, než začneš písať akýkoľvek kód, musíš vykonať hĺbkovú analýzu projektu, aby si pochopil jeho aktuálny stav a pravidlá. Nateraz nepíš žiaden kód, len študuj.
+Tvoje úlohy:
+-Pravidlá a roly: Naštuduj si súbory v adresári .cline/ (najmä rules.md, ai-agent.md, report-tone.md). Tieto definujú tvoju identitu ako seniorného audítora a technické pravidlá projektu (napr. jazykovú politiku: komunikácia v slovenčine, artefakty v angličtine).
+-Aktuálny stav projektu: Prečítaj si dokumenty v doc/: Pruduct_status_report 14.1.2026.md a Pruduct_status_technical_debt.md. Potrebujem, aby si presne vedel, čo je hotové a kde nás tlačí technický dlh.
+-Technický audit: Pozri sa na štruktúru súborov, najmä na prepojenie medzi Rust engine-om (src-wasm/src/lib.rs) a TypeScript frontendom (src/main.ts, src/pdfGenerator.ts).
+-Heuristiky: Preštuduj si zapier-heuristics.md, aby si rozumel, ako analyzujeme zlyhania a efektivitu Zapov.
+-Po analýze mi odpovedz v slovenčine a uveď:
+-Zhrnutie tvojho pochopenia projektu (čo je cieľom aplikácie).
+-Potvrdenie, že rozumieš technickým obmedzeniam (WASM buildy, jazyková politika).
+-Tvoj pohľad na aktuálny technický dlh, ktorý si našiel v dokumentácii.
+
+Nezapisuj žiadne zmeny, kým ti nepotvrdím tvoj plán."
 
 ********************
 
