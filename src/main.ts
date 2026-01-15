@@ -309,13 +309,21 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     yPos += 20;
     
     reliabilityFlags.forEach((flag, index) => {
-      // Auto-paging: check if we need a new page (with smaller threshold for reliability items)
-      checkPageBreak(50);
+      // Calculate dynamic height based on content
+      let estimatedHeight = 50;
       
-      // Flag box
+      // Add extra space for enhanced analytics if present
+      if (flag.error_trend || flag.most_common_error || (flag.max_streak && flag.max_streak > 0)) {
+        estimatedHeight += 15;
+      }
+      
+      // Auto-paging: check if we need a new page
+      checkPageBreak(estimatedHeight);
+      
+      // Flag box - dynamic height
       const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 202, 202] : [254, 243, 199];
       pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
-      pdf.roundedRect(margin, yPos, contentWidth, 45, 2, 2, 'F');
+      pdf.roundedRect(margin, yPos, contentWidth, estimatedHeight, 2, 2, 'F');
       
       // Severity badge
       const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] : [217, 119, 6];
@@ -339,14 +347,86 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       const messageLines = pdf.splitTextToSize(flag.message, contentWidth - 10);
       pdf.text(messageLines, margin + 3, yPos + 15);
       
+      let detailYPos = yPos + 15 + (messageLines.length * 4);
+      
       // Flag details
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
       const detailLines = pdf.splitTextToSize(flag.details, contentWidth - 10);
-      pdf.text(detailLines, margin + 3, yPos + 15 + (messageLines.length * 4));
+      pdf.text(detailLines, margin + 3, detailYPos);
       
-      yPos += 50;
+      detailYPos += (detailLines.length * 4) + 5;
+      
+      // Enhanced Analytics Section (only if data exists)
+      if (flag.error_trend || flag.most_common_error || (flag.max_streak && flag.max_streak > 0)) {
+        // Divider line
+        pdf.setDrawColor(203, 213, 225); // slate-300
+        pdf.line(margin + 5, detailYPos - 2, pageWidth - margin - 5, detailYPos - 2);
+        
+        detailYPos += 3;
+        
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(71, 85, 105);
+        pdf.text('ERROR ANALYTICS:', margin + 5, detailYPos);
+        
+        detailYPos += 5;
+        
+        // Error Trend
+        if (flag.error_trend) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8);
+          
+          let trendText = '';
+          let trendColor: [number, number, number] = [71, 85, 105];
+          
+          if (flag.error_trend === 'increasing') {
+            trendText = 'Trend: DETERIORATING';
+            trendColor = [220, 38, 38]; // red - rose-600
+          } else if (flag.error_trend === 'decreasing') {
+            trendText = 'Trend: IMPROVING';
+            trendColor = [22, 163, 74]; // green - emerald-600
+          } else {
+            trendText = 'Trend: Stable';
+          }
+          
+          pdf.setTextColor(trendColor[0], trendColor[1], trendColor[2]);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(trendText, margin + 7, detailYPos);
+          detailYPos += 4;
+        }
+        
+        // Max Streak
+        if (flag.max_streak && flag.max_streak > 0) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8);
+          pdf.setTextColor(71, 85, 105);
+          pdf.text(`Max consecutive failures: ${flag.max_streak}`, margin + 7, detailYPos);
+          detailYPos += 4;
+        }
+        
+        // Most Common Error
+        if (flag.most_common_error) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8);
+          pdf.setTextColor(71, 85, 105);
+          const errorPrefix = 'Most common error: ';
+          pdf.text(errorPrefix, margin + 7, detailYPos);
+          
+          // Error message in italic
+          pdf.setFont('helvetica', 'italic');
+          pdf.setTextColor(107, 114, 128); // gray-500
+          const errorLines = pdf.splitTextToSize(
+            flag.most_common_error, 
+            contentWidth - 20 - pdf.getTextWidth(errorPrefix)
+          );
+          pdf.text(errorLines, margin + 7 + pdf.getTextWidth(errorPrefix), detailYPos);
+          detailYPos += (errorLines.length * 4);
+        }
+      }
+      
+      yPos += estimatedHeight + 5;
     });
     
     yPos += 5;

@@ -4,3 +4,7 @@ data/
 *.log
 .DS_Store
 .throttle-config.json
+
+# Rust build artifacts
+src-wasm/target/
+src-wasm/pkg/

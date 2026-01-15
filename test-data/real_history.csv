@@ -1,0 +1,46 @@
+zap_id,zap_name,execution_id,status,timestamp,error_message
+1001,RSS to Slack - Polling Issue,exec_001,success,2025-01-01T08:00:00Z,
+1001,RSS to Slack - Polling Issue,exec_002,success,2025-01-01T09:00:00Z,
+1001,RSS to Slack - Polling Issue,exec_003,success,2025-01-01T10:00:00Z,
+1001,RSS to Slack - Polling Issue,exec_004,success,2025-01-01T11:00:00Z,
+1001,RSS to Slack - Polling Issue,exec_005,error,2025-01-01T12:00:00Z,Rate limit exceeded
+1001,RSS to Slack - Polling Issue,exec_006,success,2025-01-01T13:00:00Z,
+1001,RSS to Slack - Polling Issue,exec_007,error,2025-01-01T14:00:00Z,Rate limit exceeded
+1001,RSS to Slack - Polling Issue,exec_008,error,2025-01-01T15:00:00Z,Rate limit exceeded
+1001,RSS to Slack - Polling Issue,exec_009,error,2025-01-01T16:00:00Z,Connection timeout
+1001,RSS to Slack - Polling Issue,exec_010,error,2025-01-01T17:00:00Z,Rate limit exceeded
+1001,RSS to Slack - Polling Issue,exec_011,error,2025-01-01T18:00:00Z,Rate limit exceeded
+1001,RSS to Slack - Polling Issue,exec_012,success,2025-01-01T19:00:00Z,
+1001,RSS to Slack - Polling Issue,exec_013,error,2025-01-01T20:00:00Z,Rate limit exceeded
+1001,RSS to Slack - Polling Issue,exec_014,error,2025-01-01T21:00:00Z,Rate limit exceeded
+1001,RSS to Slack - Polling Issue,exec_015,error,2025-01-01T22:00:00Z,Rate limit exceeded
+1002,Webhook to Slack with Late Filter,exec_101,error,2025-01-01T08:00:00Z,Invalid webhook payload
+1002,Webhook to Slack with Late Filter,exec_102,error,2025-01-01T09:00:00Z,Invalid webhook payload
+1002,Webhook to Slack with Late Filter,exec_103,error,2025-01-01T10:00:00Z,Authentication failed
+1002,Webhook to Slack with Late Filter,exec_104,error,2025-01-01T11:00:00Z,Invalid webhook payload
+1002,Webhook to Slack with Late Filter,exec_105,error,2025-01-01T12:00:00Z,Authentication failed
+1002,Webhook to Slack with Late Filter,exec_106,success,2025-01-01T13:00:00Z,
+1002,Webhook to Slack with Late Filter,exec_107,error,2025-01-01T14:00:00Z,Invalid webhook payload
+1002,Webhook to Slack with Late Filter,exec_108,success,2025-01-01T15:00:00Z,
+1002,Webhook to Slack with Late Filter,exec_109,success,2025-01-01T16:00:00Z,
+1002,Webhook to Slack with Late Filter,exec_110,success,2025-01-01T17:00:00Z,
+1002,Webhook to Slack with Late Filter,exec_111,success,2025-01-01T18:00:00Z,
+1002,Webhook to Slack with Late Filter,exec_112,success,2025-01-01T19:00:00Z,
+1002,Webhook to Slack with Late Filter,exec_113,success,2025-01-01T20:00:00Z,
+1002,Webhook to Slack with Late Filter,exec_114,success,2025-01-01T21:00:00Z,
+1002,Webhook to Slack with Late Filter,exec_115,success,2025-01-01T22:00:00Z,
+1003,Critical Payment Processor,exec_201,success,2025-01-01T08:00:00Z,
+1003,Critical Payment Processor,exec_202,success,2025-01-01T09:00:00Z,
+1003,Critical Payment Processor,exec_203,error,2025-01-01T10:00:00Z,Database connection lost
+1003,Critical Payment Processor,exec_204,error,2025-01-01T11:00:00Z,Database connection lost
+1003,Critical Payment Processor,exec_205,error,2025-01-01T12:00:00Z,Database connection lost
+1003,Critical Payment Processor,exec_206,error,2025-01-01T13:00:00Z,Database connection lost
+1003,Critical Payment Processor,exec_207,error,2025-01-01T14:00:00Z,Database connection lost
+1003,Critical Payment Processor,exec_208,error,2025-01-01T15:00:00Z,Database connection lost
+1003,Critical Payment Processor,exec_209,error,2025-01-01T16:00:00Z,Database connection lost
+1003,Critical Payment Processor,exec_210,success,2025-01-01T17:00:00Z,
+1003,Critical Payment Processor,exec_211,success,2025-01-01T18:00:00Z,
+1003,Critical Payment Processor,exec_212,success,2025-01-01T19:00:00Z,
+1003,Critical Payment Processor,exec_213,success,2025-01-01T20:00:00Z,
+1003,Critical Payment Processor,exec_214,success,2025-01-01T21:00:00Z,
+1003,Critical Payment Processor,exec_215,success,2025-01-01T22:00:00Z,

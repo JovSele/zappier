@@ -296,25 +296,66 @@ fn attach_usage_stats(zapfile: &mut ZapFile, task_history_map: &HashMap<u64, Usa
 
 /// Detect error loops (high failure rate in Zap executions)
 /// Flags Zaps where error rate exceeds 10% threshold
+/// Enhanced with trend analysis, streak detection, and common error identification
 fn detect_error_loop(zap: &Zap) -> Option<EfficiencyFlag> {
     if let Some(stats) = &zap.usage_stats {
         // Only flag if there's actual execution data and error rate exceeds threshold
         if stats.total_runs > 0 && stats.error_rate > 10.0 {
+            // Build enhanced details message with analytics
+            let mut details = format!(
+                "This Zap has experienced {} errors out of {} total runs ({:.1}% error rate). ",
+                stats.error_count,
+                stats.total_runs,
+                stats.error_rate
+            );
+            
+            // Add trend information if available
+            if let Some(ref trend) = stats.error_trend {
+                let trend_msg = match trend.as_str() {
+                    "increasing" => "⚠️ Error rate is INCREASING over time, indicating a worsening issue.",
+                    "decreasing" => "✓ Error rate is decreasing, showing signs of improvement.",
+                    "stable" => "Error rate has remained stable.",
+                    _ => "",
+                };
+                if !trend_msg.is_empty() {
+                    details.push_str(trend_msg);
+                    details.push(' ');
+                }
+            }
+            
+            // Add streak information if significant
+            if stats.max_streak > 3 {
+                details.push_str(&format!(
+                    "Critical: Maximum consecutive failure streak of {} executions detected. ",
+                    stats.max_streak
+                ));
+            }
+            
+            // Add most common error if available
+            if let Some(ref error) = stats.most_common_error {
+                details.push_str(&format!(
+                    "Most common error: '{}'. ",
+                    error
+                ));
+            }
+            
+            details.push_str(
+                "High error rates indicate potential configuration issues, authentication problems, \
+                or incompatible data formats. Review recent error logs and fix the underlying issues \
+                to avoid wasting tasks on failed executions."
+            );
+            
             return Some(EfficiencyFlag {
                 zap_id: zap.id,
                 zap_title: zap.title.clone(),
                 flag_type: "error_loop".to_string(),
                 severity: if stats.error_rate > 50.0 { "high" } else { "medium" }.to_string(),
                 message: format!("High error rate detected: {:.1}%", stats.error_rate),
-                details: format!(
-                    "This Zap has experienced {} errors out of {} total runs ({:.1}% error rate). \
-                    High error rates indicate potential configuration issues, authentication problems, \
-                    or incompatible data formats. Review recent error logs and fix the underlying issues \
-                    to avoid wasting tasks on failed executions.",
-                    stats.error_count,
-                    stats.total_runs,
-                    stats.error_rate
-                ),
+                details,
+                // Pass enhanced analytics to frontend
+                most_common_error: stats.most_common_error.clone(),
+                error_trend: stats.error_trend.clone(),
+                max_streak: Some(stats.max_streak),
             });
         }
     }
@@ -521,6 +562,10 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
                             index + 1,
                             actions_before_filter
                         ),
+                        // Not applicable for this flag type
+                        most_common_error: None,
+                        error_trend: None,
+                        max_streak: None,
                     });
                 }
             }
@@ -572,6 +617,10 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
                 could be used instead for real-time processing and reduced task consumption.",
                 app_name
             ),
+            // Not applicable for this flag type
+            most_common_error: None,
+            error_trend: None,
+            max_streak: None,
         })
     } else {
         None
