@@ -358,6 +358,20 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       
       detailYPos += (detailLines.length * 4) + 5;
       
+      // Savings display (if available)
+      if (flag.estimated_monthly_savings > 0) {
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(107, 114, 128); // gray-500
+        pdf.text(`💰 Est. savings: $${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 5, detailYPos);
+        detailYPos += 4;
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(7);
+        const explanationLines = pdf.splitTextToSize(flag.savings_explanation, contentWidth - 15);
+        pdf.text(explanationLines, margin + 5, detailYPos);
+        detailYPos += (explanationLines.length * 3) + 3;
+      }
+      
       // Enhanced Analytics Section (only if data exists)
       if (flag.error_trend || flag.most_common_error || (flag.max_streak && flag.max_streak > 0)) {
         // Divider line
@@ -491,7 +505,24 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
       const detailLines = pdf.splitTextToSize(flag.details, contentWidth - 10);
-      pdf.text(detailLines, margin + 3, yPos + 15 + (messageLines.length * 4));
+      let detailYPos = yPos + 15 + (messageLines.length * 4);
+      pdf.text(detailLines, margin + 3, detailYPos);
+      
+      detailYPos += (detailLines.length * 4) + 5;
+      
+      // Savings display (if available)
+      if (flag.estimated_monthly_savings > 0) {
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(107, 114, 128); // gray-500
+        pdf.text(`💰 Est. savings: $${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 5, detailYPos);
+        detailYPos += 4;
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(7);
+        const explanationLines = pdf.splitTextToSize(flag.savings_explanation, contentWidth - 15);
+        pdf.text(explanationLines, margin + 5, detailYPos);
+        detailYPos += (explanationLines.length * 3);
+      }
       
       yPos += 45;
     });
@@ -650,6 +681,9 @@ interface ParseResult {
     most_common_error?: string;
     error_trend?: string; // "increasing", "stable", "decreasing"
     max_streak?: number;
+    // Dynamic savings calculation
+    estimated_monthly_savings: number; // in USD
+    savings_explanation: string; // How savings were calculated
   }>;
   efficiency_score: number;
   estimated_savings: number;

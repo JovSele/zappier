@@ -5,6 +5,14 @@ use zip::ZipArchive;
 use serde::{Deserialize, Serialize};
 use csv::ReaderBuilder;
 
+// Pricing constants for savings calculations
+const TASK_PRICE: f32 = 0.02; // $0.02 per task (conservative estimate)
+const MONTHS_PER_YEAR: u32 = 12;
+
+// Savings calculation constants (conservative percentages)
+const POLLING_REDUCTION_RATE: f32 = 0.20; // 20% reduction from polling overhead
+const LATE_FILTER_FALLBACK_RATE: f32 = 0.30; // 30% fallback if no task history
+
 // Triple stores metadata
 #[derive(Debug, Deserialize, Serialize)]
 struct TripleStores {
@@ -109,6 +117,9 @@ struct EfficiencyFlag {
     most_common_error: Option<String>,
     error_trend: Option<String>,
     max_streak: Option<u32>,
+    // Dynamic savings calculation
+    estimated_monthly_savings: f32, // in USD
+    savings_explanation: String, // How savings were calculated
 }
 
 #[derive(Serialize)]
@@ -345,6 +356,14 @@ fn detect_error_loop(zap: &Zap) -> Option<EfficiencyFlag> {
                 to avoid wasting tasks on failed executions."
             );
             
+            // Calculate dynamic savings: each error = wasted task
+            let monthly_savings = (stats.error_count as f32) * TASK_PRICE;
+            let savings_explanation = format!(
+                "Based on ${:.2} per task and eliminating {} failed executions",
+                TASK_PRICE,
+                stats.error_count
+            );
+            
             return Some(EfficiencyFlag {
                 zap_id: zap.id,
                 zap_title: zap.title.clone(),
@@ -356,6 +375,9 @@ fn detect_error_loop(zap: &Zap) -> Option<EfficiencyFlag> {
                 most_common_error: stats.most_common_error.clone(),
                 error_trend: stats.error_trend.clone(),
                 max_streak: Some(stats.max_streak),
+                // Dynamic savings calculation
+                estimated_monthly_savings: monthly_savings,
+                savings_explanation,
             });
         }
     }
@@ -548,6 +570,41 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
                 
                 // Only flag if there are actual action steps before the filter
                 if actions_before_filter > 0 {
+                    // Calculate savings based on task history if available
+                    let (monthly_savings, savings_explanation) = if let Some(stats) = &zap.usage_stats {
+                        if stats.total_runs > 0 {
+                            // Calculate filter rejection rate from execution history
+                            let filter_rejection_rate = if stats.success_count < stats.total_runs {
+                                ((stats.total_runs - stats.success_count) as f32) / (stats.total_runs as f32)
+                            } else {
+                                LATE_FILTER_FALLBACK_RATE // Use fallback if no rejections detected
+                            };
+                            
+                            // Wasted tasks = actions_before_filter * rejected_items
+                            let wasted_tasks_per_month = (stats.total_runs as f32) * (actions_before_filter as f32) * filter_rejection_rate;
+                            let savings = wasted_tasks_per_month * TASK_PRICE;
+                            
+                            let explanation = format!(
+                                "Based on ${:.2} per task, {} actions before filter, and {:.0}% filter rejection rate from {} executions",
+                                TASK_PRICE,
+                                actions_before_filter,
+                                filter_rejection_rate * 100.0,
+                                stats.total_runs
+                            );
+                            (savings, explanation)
+                        } else {
+                            (0.0, "Insufficient execution data for savings calculation".to_string())
+                        }
+                    } else {
+                        // Fallback calculation without task history (30% conservative estimate)
+                        let explanation = format!(
+                            "Estimated savings based on ${:.2} per task and {}% conservative filter rejection rate (no execution data available)",
+                            TASK_PRICE,
+                            (LATE_FILTER_FALLBACK_RATE * 100.0) as u32
+                        );
+                        (0.0, explanation) // Return 0 without data to be conservative
+                    };
+                    
                     return Some(EfficiencyFlag {
                         zap_id: zap.id,
                         zap_title: zap.title.clone(),
@@ -566,6 +623,9 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
                         most_common_error: None,
                         error_trend: None,
                         max_streak: None,
+                        // Dynamic savings calculation
+                        estimated_monthly_savings: monthly_savings,
+                        savings_explanation,
                     });
                 }
             }
@@ -605,6 +665,24 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
         .any(|&polling_app| app_name.contains(polling_app));
     
     if is_polling {
+        // Calculate savings: 20% reduction from polling overhead
+        let (monthly_savings, savings_explanation) = if let Some(stats) = &zap.usage_stats {
+            if stats.total_runs > 0 {
+                let savings = (stats.total_runs as f32) * TASK_PRICE * POLLING_REDUCTION_RATE;
+                let explanation = format!(
+                    "Based on ${:.2} per task and estimated {}% reduction from {} polling executions",
+                    TASK_PRICE,
+                    (POLLING_REDUCTION_RATE * 100.0) as u32,
+                    stats.total_runs
+                );
+                (savings, explanation)
+            } else {
+                (0.0, "Insufficient execution data for savings calculation".to_string())
+            }
+        } else {
+            (0.0, "Insufficient execution data for savings calculation".to_string())
+        };
+        
         Some(EfficiencyFlag {
             zap_id: zap.id,
             zap_title: zap.title.clone(),
@@ -621,6 +699,9 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
             most_common_error: None,
             error_trend: None,
             max_streak: None,
+            // Dynamic savings calculation
+            estimated_monthly_savings: monthly_savings,
+            savings_explanation,
         })
     } else {
         None
@@ -707,17 +788,13 @@ fn calculate_efficiency_score(flags: &[EfficiencyFlag]) -> u32 {
 }
 
 /// Calculate estimated monthly savings based on efficiency flags
-/// High severity (late filter): $15/month per affected Zap
-/// Medium severity (polling): $5/month per affected Zap
+/// Uses dynamic calculations from individual flags
 fn calculate_estimated_savings(flags: &[EfficiencyFlag]) -> f32 {
     let mut total_savings: f32 = 0.0;
     
+    // Sum up dynamically calculated savings from each flag
     for flag in flags {
-        match (flag.flag_type.as_str(), flag.severity.as_str()) {
-            ("late_filter_placement", "high") => total_savings += 15.0,
-            ("polling_trigger", "medium") => total_savings += 5.0,
-            _ => {}
-        }
+        total_savings += flag.estimated_monthly_savings;
     }
     
     total_savings
