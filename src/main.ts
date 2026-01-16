@@ -401,26 +401,38 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       }).h;
       detailYPos += detailsHeight + 5;
             
+
       // Savings display (if available)
       if (flag.estimated_monthly_savings > 0) {
-        pdf.setFillColor(16, 185, 129); // emerald-500
-        pdf.roundedRect(margin + 5, detailYPos - 2.5, 3, 3, 0.5, 0.5, 'F'); // malý zelený štvorček
+        pdf.setFillColor(16, 185, 129);
+        pdf.roundedRect(margin + 5, detailYPos - 2.5, 3, 3, 0.5, 0.5, 'F');
+        
+        // ✅ BOLD pre "Est. savings:" + hodnotu
         pdf.setFontSize(8);
-        pdf.setTextColor(107, 114, 128); // gray-500
+        pdf.setTextColor(107, 114, 128);
         pdf.setFont('helvetica', 'bold');
-        pdf.text(`Est. savings: $${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 10, detailYPos);
+        pdf.text(`Est. savings: `, margin + 10, detailYPos);
+        
+        // ✅ BOLD pre číslo
+        const labelWidth = pdf.getTextWidth('Est. savings: ');
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`$${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 10 + labelWidth, detailYPos);
         detailYPos += 4;
-        pdf.setFont('helvetica', 'italic');
+        
+        // ✅ TMAVOSIVÝ text pre vysvetlivku
+        pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(7);
+        pdf.setTextColor(100, 100, 100); // Tmavosivá
         const explanationLines = pdf.splitTextToSize(flag.savings_explanation, contentWidth - 25);
         pdf.text(explanationLines, margin + 10, detailYPos);
         detailYPos += (explanationLines.length * 3) + 3;
       }
       
+      
       // Enhanced Analytics Section (only if data exists)
       if (flag.error_trend || flag.most_common_error || (flag.max_streak && flag.max_streak > 0)) {
         // Divider line
-        pdf.setDrawColor(203, 213, 225); // slate-300
+        pdf.setDrawColor(203, 213, 225);
         pdf.line(margin + 5, detailYPos - 2, pageWidth - margin - 5, detailYPos - 2);
         
         detailYPos += 3;
@@ -432,7 +444,11 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
         
         detailYPos += 5;
         
-        // Error Trend
+        // ✅ 2-STĹPCOVÝ LAYOUT - Trend a Max Streak vedľa seba
+        const column1X = margin + 7;
+        const column2X = margin + (contentWidth / 2);
+        
+        // Error Trend (ľavý stĺpec)
         if (flag.error_trend) {
           pdf.setFont('helvetica', 'normal');
           pdf.setFontSize(8);
@@ -442,28 +458,35 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
           
           if (flag.error_trend === 'increasing') {
             trendText = 'Trend: DETERIORATING';
-            trendColor = [220, 38, 38]; // red - rose-600
+            trendColor = [220, 38, 38];
           } else if (flag.error_trend === 'decreasing') {
             trendText = 'Trend: IMPROVING';
-            trendColor = [22, 163, 74]; // green - emerald-600
+            trendColor = [22, 163, 74];
           } else {
             trendText = 'Trend: Stable';
           }
           
           pdf.setTextColor(trendColor[0], trendColor[1], trendColor[2]);
           pdf.setFont('helvetica', 'bold');
-          pdf.text(trendText, margin + 7, detailYPos);
-          detailYPos += 4;
+          pdf.text(trendText, column1X, detailYPos);
         }
         
-        // Max Streak
+        // Max Streak (pravý stĺpec)
         if (flag.max_streak && flag.max_streak > 0) {
           pdf.setFont('helvetica', 'normal');
           pdf.setFontSize(8);
           pdf.setTextColor(71, 85, 105);
-          pdf.text(`Max consecutive failures: ${flag.max_streak}`, margin + 7, detailYPos);
-          detailYPos += 4;
+          
+          // Label normal
+          pdf.text('Max failures: ', column2X, detailYPos);
+          
+          // ✅ BOLD pre číslo
+          const labelWidth = pdf.getTextWidth('Max failures: ');
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`${flag.max_streak}`, column2X + labelWidth, detailYPos);
         }
+        
+        detailYPos += 4;
         
         // Most Common Error
         if (flag.most_common_error) {
@@ -591,20 +614,46 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       detailYPos += detailsHeight + 5;
       
       // Savings display (if available)
+      // Savings display (Efficiency Flags) – unified style
       if (flag.estimated_monthly_savings > 0) {
-        pdf.setFillColor(16, 185, 129); // emerald-500
-        pdf.roundedRect(margin + 5, detailYPos - 2.5, 3, 3, 0.5, 0.5, 'F'); // malý zelený štvorček
+        pdf.setFillColor(16, 185, 129);
+        pdf.roundedRect(margin + 5, detailYPos - 2.5, 3, 3, 0.5, 0.5, 'F');
+
         pdf.setFontSize(8);
-        pdf.setTextColor(107, 114, 128); // gray-500
+
+        // Label
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(71, 85, 105);
+        const label = 'Est. savings: ';
+        pdf.text(label, margin + 10, detailYPos);
+
+        // Value (BOLD)
+        const labelWidth = pdf.getTextWidth(label);
         pdf.setFont('helvetica', 'bold');
-        pdf.text(`Est. savings: $${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 10, detailYPos);
+        pdf.text(
+          `$${flag.estimated_monthly_savings.toFixed(2)}/month`,
+          margin + 10 + labelWidth,
+          detailYPos
+        );
+
         detailYPos += 4;
-        pdf.setFont('helvetica', 'italic');
-        pdf.setFontSize(7);
-        const explanationLines = pdf.splitTextToSize(flag.savings_explanation, contentWidth - 15);
-        pdf.text(explanationLines, margin + 5, detailYPos);
-        detailYPos += (explanationLines.length * 3);
+
+        // Explanation (tmavosivá, nie italic)
+        if (flag.savings_explanation) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(7);
+          pdf.setTextColor(100, 100, 100);
+
+          const explanationLines = pdf.splitTextToSize(
+            flag.savings_explanation,
+            contentWidth - 25
+          );
+
+          pdf.text(explanationLines, margin + 10, detailYPos);
+          detailYPos += explanationLines.length * 3 + 2;
+        }
       }
+
       
       yPos += estimatedHeight + 5;
     });
@@ -639,8 +688,8 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     yPos = margin;
   }
   
-  pdf.setFillColor(241, 245, 249); // slate-100 background
-  pdf.setDrawColor(200, 200, 200); // border
+  pdf.setFillColor(203, 213, 225); // ✅ ZMENA: slate-300 (tmavšia šedá)
+  pdf.setDrawColor(148, 163, 184); // ✅ ZMENA: slate-400 (tmavší border)
   pdf.setLineWidth(0.5);
   pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
 
@@ -680,7 +729,7 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       
       // Alternating background for readability
       if (index % 2 === 0) {
-        pdf.setFillColor(249, 250, 251);
+        pdf.setFillColor(226, 232, 240);
         pdf.rect(xPos - 2, yPos - 2, columnWidth + 4, itemHeight, 'F');
       }
       
@@ -715,7 +764,7 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       checkPageBreak(10);
       
       if (index % 2 === 0) {
-        pdf.setFillColor(249, 250, 251);
+        pdf.setFillColor(226, 232, 240);
         pdf.rect(margin - 2, yPos - 3, contentWidth + 4, 8, 'F');
       }
       

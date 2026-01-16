@@ -3,11 +3,22 @@
 
 import jsPDF from 'jspdf'
 
+// ========================================
+// DEBUG MODE CONTROL
+// ========================================
+const DEBUG_MODE = false; // Set to true to enable debug grid in PDF
+
 /**
  * Draw debug grid on PDF page for precise element positioning
  * Grid has major lines every 10mm and minor marks every 5mm
+ * Only renders if DEBUG_MODE is true
  */
 export function drawDebugGrid(pdf: jsPDF, pageWidth: number, pageHeight: number): void {
+  // Exit early if debug mode is disabled
+  if (!DEBUG_MODE) {
+    return;
+  }
+  
   // Save current graphics state
   const currentDrawColor = pdf.getDrawColor()
   const currentLineWidth = pdf.getLineWidth()
@@ -177,22 +188,48 @@ export function drawSectionHeaderWithSecondary(
   pdf.text(secondaryText, x + width - padding, secondaryTextY, { align: 'right' })
 }
 /**
- * Sanitize text for PDF rendering
+ * Sanitize text for PDF rendering - ASCII ONLY
  * Removes/replaces special characters that cause rendering issues in jsPDF
+ * 
+ * Strategy:
+ * 1. Replace common special chars with ASCII equivalents
+ * 2. Strip ALL remaining non-ASCII characters [^\x00-\x7F]
+ * 
  * @param text Original text string
- * @returns Sanitized text safe for PDF rendering
+ * @returns Sanitized text safe for PDF rendering (ASCII only)
  */
 export function sanitizeForPDF(text: string): string {
   return text
-    .replace(/✓/g, '[OK]')      // Checkmark → square root (similar looking)
-    .replace(/✗/g, '[X]')      // X mark → lowercase x
-    .replace(/⚠️/g, '[!]')     // Warning emoji → exclamation
-    .replace(/'/g, "'")      // Curly single quote (left)
-    .replace(/'/g, "'")      // Curly single quote (right)
-    .replace(/"/g, '"')      // Curly double quote (left)
-    .replace(/"/g, '"')      // Curly double quote (right)
-    .replace(/—/g, '-')      // Em dash
-    .replace(/–/g, '-')      // En dash
-    .replace(/…/g, '...')    // Ellipsis
-    .replace(/&/g, '&');     // Ampersand HTML entity
+    // Special symbols → ASCII equivalents
+    .replace(/✓/g, 'OK')         // Checkmark → OK
+    .replace(/✗/g, 'X')          // X mark → X
+    .replace(/⚠️/g, '[!]')       // Warning emoji → [!]
+    .replace(/⚡/g, '')           // Lightning emoji → empty
+    .replace(/💸/g, '')           // Money emoji → empty
+    .replace(/🔴/g, '')           // Red circle → empty
+    .replace(/🟡/g, '')           // Yellow circle → empty
+    .replace(/🔵/g, '')           // Blue circle → empty
+    
+    // Quotes → standard ASCII quotes
+    .replace(/['']/g, "'")       // Curly single quotes → straight single quote
+    .replace(/[""]/g, '"')       // Curly double quotes → straight double quote
+    
+    // Dashes → standard ASCII hyphen
+    .replace(/[—–]/g, '-')       // Em dash, en dash → hyphen-minus
+    
+    // Other common chars
+    .replace(/…/g, '...')        // Ellipsis → three dots
+    .replace(/•/g, '*')          // Bullet → asterisk
+    .replace(/×/g, 'x')          // Multiplication sign → x
+    .replace(/÷/g, '/')          // Division sign → slash
+    
+    // HTML entities
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    
+    // FINAL PASS: Remove ALL remaining non-ASCII characters
+    .replace(/[^\x00-\x7F]/g, ''); // Strip anything outside ASCII range (0-127)
 }
