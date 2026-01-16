@@ -2,6 +2,7 @@ import './style.css'
 import init, { hello_world, parse_zapier_export, parse_zapfile_json } from '../src-wasm/pkg/zapier_lighthouse_wasm'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import { drawDebugGrid, sanitizeForPDF } from './pdfHelpers'
 
 // Initialize WASM module
 let wasmReady = false
@@ -165,6 +166,8 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   const margin = 20;
   const contentWidth = pageWidth - 2 * margin;
   
+  pdf.setCharSpace(0);
+
   let yPos = margin;
   
   // Helper function to add a new page if needed
@@ -210,13 +213,15 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   yPos += 15;
   
   // Executive Summary Section
-  pdf.setFillColor(241, 245, 249); // slate-100
-  pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
-  
+  pdf.setFillColor(241, 245, 249); // slate-100 background
+  pdf.setDrawColor(200, 200, 200); // slate-300 border
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
+    
   pdf.setTextColor(15, 23, 42);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('EXECUTIVE SUMMARY', margin, yPos + 5);
+  pdf.text('EXECUTIVE SUMMARY', margin + 5, yPos + 10);
   
   yPos += 20;
   
@@ -293,28 +298,53 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   if (reliabilityFlags.length > 0) {
     checkPageBreak(20);
     
-    pdf.setFillColor(254, 202, 202); // rose-200
-    pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+    pdf.setFillColor(254, 202, 202); // rose-200 background
+    pdf.setDrawColor(220, 38, 38); // rose-600 border
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
     
     pdf.setTextColor(220, 38, 38); // rose-600
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('[!] RELIABILITY CONCERNS', margin, yPos + 5);
+    pdf.text('[!] RELIABILITY CONCERNS', margin + 5, yPos + 10);
     
     pdf.setTextColor(71, 85, 105);
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`${reliabilityFlags.length} Zap${reliabilityFlags.length > 1 ? 's' : ''} with high error rates`, pageWidth - margin, yPos + 5, { align: 'right' });
+    pdf.text(`${reliabilityFlags.length} Zap${reliabilityFlags.length > 1 ? 's' : ''} with high error rates`, 
+            pageWidth - margin - 5, yPos + 10, { align: 'right' });
     
     yPos += 20;
     
     reliabilityFlags.forEach((flag, index) => {
+      // ✅ KOMPLETNÝ RESET na začiatku každého flagu
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setCharSpace(0);
+      pdf.setTextColor(0, 0, 0);
+
+    // 🔍 DEBUG - vypiš do console
+      console.log('Flag details:', flag.details);
+      console.log('Flag details length:', flag.details.length);
+      console.log('Has extra spaces?', flag.details.includes('  '));
+      console.log('=== FLAG #' + (index + 1) + ' ===');
+      console.log('Severity:', flag.severity);
+      console.log('Title:', flag.zap_title);
+      console.log('Message:', flag.message);
+      console.log('Message length:', flag.message.length);
+      console.log('Has checkmark in message?', flag.message.includes('✓'));
+      console.log('Has special chars?', /[^\x00-\x7F]/.test(flag.message));
+
       // Calculate dynamic height based on content
       let estimatedHeight = 50;
       
       // Add extra space for enhanced analytics if present
       if (flag.error_trend || flag.most_common_error || (flag.max_streak && flag.max_streak > 0)) {
-        estimatedHeight += 15;
+        estimatedHeight += 20;
+
+        if (flag.most_common_error && flag.most_common_error.length > 50) {
+          estimatedHeight += 10;
+        }
       }
       
       // Auto-paging: check if we need a new page
@@ -344,31 +374,46 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       pdf.setTextColor(51, 65, 85);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
-      const messageLines = pdf.splitTextToSize(flag.message, contentWidth - 10);
-      pdf.text(messageLines, margin + 3, yPos + 15);
-      
-      let detailYPos = yPos + 15 + (messageLines.length * 4);
-      
+      pdf.setCharSpace(0);
+      let detailYPos = yPos + 15;
+      pdf.text(sanitizeForPDF(flag.message), margin + 8, detailYPos, {
+        maxWidth: contentWidth - 20
+      });
+
+      // Calculate how many lines the message took
+      const messageHeight = pdf.getTextDimensions(sanitizeForPDF(flag.message), {
+        maxWidth: contentWidth - 20
+      }).h;
+      detailYPos += messageHeight + 2;
+
       // Flag details
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
-      const detailLines = pdf.splitTextToSize(flag.details, contentWidth - 10);
-      pdf.text(detailLines, margin + 3, detailYPos);
-      
-      detailYPos += (detailLines.length * 4) + 5;
-      
+      pdf.setCharSpace(0);
+      pdf.text(sanitizeForPDF(flag.details), margin + 8, detailYPos, {
+        maxWidth: contentWidth - 20
+      });
+
+      // Calculate how many lines the details took
+      const detailsHeight = pdf.getTextDimensions(sanitizeForPDF(flag.details), {
+        maxWidth: contentWidth - 20
+      }).h;
+      detailYPos += detailsHeight + 5;
+            
       // Savings display (if available)
       if (flag.estimated_monthly_savings > 0) {
+        pdf.setFillColor(16, 185, 129); // emerald-500
+        pdf.roundedRect(margin + 5, detailYPos - 2.5, 3, 3, 0.5, 0.5, 'F'); // malý zelený štvorček
         pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(107, 114, 128); // gray-500
-        pdf.text(`💰 Est. savings: $${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 5, detailYPos);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`Est. savings: $${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 10, detailYPos);
         detailYPos += 4;
         pdf.setFont('helvetica', 'italic');
         pdf.setFontSize(7);
-        const explanationLines = pdf.splitTextToSize(flag.savings_explanation, contentWidth - 15);
-        pdf.text(explanationLines, margin + 5, detailYPos);
+        const explanationLines = pdf.splitTextToSize(flag.savings_explanation, contentWidth - 25);
+        pdf.text(explanationLines, margin + 10, detailYPos);
         detailYPos += (explanationLines.length * 3) + 3;
       }
       
@@ -430,13 +475,17 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
           
           // Error message in italic
           pdf.setFont('helvetica', 'italic');
-          pdf.setTextColor(107, 114, 128); // gray-500
-          const errorLines = pdf.splitTextToSize(
-            flag.most_common_error, 
-            contentWidth - 20 - pdf.getTextWidth(errorPrefix)
-          );
-          pdf.text(errorLines, margin + 7 + pdf.getTextWidth(errorPrefix), detailYPos);
-          detailYPos += (errorLines.length * 4);
+          pdf.setTextColor(107, 114, 128);
+          pdf.setCharSpace(0); // RESET
+          pdf.text(flag.most_common_error, margin + 7 + pdf.getTextWidth(errorPrefix), detailYPos, {
+            maxWidth: contentWidth - 20 - pdf.getTextWidth(errorPrefix)
+          });
+          
+          // Calculate height
+          const errorHeight = pdf.getTextDimensions(flag.most_common_error, {
+            maxWidth: contentWidth - 20 - pdf.getTextWidth(errorPrefix)
+          }).h;
+          detailYPos += errorHeight;
         }
       }
       
@@ -452,30 +501,47 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     checkPageBreak(20);
     
     pdf.setFillColor(241, 245, 249);
-    pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
+    pdf.setDrawColor(200, 200, 200);
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
     
     pdf.setTextColor(15, 23, 42);
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('EFFICIENCY FINDINGS', margin, yPos + 5);
+    pdf.text('EFFICIENCY FINDINGS', margin + 5, yPos + 10);
     
     pdf.setTextColor(71, 85, 105);
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`${efficiencyFlags.length} optimization ${efficiencyFlags.length === 1 ? 'opportunity' : 'opportunities'}`, pageWidth - margin, yPos + 5, { align: 'right' });
+    pdf.text(`${efficiencyFlags.length} optimization ${efficiencyFlags.length === 1 ? 'opportunity' : 'opportunities'}`, pageWidth - margin - 5, yPos + 10, { align: 'right' });
     
     yPos += 20;
     
     efficiencyFlags.forEach((flag, index) => {
       // Auto-paging: dynamically check space needed
-      checkPageBreak(45);
+      let estimatedHeight = 30; // Base height
+  
+      // Add height for message
+      const messageLines = Math.ceil(flag.message.length / 80);
+      estimatedHeight += messageLines * 5;
       
-      // Flag box
+      // Add height for details
+      const detailLines = Math.ceil(flag.details.length / 80);
+      estimatedHeight += detailLines * 4;
+      
+      // Add height for savings (if present)
+      if (flag.estimated_monthly_savings > 0) {
+        estimatedHeight += 15;
+      }
+      
+      checkPageBreak(estimatedHeight);
+      
+      // Flag box 
       const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 202, 202] : 
-                       flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
+                      flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
       
       pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
-      pdf.roundedRect(margin, yPos, contentWidth, 40, 2, 2, 'F');
+      pdf.roundedRect(margin, yPos, contentWidth, estimatedHeight, 2, 2, 'F'); 
       
       // Severity badge
       const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] : 
@@ -497,25 +563,41 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       pdf.setTextColor(51, 65, 85);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
-      const messageLines = pdf.splitTextToSize(flag.message, contentWidth - 10);
-      pdf.text(messageLines, margin + 3, yPos + 15);
-      
+      let detailYPos = yPos + 15;
+      pdf.setCharSpace(0);
+      pdf.text(sanitizeForPDF(flag.message), margin + 8, detailYPos, {
+        maxWidth: contentWidth - 20
+      });
+
+      // Calculate how many lines the message took
+      const messageHeight = pdf.getTextDimensions(sanitizeForPDF(flag.message), {
+        maxWidth: contentWidth - 20
+      }).h;
+      detailYPos += messageHeight + 2;
+
       // Flag details
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
-      const detailLines = pdf.splitTextToSize(flag.details, contentWidth - 10);
-      let detailYPos = yPos + 15 + (messageLines.length * 4);
-      pdf.text(detailLines, margin + 3, detailYPos);
-      
-      detailYPos += (detailLines.length * 4) + 5;
+      pdf.setCharSpace(0);
+      pdf.text(sanitizeForPDF(flag.details), margin + 8, detailYPos, {
+        maxWidth: contentWidth - 20
+      });
+
+      // Calculate how many lines the details took
+      const detailsHeight = pdf.getTextDimensions(sanitizeForPDF(flag.details), {
+        maxWidth: contentWidth - 20
+      }).h;
+      detailYPos += detailsHeight + 5;
       
       // Savings display (if available)
       if (flag.estimated_monthly_savings > 0) {
+        pdf.setFillColor(16, 185, 129); // emerald-500
+        pdf.roundedRect(margin + 5, detailYPos - 2.5, 3, 3, 0.5, 0.5, 'F'); // malý zelený štvorček
         pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(107, 114, 128); // gray-500
-        pdf.text(`💰 Est. savings: $${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 5, detailYPos);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`Est. savings: $${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 10, detailYPos);
         detailYPos += 4;
         pdf.setFont('helvetica', 'italic');
         pdf.setFontSize(7);
@@ -524,7 +606,7 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
         detailYPos += (explanationLines.length * 3);
       }
       
-      yPos += 45;
+      yPos += estimatedHeight + 5;
     });
   }
   
@@ -557,20 +639,23 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     yPos = margin;
   }
   
-  pdf.setFillColor(241, 245, 249);
-  pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
-  
+  pdf.setFillColor(241, 245, 249); // slate-100 background
+  pdf.setDrawColor(200, 200, 200); // border
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
+
   pdf.setTextColor(15, 23, 42);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('APP INVENTORY', margin, yPos + 5);
-  
+  pdf.text('APP INVENTORY', margin + 5, yPos + 10);
+
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
-  pdf.text(`${result.apps.length} unique applications detected`, pageWidth - margin, yPos + 5, { align: 'right' });
-  
-  yPos += 18;
+  pdf.text(`${result.apps.length} unique applications detected`, 
+          pageWidth - margin - 5, yPos + 10, { align: 'right' });
+
+  yPos += 20;
   
   // INTELLIGENT GRID LAYOUT: Use columns if many apps (better scalability)
   if (result.apps.length > 15) {
@@ -658,6 +743,14 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
              pageWidth / 2, pageHeight - 10, { align: 'center' });
     pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     pdf.text('Confidential', margin, pageHeight - 10);
+  }
+  
+  // ========================================
+  // DEBUG GRID: Draw AFTER all content (last thing before save)
+  // ========================================
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+    drawDebugGrid(pdf, pageWidth, pageHeight);
   }
   
   // Save PDF
