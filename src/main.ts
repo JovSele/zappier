@@ -751,13 +751,13 @@ function displayResults(result: ParseResult) {
                 </div>
                 <p class="text-sm font-semibold text-slate-700 mb-2">${flag.message}</p>
                 <p class="text-sm text-slate-600 mb-3">${flag.details}</p>
-                <div class="flex items-center justify-between mt-3">
+                <div class="flex items-center justify-between flex-wrap gap-2 mt-3">
                   <p class="text-xs text-slate-400 font-mono">Zap ID: ${flag.zap_id}</p>
                   <a href="${flag.flag_type === 'late_filter_placement' ? 'https://help.zapier.com/hc/en-us/articles/8496288555917-Add-conditions-to-Zaps-with-Filter' : 'https://help.zapier.com/hc/en-us/articles/8496181725453-Trigger-Zaps-instantly'}" 
                      target="_blank" 
                      rel="noopener noreferrer"
                      class="inline-flex items-center gap-1 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-md transition-colors">
-                    📖 How to fix
+                    📖 Technical Docs
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
