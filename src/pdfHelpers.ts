@@ -184,9 +184,9 @@ export function drawSectionHeaderWithSecondary(
  */
 export function sanitizeForPDF(text: string): string {
   return text
-    .replace(/✓/g, '√')      // Checkmark → square root (similar looking)
-    .replace(/✗/g, 'x')      // X mark → lowercase x
-    .replace(/⚠️/g, '!')     // Warning emoji → exclamation
+    .replace(/✓/g, '[OK]')      // Checkmark → square root (similar looking)
+    .replace(/✗/g, '[X]')      // X mark → lowercase x
+    .replace(/⚠️/g, '[!]')     // Warning emoji → exclamation
     .replace(/'/g, "'")      // Curly single quote (left)
     .replace(/'/g, "'")      // Curly single quote (right)
     .replace(/"/g, '"')      // Curly double quote (left)
