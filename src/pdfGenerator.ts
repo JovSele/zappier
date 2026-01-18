@@ -49,6 +49,14 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig):
   const margin = 20;
   const contentWidth = pageWidth - 2 * margin;
   
+  // Modern Traffic Light Color System
+  const colors = {
+    critical: { bg: [254, 226, 226] as [number, number, number], text: [153, 27, 27] as [number, number, number], badge: [252, 165, 165] as [number, number, number] },
+    warning: { bg: [254, 243, 199] as [number, number, number], text: [146, 64, 14] as [number, number, number], badge: [252, 211, 77] as [number, number, number] },
+    healthy: { bg: [220, 252, 231] as [number, number, number], text: [21, 128, 61] as [number, number, number], badge: [134, 239, 172] as [number, number, number] },
+    info: { bg: [239, 246, 255] as [number, number, number], text: [30, 64, 175] as [number, number, number], badge: [147, 197, 253] as [number, number, number] }
+  };
+  
   pdf.setCharSpace(0);
   
   let yPos = margin;
@@ -75,18 +83,18 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig):
   yPos += 15;
   
   // Executive Summary
-  yPos = renderExecutiveSummary(pdf, result, margin, contentWidth, pageWidth, yPos);
+  yPos = renderExecutiveSummary(pdf, result, margin, contentWidth, pageWidth, yPos, colors);
   
   // Reliability Section (if applicable)
   const reliabilityFlags = result.efficiency_flags.filter(f => f.flag_type === 'error_loop');
   if (reliabilityFlags.length > 0) {
-    yPos = renderReliabilitySection(pdf, reliabilityFlags, margin, contentWidth, pageWidth, pageHeight, yPos, checkPageBreak);
+    yPos = renderReliabilitySection(pdf, reliabilityFlags, margin, contentWidth, pageWidth, pageHeight, yPos, checkPageBreak, colors);
   }
   
   // Efficiency Findings Section
   const efficiencyFlags = result.efficiency_flags.filter(f => f.flag_type !== 'error_loop');
   if (efficiencyFlags.length > 0) {
-    yPos = renderEfficiencySection(pdf, efficiencyFlags, margin, contentWidth, pageWidth, pageHeight, yPos, checkPageBreak);
+    yPos = renderEfficiencySection(pdf, efficiencyFlags, margin, contentWidth, pageWidth, pageHeight, yPos, checkPageBreak, colors);
   }
   
   // No findings case
@@ -159,7 +167,8 @@ function renderExecutiveSummary(
   margin: number,
   contentWidth: number,
   pageWidth: number,
-  yPos: number
+  yPos: number,
+  colors: any
 ): number {
   // Section Header
   pdf.setFillColor(241, 245, 249);
@@ -175,45 +184,45 @@ function renderExecutiveSummary(
   // Key Metrics Grid
   const metricBoxWidth = contentWidth / 3 - 5;
   
-  // Efficiency Score Box
-  pdf.setFillColor(241, 245, 249);
+  // Efficiency Score Box - Green (Healthy)
+  const scoreColorSet = result.efficiency_score >= 75 ? colors.healthy : 
+                        result.efficiency_score >= 50 ? colors.warning : colors.critical;
+  pdf.setFillColor(scoreColorSet.bg[0], scoreColorSet.bg[1], scoreColorSet.bg[2]);
   pdf.roundedRect(margin, yPos, metricBoxWidth, 30, 3, 3, 'F');
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.text('EFFICIENCY SCORE', margin + metricBoxWidth / 2, yPos + 8, { align: 'center' });
-  
-  const scoreColor: [number, number, number] = result.efficiency_score >= 75 ? [16, 185, 129] : 
-                     result.efficiency_score >= 50 ? [245, 158, 11] : [239, 68, 68];
-  pdf.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+  pdf.setTextColor(scoreColorSet.text[0], scoreColorSet.text[1], scoreColorSet.text[2]);
   pdf.setFontSize(28);
   pdf.setFont('helvetica', 'bold');
   pdf.text(`${result.efficiency_score}`, margin + metricBoxWidth / 2, yPos + 22, { align: 'center' });
   pdf.setFontSize(10);
   pdf.text('/100', margin + metricBoxWidth / 2 + 10, yPos + 22);
   
-  // Zaps Analyzed Box
-  pdf.setFillColor(241, 245, 249);
+  // Issues Found Box - Yellow (Warning)
+  const issuesCount = result.efficiency_flags.length;
+  pdf.setFillColor(colors.warning.bg[0], colors.warning.bg[1], colors.warning.bg[2]);
   pdf.roundedRect(margin + metricBoxWidth + 5, yPos, metricBoxWidth, 30, 3, 3, 'F');
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('ZAPS ANALYZED', margin + metricBoxWidth + 5 + metricBoxWidth / 2, yPos + 8, { align: 'center' });
-  pdf.setTextColor(15, 23, 42);
+  pdf.text('ISSUES FOUND', margin + metricBoxWidth + 5 + metricBoxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.setTextColor(colors.warning.text[0], colors.warning.text[1], colors.warning.text[2]);
   pdf.setFontSize(28);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(`${result.zap_count}`, margin + metricBoxWidth + 5 + metricBoxWidth / 2, yPos + 22, { align: 'center' });
+  pdf.text(`${issuesCount}`, margin + metricBoxWidth + 5 + metricBoxWidth / 2, yPos + 22, { align: 'center' });
   
-  // Total Steps Box
-  pdf.setFillColor(241, 245, 249);
+  // Est. Savings Box - Blue (Info)
+  pdf.setFillColor(colors.info.bg[0], colors.info.bg[1], colors.info.bg[2]);
   pdf.roundedRect(margin + 2 * (metricBoxWidth + 5), yPos, metricBoxWidth, 30, 3, 3, 'F');
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('TOTAL STEPS', margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 8, { align: 'center' });
-  pdf.setTextColor(15, 23, 42);
-  pdf.setFontSize(28);
+  pdf.text('EST. SAVINGS', margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.setTextColor(colors.info.text[0], colors.info.text[1], colors.info.text[2]);
+  pdf.setFontSize(20);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(`${result.total_nodes}`, margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 22, { align: 'center' });
+  pdf.text(`$${result.estimated_savings.toFixed(0)}`, margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 22, { align: 'center' });
   
   yPos += 45;
   
@@ -252,16 +261,15 @@ function renderReliabilitySection(
   pageWidth: number,
   pageHeight: number,
   yPos: number,
-  checkPageBreak: (space: number) => boolean
+  checkPageBreak: (space: number) => boolean,
+  colors: any
 ): number {
   checkPageBreak(20);
   
-  // Section Header
-  pdf.setFillColor(254, 202, 202);
-  pdf.setDrawColor(220, 38, 38);
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
-  pdf.setTextColor(220, 38, 38);
+  // Section Header - Use Critical Red
+  pdf.setFillColor(colors.critical.bg[0], colors.critical.bg[1], colors.critical.bg[2]);
+  pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'F');
+  pdf.setTextColor(colors.critical.text[0], colors.critical.text[1], colors.critical.text[2]);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
   pdf.text('[!] RELIABILITY CONCERNS', margin + 5, yPos + 10);
@@ -278,7 +286,7 @@ function renderReliabilitySection(
   
   // Render each flag
   flags.forEach((flag, index) => {
-    yPos = renderFlagCard(pdf, flag, index, margin, contentWidth, pageWidth, pageHeight, yPos, checkPageBreak);
+    yPos = renderFlagCard(pdf, flag, index, margin, contentWidth, pageWidth, pageHeight, yPos, checkPageBreak, colors);
   });
   
   yPos += 5;
@@ -297,16 +305,15 @@ function renderEfficiencySection(
   pageWidth: number,
   pageHeight: number,
   yPos: number,
-  checkPageBreak: (space: number) => boolean
+  checkPageBreak: (space: number) => boolean,
+  colors: any
 ): number {
   checkPageBreak(20);
   
-  // Section Header
-  pdf.setFillColor(241, 245, 249);
-  pdf.setDrawColor(200, 200, 200);
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
-  pdf.setTextColor(15, 23, 42);
+  // Section Header - Use Info Blue
+  pdf.setFillColor(colors.info.bg[0], colors.info.bg[1], colors.info.bg[2]);
+  pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'F');
+  pdf.setTextColor(colors.info.text[0], colors.info.text[1], colors.info.text[2]);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
   pdf.text('EFFICIENCY FINDINGS', margin + 5, yPos + 10);
@@ -323,7 +330,7 @@ function renderEfficiencySection(
   
   // Render each flag
   flags.forEach((flag, index) => {
-    yPos = renderFlagCard(pdf, flag, index, margin, contentWidth, pageWidth, pageHeight, yPos, checkPageBreak);
+    yPos = renderFlagCard(pdf, flag, index, margin, contentWidth, pageWidth, pageHeight, yPos, checkPageBreak, colors);
   });
   
   yPos += 5;
@@ -343,7 +350,8 @@ function renderFlagCard(
   pageWidth: number,
   pageHeight: number,
   yPos: number,
-  checkPageBreak: (space: number) => boolean
+  checkPageBreak: (space: number) => boolean,
+  colors: any
 ): number {
   // Check page break
   checkPageBreak(80);
@@ -388,23 +396,24 @@ function renderFlagCard(
   // Calculate total box height
   const actualHeight = 15 + messageHeight + 2 + detailsHeight + 5 + savingsHeight + analyticsHeight + boxPadding;
   
-  // Draw box
-  const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 202, 202] :
-                      flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
-  pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
-  pdf.setDrawColor(flagColor[0] - 30, flagColor[1] - 30, flagColor[2] - 30);
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(margin, boxStartY, contentWidth, actualHeight, 2, 2, 'FD');
+  // Map severity to color set (using modern traffic light colors)
+  const severityColors = flag.severity === 'high' ? colors.critical :
+                         flag.severity === 'medium' ? colors.warning : colors.info;
   
-  // Draw badge
-  const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] :
-                        flag.severity === 'medium' ? [217, 119, 6] : [37, 99, 235];
-  pdf.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
-  pdf.roundedRect(margin + 3, boxStartY + 3, 20, 6, 1, 1, 'F');
+  // Draw box with modern flat design (no borders)
+  pdf.setFillColor(severityColors.bg[0], severityColors.bg[1], severityColors.bg[2]);
+  pdf.roundedRect(margin, boxStartY, contentWidth, actualHeight, 3, 3, 'F');
+  
+  // Draw badge in right corner with modern colors
+  const badgeWidth = 30;
+  const badgeHeight = 8;
+  pdf.setFillColor(severityColors.badge[0], severityColors.badge[1], severityColors.badge[2]);
+  pdf.roundedRect(pageWidth - margin - badgeWidth - 3, boxStartY + 3, badgeWidth, badgeHeight, 2, 2, 'F');
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(flag.severity.toUpperCase(), margin + 13, boxStartY + 7, { align: 'center' });
+  const badgeText = flag.severity === 'high' ? 'Critical' : flag.severity === 'medium' ? 'Warning' : 'Healthy';
+  pdf.text(badgeText, pageWidth - margin - badgeWidth / 2 - 3, boxStartY + 8, { align: 'center' });
   
   // Draw title
   pdf.setTextColor(15, 23, 42);
