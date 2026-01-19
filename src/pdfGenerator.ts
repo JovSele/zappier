@@ -173,12 +173,12 @@ function renderExecutiveSummary(
   // Section Header
   pdf.setFillColor(241, 245, 249);
   pdf.setDrawColor(200, 200, 200);
-  pdf.setLineWidth(0.5);
+  pdf.setLineWidth(0.1);
   pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
   pdf.setTextColor(15, 23, 42);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('EXECUTIVE SUMMARY', margin + 5, yPos + 10);
+  pdf.text('EXECUTIVE SUMMARY', margin + 5, yPos + 10.5);
   yPos += 20;
   
   // Key Metrics Grid

@@ -213,15 +213,15 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   yPos += 15;
   
   // Executive Summary Section
-  pdf.setFillColor(241, 245, 249); // slate-100 background
-  pdf.setDrawColor(200, 200, 200); // slate-300 border
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
+  pdf.setFillColor(219, 234, 254); // ✅ #DBEAFE 
+  pdf.setDrawColor(147, 197, 253); // ✅ #93C5FD 
+  pdf.setLineWidth(0.1);
+  pdf.roundedRect(margin, yPos, contentWidth, 15, 2, 2, 'FD');
     
-  pdf.setTextColor(15, 23, 42);
+  pdf.setTextColor(37, 99, 235);   // ✅ #2563EB
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('EXECUTIVE SUMMARY', margin + 5, yPos + 10);
+  pdf.text('EXECUTIVE SUMMARY', margin + 5, yPos + 9.5);
   
   yPos += 20;
   
@@ -230,7 +230,9 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   
   // Efficiency Score Box
   pdf.setFillColor(241, 245, 249);
-  pdf.roundedRect(margin, yPos, metricBoxWidth, 30, 3, 3, 'F');
+  pdf.setDrawColor(200, 200, 200);  
+  pdf.setLineWidth(0.1);   
+  pdf.roundedRect(margin, yPos, metricBoxWidth, 30, 2, 2, 'FD');
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.text('EFFICIENCY SCORE', margin + metricBoxWidth / 2, yPos + 8, { align: 'center' });
@@ -246,7 +248,9 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   
   // Zaps Found Box
   pdf.setFillColor(241, 245, 249);
-  pdf.roundedRect(margin + metricBoxWidth + 5, yPos, metricBoxWidth, 30, 3, 3, 'F');
+  pdf.setDrawColor(200, 200, 200);  
+  pdf.setLineWidth(0.1);   
+  pdf.roundedRect(margin + metricBoxWidth + 5, yPos, metricBoxWidth, 30, 2, 2, 'FD');
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
@@ -258,7 +262,9 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   
   // Total Steps Box
   pdf.setFillColor(241, 245, 249);
-  pdf.roundedRect(margin + 2 * (metricBoxWidth + 5), yPos, metricBoxWidth, 30, 3, 3, 'F');
+  pdf.setDrawColor(200, 200, 200);  
+  pdf.setLineWidth(0.1);            
+  pdf.roundedRect(margin + 2 * (metricBoxWidth + 5), yPos, metricBoxWidth, 30, 2, 2, 'FD');
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
@@ -268,19 +274,21 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   pdf.setFont('helvetica', 'bold');
   pdf.text(`${result.total_nodes}`, margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 22, { align: 'center' });
   
-  yPos += 45;
+  yPos += 35;
   
   // Estimated Savings Highlight (if applicable)
   if (result.estimated_savings > 0) {
     checkPageBreak(40);
     
-    pdf.setFillColor(16, 185, 129); // emerald-500
-    pdf.roundedRect(margin, yPos, contentWidth, 35, 3, 3, 'F');
+    pdf.setFillColor(209, 250, 229); 
+    pdf.setDrawColor(110, 231, 183); 
+    pdf.setLineWidth(0.1);            
+    pdf.roundedRect(margin, yPos, contentWidth, 40, 2, 2, 'FD');
     
-    pdf.setTextColor(255, 255, 255);
+    pdf.setTextColor(5, 150, 105);
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('ESTIMATED ANNUAL SAVINGS', margin + 5, yPos + 10);
+    pdf.text('ESTIMATED ANNUAL SAVINGS', margin + 5, yPos + 9.5);
     
     pdf.setFontSize(32);
     pdf.text(`$${(result.estimated_savings * 12).toFixed(0)}`, margin + 5, yPos + 25);
@@ -290,7 +298,7 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     pdf.text(`Monthly: $${result.estimated_savings.toFixed(0)} - Based on optimizing all detected issues`,
              margin + 5, yPos + 32);
     
-    yPos += 45;
+    yPos += 50;
   }
   
   // Reliability Section (if error_loop flags exist)
@@ -298,15 +306,15 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   if (reliabilityFlags.length > 0) {
     checkPageBreak(20);
     
-    pdf.setFillColor(254, 202, 202); // rose-200 background
-    pdf.setDrawColor(220, 38, 38); // rose-600 border
-    pdf.setLineWidth(0.5);
-    pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
+    pdf.setFillColor(254, 226, 226); 
+    pdf.setDrawColor(252, 165, 165); 
+    pdf.setLineWidth(0.1);
+    pdf.roundedRect(margin, yPos, contentWidth, 15, 2, 2, 'FD');
     
-    pdf.setTextColor(220, 38, 38); // rose-600
+    pdf.setTextColor(220, 38, 38); 
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('[!] RELIABILITY CONCERNS', margin + 5, yPos + 10);
+    pdf.text('[!] RELIABILITY CONCERNS', margin + 5, yPos + 9.5);
     
     pdf.setTextColor(71, 85, 105);
     pdf.setFontSize(10);
@@ -351,9 +359,16 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       checkPageBreak(estimatedHeight);
       
       // Flag box - dynamic height
-      const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 202, 202] : [254, 243, 199];
+      const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 226, 226] : 
+                      flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
+
+      const borderColor: [number, number, number] = flag.severity === 'high' ? [252, 165, 165] : 
+                        flag.severity === 'medium' ? [252, 211, 77] : [147, 197, 253];
+
       pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
-      pdf.roundedRect(margin, yPos, contentWidth, estimatedHeight, 2, 2, 'F');
+      pdf.setDrawColor(borderColor[0], borderColor[1], borderColor[2]); 
+      pdf.setLineWidth(0.1);                                              
+      pdf.roundedRect(margin, yPos, contentWidth, estimatedHeight, 2, 2, 'FD'); 
       
       // Severity badge
       const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] : [217, 119, 6];
@@ -376,8 +391,8 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       pdf.setFont('helvetica', 'bold');
       pdf.setCharSpace(0);
       let detailYPos = yPos + 15;
-      pdf.text(sanitizeForPDF(flag.message), margin + 8, detailYPos, {
-        maxWidth: contentWidth - 20
+      pdf.text(sanitizeForPDF(flag.message), margin + 5, detailYPos, {
+        maxWidth: contentWidth - 15
       });
 
       // Calculate how many lines the message took
@@ -391,8 +406,8 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
       pdf.setCharSpace(0);
-      pdf.text(sanitizeForPDF(flag.details), margin + 8, detailYPos, {
-        maxWidth: contentWidth - 20
+      pdf.text(sanitizeForPDF(flag.details), margin + 5, detailYPos, {
+        maxWidth: contentWidth - 15
       });
 
       // Calculate how many lines the details took
@@ -523,15 +538,15 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   if (efficiencyFlags.length > 0) {
     checkPageBreak(20);
     
-    pdf.setFillColor(241, 245, 249);
-    pdf.setDrawColor(200, 200, 200);
-    pdf.setLineWidth(0.5);
-    pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
+    pdf.setFillColor(219, 234, 254); // ✅ #DBEAFE 
+    pdf.setDrawColor(147, 197, 253); // ✅ #93C5FD 
+    pdf.setLineWidth(0.1);
+    pdf.roundedRect(margin, yPos, contentWidth, 15, 2, 2, 'FD');
     
-    pdf.setTextColor(15, 23, 42);
+    pdf.setTextColor(37, 99, 235); // ✅ #2563EB
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('EFFICIENCY FINDINGS', margin + 5, yPos + 10);
+    pdf.text('EFFICIENCY FINDINGS', margin + 5, yPos + 9.5);
     
     pdf.setTextColor(71, 85, 105);
     pdf.setFontSize(10);
@@ -560,13 +575,18 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       checkPageBreak(estimatedHeight);
       
       // Flag box 
-      const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 202, 202] : 
-                      flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
-      
+      const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 226, 226] : 
+                flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
+
+      const borderColor: [number, number, number] = flag.severity === 'high' ? [252, 165, 165] : 
+                        flag.severity === 'medium' ? [252, 211, 77] : [147, 197, 253];
+
       pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
-      pdf.roundedRect(margin, yPos, contentWidth, estimatedHeight, 2, 2, 'F'); 
-      
-      // Severity badge
+      pdf.setDrawColor(borderColor[0], borderColor[1], borderColor[2]); // ✅ pridaný border
+      pdf.setLineWidth(0.2);                                              // ✅ tenký okraj
+      pdf.roundedRect(margin, yPos, contentWidth, estimatedHeight, 2, 2, 'FD'); // ✅ 'FD'
+
+      // Severity badge - NOVÉ FARBY
       const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] : 
                         flag.severity === 'medium' ? [217, 119, 6] : [37, 99, 235];
       pdf.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
@@ -588,8 +608,8 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       pdf.setFont('helvetica', 'bold');
       let detailYPos = yPos + 15;
       pdf.setCharSpace(0);
-      pdf.text(sanitizeForPDF(flag.message), margin + 8, detailYPos, {
-        maxWidth: contentWidth - 20
+      pdf.text(sanitizeForPDF(flag.message), margin + 5, detailYPos, {
+        maxWidth: contentWidth - 15
       });
 
       // Calculate how many lines the message took
@@ -603,8 +623,8 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
       pdf.setCharSpace(0);
-      pdf.text(sanitizeForPDF(flag.details), margin + 8, detailYPos, {
-        maxWidth: contentWidth - 20
+      pdf.text(sanitizeForPDF(flag.details), margin + 5, detailYPos, {
+        maxWidth: contentWidth - 15
       });
 
       // Calculate how many lines the details took
@@ -688,15 +708,15 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     yPos = margin;
   }
   
-  pdf.setFillColor(203, 213, 225); // ✅ ZMENA: slate-300 (tmavšia šedá)
-  pdf.setDrawColor(148, 163, 184); // ✅ ZMENA: slate-400 (tmavší border)
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(margin, yPos, contentWidth, 15, 3, 3, 'FD');
+  pdf.setFillColor(219, 234, 254); // ✅ #DBEAFE 
+  pdf.setDrawColor(147, 197, 253); // ✅ #93C5FD 
+  pdf.setLineWidth(0.1);
+  pdf.roundedRect(margin, yPos, contentWidth, 15, 2, 2, 'FD');
 
-  pdf.setTextColor(15, 23, 42);
+  pdf.setTextColor(37, 99, 235);   // ✅ #2563EB
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('APP INVENTORY', margin + 5, yPos + 10);
+  pdf.text('APP INVENTORY', margin + 5, yPos + 9.5);
 
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
@@ -710,41 +730,41 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
   if (result.apps.length > 15) {
     // Multi-column grid layout for better space utilization
     const numColumns = result.apps.length > 30 ? 3 : 2;
-    const columnWidth = contentWidth / numColumns - 5;
+    const gap = 4;  // ✅ medzera medzi stĺpcami
+    const columnWidth = (contentWidth - gap * (numColumns - 1)) / numColumns;  // ✅ presný výpočet
     const itemHeight = 7;
     let currentColumn = 0;
-    let startYPos = yPos;
     
     result.apps.forEach((app, index) => {
       // Check if we need a new page
       if (yPos + itemHeight > pageHeight - margin) {
         pdf.addPage();
         yPos = margin;
-        startYPos = yPos;
         currentColumn = 0;
       }
       
-      // Calculate column position
-      const xPos = margin + currentColumn * (columnWidth + 5);
+      // ✅ PRESNÝ výpočet X pozície
+      const xPos = margin + currentColumn * (columnWidth + gap);
       
       // Alternating background for readability
-      if (index % 2 === 0) {
-        pdf.setFillColor(226, 232, 240);
-        pdf.rect(xPos - 2, yPos - 2, columnWidth + 4, itemHeight, 'F');
-      }
+      const bgColor = index % 2 === 0 ? [226, 232, 240] : [241, 245, 249];
+      pdf.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      pdf.setDrawColor(203, 213, 225);  // ✅ správny border color
+      pdf.setLineWidth(0.2);  // ✅ správna hrúbka
+      pdf.roundedRect(xPos, yPos, columnWidth, itemHeight, 2, 2, 'FD');  // ✅ presná šírka
       
       // App name (truncated if too long)
       pdf.setTextColor(15, 23, 42);
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'bold');
       const truncatedName = app.name.length > 25 ? app.name.substring(0, 22) + '...' : app.name;
-      pdf.text(truncatedName, xPos, yPos + 4);
+      pdf.text(truncatedName, xPos + 2, yPos + 4.5);  // ✅ padding vnútri
       
       // Usage count
       pdf.setTextColor(148, 163, 184);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
-      pdf.text(`${app.count}×`, xPos + columnWidth - 2, yPos + 4, { align: 'right' });
+      pdf.text(`${app.count}×`, xPos + columnWidth - 2, yPos + 4.5, { align: 'right' });  // ✅ zarovnané
       
       // Move to next row or column
       currentColumn++;
@@ -763,19 +783,23 @@ async function generatePDFReport(result: ParseResult, config: PDFConfig) {
     result.apps.forEach((app, index) => {
       checkPageBreak(10);
       
-      if (index % 2 === 0) {
-        pdf.setFillColor(226, 232, 240);
-        pdf.rect(margin - 2, yPos - 3, contentWidth + 4, 8, 'F');
-      }
+      // Alternating background
+      const bgColor = index % 2 === 0 ? [226, 232, 240] : [241, 245, 249];
+      pdf.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      pdf.setDrawColor(203, 213, 225);  // ✅ správny border color
+      pdf.setLineWidth(0.2);  // ✅ správna hrúbka
+      pdf.roundedRect(margin, yPos - 2, contentWidth, 8, 2, 2, 'FD');  // ✅ PRESNE ako header
       
+      // App name
       pdf.setTextColor(15, 23, 42);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(app.name, margin, yPos);
+      pdf.text(app.name, margin + 2, yPos + 3.5);  // ✅ +2 padding vnútri
       
+      // Usage count
       pdf.setTextColor(148, 163, 184);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`${app.count} ${app.count === 1 ? 'use' : 'uses'}`, pageWidth - margin, yPos, { align: 'right' });
+      pdf.text(`${app.count} ${app.count === 1 ? 'use' : 'uses'}`, pageWidth - margin - 2, yPos + 3.5, { align: 'right' });  // ✅ -2 padding
       
       yPos += 8;
     });
