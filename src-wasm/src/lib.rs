@@ -57,6 +57,8 @@ struct UsageStats {
     most_common_error: Option<String>,
     error_trend: Option<String>, // "increasing", "stable", "decreasing"
     max_streak: u32, // Longest consecutive failure streak
+    // NEW: Last execution timestamp
+    last_run: Option<String>, // ISO timestamp of most recent execution
 }
 
 // Zap (automation workflow)
@@ -129,6 +131,27 @@ struct ErrorResult {
     message: String,
 }
 
+// NEW: Zap Summary for quick preview (no heuristics)
+#[derive(Serialize)]
+struct ZapSummary {
+    id: u64,
+    title: String,
+    status: String,  // "on", "off", "paused"
+    step_count: usize,
+    trigger_app: String,  // "RSS", "WordPress", "Webhook"
+    last_run: Option<String>,  // ISO timestamp or null
+    error_rate: Option<f32>,  // 0-100 or null (safe division by zero)
+    total_runs: u32,
+}
+
+// NEW: Zap List Result (for selector dashboard)
+#[derive(Serialize)]
+struct ZapListResult {
+    success: bool,
+    message: String,
+    zaps: Vec<ZapSummary>,
+}
+
 /// Temporary structure to track execution records for analytics
 #[derive(Debug)]
 struct ExecutionRecord {
@@ -142,6 +165,7 @@ struct ExecutionRecord {
 fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
     let mut task_history_map: HashMap<u64, UsageStats> = HashMap::new();
     let mut zap_executions: HashMap<u64, Vec<ExecutionRecord>> = HashMap::new();
+    let mut zap_timestamps: HashMap<u64, Vec<String>> = HashMap::new();
     
     for csv_content in csv_contents {
         // Try to parse as CSV
@@ -168,6 +192,7 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
             let status_idx = headers.iter().position(|h| h.to_lowercase() == "status");
             let error_msg_idx = headers.iter().position(|h| 
                 h.to_lowercase() == "error_message" || h.to_lowercase() == "error");
+            let timestamp_idx = headers.iter().position(|h| h.to_lowercase() == "timestamp");
             
             if let (Some(zap_id_col), Some(status_col)) = (zap_id_idx, status_idx) {
                 // Process all records and aggregate by zap_id
@@ -190,6 +215,17 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
                                         None
                                     };
                                     
+                                    // Extract timestamp if available
+                                    if let Some(timestamp_col) = timestamp_idx {
+                                        if let Some(timestamp_str) = record.get(timestamp_col) {
+                                            if !timestamp_str.is_empty() {
+                                                zap_timestamps.entry(zap_id)
+                                                    .or_insert_with(Vec::new)
+                                                    .push(timestamp_str.to_string());
+                                            }
+                                        }
+                                    }
+                                    
                                     // Track execution record for advanced analytics
                                     zap_executions.entry(zap_id)
                                         .or_insert_with(Vec::new)
@@ -208,6 +244,7 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
                                         most_common_error: None,
                                         error_trend: None,
                                         max_streak: 0,
+                                        last_run: None,
                                     });
                                     
                                     // Increment counters based on status
@@ -233,10 +270,18 @@ fn parse_csv_files(csv_contents: &[String]) -> HashMap<u64, UsageStats> {
         }
     }
     
-    // Enhanced analytics: Calculate error rates, trends, streaks, and most common errors
+    // Enhanced analytics: Calculate error rates, trends, streaks, most common errors, and last_run
     for (zap_id, stats) in task_history_map.iter_mut() {
         if stats.total_runs > 0 {
             stats.error_rate = (stats.error_count as f32 / stats.total_runs as f32) * 100.0;
+        }
+        
+        // Find most recent timestamp (last_run)
+        if let Some(timestamps) = zap_timestamps.get(zap_id) {
+            if !timestamps.is_empty() {
+                // Simple string comparison works for ISO timestamps (lexicographically sortable)
+                stats.last_run = timestamps.iter().max().cloned();
+            }
         }
         
         // Only perform advanced analytics if we have execution records
@@ -847,6 +892,257 @@ pub fn parse_zapfile_json(json_content: &str) -> String {
         message: format!("Successfully parsed {} Zaps with {} total steps", 
             zapfile.zaps.len(), 
             total_nodes
+        ),
+        apps,
+        efficiency_flags,
+        efficiency_score,
+        estimated_savings,
+    };
+
+    serde_json::to_string(&result).unwrap_or_else(|_| r#"{"success":true,"zap_count":0,"message":"Unknown"}"#.to_string())
+}
+
+/// NEW: Parse Zap List (Quick Preview - NO HEURISTICS)
+/// Fast function to extract basic Zap information for dashboard selector
+/// Does NOT run efficiency analysis - only extracts metadata
+#[wasm_bindgen]
+pub fn parse_zap_list(zip_data: &[u8]) -> String {
+    // Create a seekable reader from byte slice
+    let cursor = Cursor::new(zip_data);
+    
+    // Open the ZIP archive
+    let mut archive = match ZipArchive::new(cursor) {
+        Ok(archive) => archive,
+        Err(e) => {
+            let error = ErrorResult {
+                success: false,
+                message: format!("Failed to open ZIP archive: {}", e),
+            };
+            return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Unknown error"}"#.to_string());
+        }
+    };
+
+    // Look for zapfile.json and CSV files
+    let mut zapfile_content = String::new();
+    let mut csv_contents: Vec<String> = Vec::new();
+    let mut found_zapfile = false;
+
+    for i in 0..archive.len() {
+        let mut file = match archive.by_index(i) {
+            Ok(file) => file,
+            Err(_) => continue,
+        };
+
+        let file_name = file.name().to_string();
+        
+        if file_name.to_lowercase().ends_with("zapfile.json") {
+            if let Err(e) = file.read_to_string(&mut zapfile_content) {
+                let error = ErrorResult {
+                    success: false,
+                    message: format!("Failed to read zapfile.json: {}", e),
+                };
+                return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Read error"}"#.to_string());
+            }
+            found_zapfile = true;
+        }
+        else if file_name.to_lowercase().ends_with(".csv") {
+            let mut csv_content = String::new();
+            if file.read_to_string(&mut csv_content).is_ok() {
+                csv_contents.push(csv_content);
+            }
+        }
+    }
+
+    if !found_zapfile {
+        let error = ErrorResult {
+            success: false,
+            message: "zapfile.json not found in archive".to_string(),
+        };
+        return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"File not found"}"#.to_string());
+    }
+
+    // Parse zapfile.json
+    let mut zapfile: ZapFile = match serde_json::from_str(&zapfile_content) {
+        Ok(zapfile) => zapfile,
+        Err(e) => {
+            let error = ErrorResult {
+                success: false,
+                message: format!("Failed to parse zapfile.json: {} at line {}, column {}", 
+                    e, 
+                    e.line(), 
+                    e.column()
+                ),
+            };
+            return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Parse error"}"#.to_string());
+        }
+    };
+
+    // Parse CSV files for task history (optional - may not exist)
+    let task_history_map = parse_csv_files(&csv_contents);
+    
+    // Attach usage statistics to Zaps
+    attach_usage_stats(&mut zapfile, &task_history_map);
+
+    // Build ZapSummary list
+    let mut zap_summaries: Vec<ZapSummary> = Vec::new();
+    
+    for zap in &zapfile.zaps {
+        // Extract trigger app name
+        let trigger_app = zap.nodes.values()
+            .find(|node| node.parent_id.is_none() && node.type_of == "read")
+            .map(|node| parse_app_name(&node.selected_api))
+            .unwrap_or_else(|| "Unknown".to_string());
+        
+        // Extract metrics from usage_stats (if available)
+        let (last_run, error_rate, total_runs) = if let Some(stats) = &zap.usage_stats {
+            let err_rate = if stats.total_runs > 0 {
+                Some(stats.error_rate)
+            } else {
+                None // Avoid showing 0% if no runs
+            };
+            (stats.last_run.clone(), err_rate, stats.total_runs)
+        } else {
+            (None, None, 0)
+        };
+        
+        zap_summaries.push(ZapSummary {
+            id: zap.id,
+            title: zap.title.clone(),
+            status: zap.status.clone(),
+            step_count: zap.nodes.len(),
+            trigger_app,
+            last_run,
+            error_rate,
+            total_runs,
+        });
+    }
+    
+    // Return ZapListResult
+    let result = ZapListResult {
+        success: true,
+        message: format!("Found {} Zaps", zap_summaries.len()),
+        zaps: zap_summaries,
+    };
+
+    serde_json::to_string(&result).unwrap_or_else(|_| r#"{"success":true,"message":"Unknown","zaps":[]}"#.to_string())
+}
+
+/// NEW: Parse Single Zap Audit (Full Analysis for Selected Zap)
+/// Runs complete audit analysis on a single selected Zap
+/// Filters the ZIP to only include the specified zap_id, then runs full heuristics
+#[wasm_bindgen]
+pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64) -> String {
+    // Create a seekable reader from byte slice
+    let cursor = Cursor::new(zip_data);
+    
+    // Open the ZIP archive
+    let mut archive = match ZipArchive::new(cursor) {
+        Ok(archive) => archive,
+        Err(e) => {
+            let error = ErrorResult {
+                success: false,
+                message: format!("Failed to open ZIP archive: {}", e),
+            };
+            return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Unknown error"}"#.to_string());
+        }
+    };
+
+    // Look for zapfile.json and CSV files
+    let mut zapfile_content = String::new();
+    let mut csv_contents: Vec<String> = Vec::new();
+    let mut found_zapfile = false;
+
+    for i in 0..archive.len() {
+        let mut file = match archive.by_index(i) {
+            Ok(file) => file,
+            Err(_) => continue,
+        };
+
+        let file_name = file.name().to_string();
+        
+        if file_name.to_lowercase().ends_with("zapfile.json") {
+            if let Err(e) = file.read_to_string(&mut zapfile_content) {
+                let error = ErrorResult {
+                    success: false,
+                    message: format!("Failed to read zapfile.json: {}", e),
+                };
+                return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Read error"}"#.to_string());
+            }
+            found_zapfile = true;
+        }
+        else if file_name.to_lowercase().ends_with(".csv") {
+            let mut csv_content = String::new();
+            if file.read_to_string(&mut csv_content).is_ok() {
+                csv_contents.push(csv_content);
+            }
+        }
+    }
+
+    if !found_zapfile {
+        let error = ErrorResult {
+            success: false,
+            message: "zapfile.json not found in archive".to_string(),
+        };
+        return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"File not found"}"#.to_string());
+    }
+
+    // Parse zapfile.json
+    let mut zapfile: ZapFile = match serde_json::from_str(&zapfile_content) {
+        Ok(zapfile) => zapfile,
+        Err(e) => {
+            let error = ErrorResult {
+                success: false,
+                message: format!("Failed to parse zapfile.json: {} at line {}, column {}", 
+                    e, 
+                    e.line(), 
+                    e.column()
+                ),
+            };
+            return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Parse error"}"#.to_string());
+        }
+    };
+
+    // FILTER: Keep only the selected Zap
+    zapfile.zaps.retain(|z| z.id == zap_id);
+    
+    if zapfile.zaps.is_empty() {
+        let error = ErrorResult {
+            success: false,
+            message: format!("Zap with ID {} not found in the export", zap_id),
+        };
+        return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Zap not found"}"#.to_string());
+    }
+
+    // Parse CSV files for task history data
+    let task_history_map = parse_csv_files(&csv_contents);
+    
+    // Attach usage statistics to Zaps
+    attach_usage_stats(&mut zapfile, &task_history_map);
+
+    // Count total nodes (should be just one Zap now)
+    let total_nodes: usize = zapfile.zaps.iter()
+        .map(|zap| zap.nodes.len())
+        .sum();
+
+    // Extract app inventory (for this single Zap)
+    let apps = extract_app_inventory(&zapfile);
+
+    // Detect efficiency issues (FULL AUDIT - includes all heuristics)
+    let efficiency_flags = detect_efficiency_flags(&zapfile);
+
+    // Calculate efficiency score
+    let efficiency_score = calculate_efficiency_score(&efficiency_flags);
+
+    // Calculate estimated savings
+    let estimated_savings = calculate_estimated_savings(&efficiency_flags);
+
+    // Return success result (same format as parse_zapier_export)
+    let result = ParseResult {
+        success: true,
+        zap_count: zapfile.zaps.len(), // Should be 1
+        total_nodes,
+        message: format!("Successfully audited Zap: {}", 
+            zapfile.zaps.first().map(|z| z.title.as_str()).unwrap_or("Unknown")
         ),
         apps,
         efficiency_flags,

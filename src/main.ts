@@ -1,10 +1,32 @@
 import './style.css'
-import init, { hello_world, parse_zapier_export, parse_zapfile_json } from '../src-wasm/pkg/zapier_lighthouse_wasm'
+import init, { hello_world, parse_zapier_export, parse_zapfile_json, parse_zap_list, parse_single_zap_audit } from '../src-wasm/pkg/zapier_lighthouse_wasm'
 import { generatePDFReport, type PDFConfig, type ParseResult } from './pdfGenerator'
 import { drawDebugGrid, sanitizeForPDF } from './pdfHelpers'
 
+// NEW: Type definitions for Zap Selector
+interface ZapSummary {
+  id: number
+  title: string
+  status: string
+  step_count: number
+  trigger_app: string
+  last_run: string | null
+  error_rate: number | null
+  total_runs: number
+}
+
+interface ZapListResult {
+  success: boolean
+  message: string
+  zaps: ZapSummary[]
+}
+
 // Initialize WASM module
 let wasmReady = false
+
+// NEW: State management for cached ZIP data
+let cachedZipData: Uint8Array | null = null
+let zapList: ZapSummary[] = []
 
 async function initWasm() {
   try {
@@ -76,14 +98,43 @@ function updateStatus(type: 'ready' | 'processing' | 'success' | 'error', messag
   statusEl.textContent = `${icon} ${message}`
 }
 
-// Handle file upload
+// NEW: Helper to format relative time
+function formatRelativeTime(isoTimestamp: string | null): string {
+  if (!isoTimestamp) return 'Never'
+  
+  try {
+    const timestamp = new Date(isoTimestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - timestamp.getTime()
+    const diffSeconds = Math.floor(diffMs / 1000)
+    const diffMinutes = Math.floor(diffSeconds / 60)
+    const diffHours = Math.floor(diffMinutes / 60)
+    const diffDays = Math.floor(diffHours / 24)
+    
+    if (diffSeconds < 60) return 'Just now'
+    if (diffMinutes < 60) return `${diffMinutes}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays === 1) return '1d ago'
+    if (diffDays < 30) return `${diffDays}d ago`
+    
+    const diffMonths = Math.floor(diffDays / 30)
+    if (diffMonths < 12) return `${diffMonths}mo ago`
+    
+    const diffYears = Math.floor(diffMonths / 12)
+    return `${diffYears}y ago`
+  } catch {
+    return 'Invalid date'
+  }
+}
+
+// NEW: Handle file upload (updated workflow with Zap Selector)
 async function handleFileUpload(file: File) {
   if (!wasmReady) {
     updateStatus('error', 'WASM engine not ready. Please refresh the page.')
     return
   }
   
-  updateStatus('processing', `Processing ${file.name}...`)
+  updateStatus('processing', `Scanning ${file.name}...`)
   
   try {
     // Read file as ArrayBuffer
@@ -92,21 +143,302 @@ async function handleFileUpload(file: File) {
     
     console.log(`File size: ${uint8Array.length} bytes`)
     
-    // Call WASM parser
-    const resultJson = parse_zapier_export(uint8Array)
+    // Cache ZIP data for later use
+    cachedZipData = uint8Array
+    
+    // NEW WORKFLOW: Call parse_zap_list (fast, no heuristics)
+    const listResultJson = parse_zap_list(uint8Array)
+    const listResult: ZapListResult = JSON.parse(listResultJson)
+    
+    console.log('Zap list result:', listResult)
+    
+    if (listResult.success) {
+      zapList = listResult.zaps
+      updateStatus('success', `✨ Found ${zapList.length} Zap${zapList.length === 1 ? '' : 's'} - Select one to audit`)
+      displayZapSelector(zapList)
+    } else {
+      updateStatus('error', listResult.message)
+    }
+    
+  } catch (error) {
+    console.error('Error processing file:', error)
+    updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+// NEW: Global filter state
+let currentSearchTerm = ''
+let currentStatusFilter: 'all' | 'on' | 'error' = 'all'
+
+// NEW: Filter zaps based on search and status
+function getFilteredZaps(): ZapSummary[] {
+  let filtered = [...zapList]
+  
+  // Apply search filter
+  if (currentSearchTerm) {
+    const search = currentSearchTerm.toLowerCase()
+    filtered = filtered.filter(zap => 
+      zap.title.toLowerCase().includes(search) || 
+      zap.trigger_app.toLowerCase().includes(search)
+    )
+  }
+  
+  // Apply status filter
+  if (currentStatusFilter === 'on') {
+    filtered = filtered.filter(zap => zap.status.toLowerCase() === 'on')
+  } else if (currentStatusFilter === 'error') {
+    filtered = filtered.filter(zap => zap.error_rate !== null && zap.error_rate > 10)
+  }
+  
+  return filtered
+}
+
+// NEW: Handle search input
+function filterZaps() {
+  const searchInput = document.getElementById('zapSearch') as HTMLInputElement
+  if (searchInput) {
+    currentSearchTerm = searchInput.value
+    displayZapSelector(zapList)
+  }
+}
+
+// NEW: Handle status filter
+function applyStatusFilter(status: 'all' | 'on' | 'error') {
+  currentStatusFilter = status
+  
+  // Update button styles
+  const buttons = document.querySelectorAll('[onclick^="applyStatusFilter"]')
+  buttons.forEach(btn => {
+    btn.className = 'px-3 py-1.5 rounded-md text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all'
+  })
+  
+  const activeBtn = document.querySelector(`[onclick="applyStatusFilter('${status}')"]`)
+  if (activeBtn) {
+    activeBtn.className = 'px-3 py-1.5 rounded-md text-xs font-bold bg-blue-600 text-white shadow-sm transition-all'
+  }
+  
+  displayZapSelector(zapList)
+}
+
+// Make functions globally available
+;(window as any).filterZaps = filterZaps
+;(window as any).applyStatusFilter = applyStatusFilter
+
+// NEW: Render only table content (optimized for filtering)
+function renderZapTable(filteredZaps: ZapSummary[]) {
+  const tableContainer = document.getElementById('zap-table-container')
+  if (!tableContainer) return
+  
+  // Helper functions for badges
+  const getStatusBadge = (status: string) => {
+    const statusLower = status.toLowerCase()
+    if (statusLower === 'on') return { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200', icon: '🟢' }
+    if (statusLower === 'off') return { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-200', icon: '🔴' }
+    return { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', icon: '🟡' }
+  }
+  
+  const getErrorRateBadge = (errorRate: number | null) => {
+    if (errorRate === null) return { bg: 'bg-slate-100', text: 'text-slate-500', label: 'N/A' }
+    if (errorRate > 10) return { bg: 'bg-rose-100', text: 'text-rose-700', label: `🔴 ${errorRate.toFixed(1)}%` }
+    if (errorRate > 5) return { bg: 'bg-amber-100', text: 'text-amber-700', label: `🟡 ${errorRate.toFixed(1)}%` }
+    return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: `🟢 ${errorRate.toFixed(1)}%` }
+  }
+  
+  tableContainer.innerHTML = `
+    <!-- Table Header -->
+    <div class="bg-slate-50 px-6 py-3 border-b border-slate-200">
+      <div class="grid grid-cols-12 gap-4 items-center">
+        <div class="col-span-1">
+          <span class="text-xs font-bold text-slate-500 uppercase">#</span>
+        </div>
+        <div class="col-span-5">
+          <span class="text-xs font-bold text-slate-500 uppercase">Zap Name</span>
+        </div>
+        <div class="col-span-2">
+          <span class="text-xs font-bold text-slate-500 uppercase">Status</span>
+        </div>
+        <div class="col-span-2 text-center">
+          <span class="text-xs font-bold text-slate-500 uppercase">Last Run</span>
+        </div>
+        <div class="col-span-2 text-right">
+          <span class="text-xs font-bold text-slate-500 uppercase">Error Rate</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Table Rows -->
+    ${filteredZaps.length > 0 ? filteredZaps.map((zap, index) => {
+      const statusBadge = getStatusBadge(zap.status)
+      const errorBadge = getErrorRateBadge(zap.error_rate)
+      const lastRun = formatRelativeTime(zap.last_run)
+      
+      return `
+        <div 
+          class="zap-row group cursor-pointer p-6 border-b border-slate-100 last:border-0 hover:bg-blue-50 transition-all duration-200 hover:scale-[1.01]" 
+          data-zap-id="${zap.id}"
+          style="animation: fade-in-up 0.3s ease-out ${index * 0.05}s both;"
+        >
+          <div class="grid grid-cols-12 gap-4 items-center">
+            <!-- Index -->
+            <div class="col-span-1">
+              <span class="text-slate-400 font-mono text-sm">#${index + 1}</span>
+            </div>
+            
+            <!-- Title & Trigger -->
+            <div class="col-span-5">
+              <h3 class="font-bold text-slate-900 group-hover:text-blue-600 transition-colors mb-1">
+                ${zap.title}
+              </h3>
+              <p class="text-xs text-slate-500">
+                <span class="font-mono bg-slate-100 px-2 py-0.5 rounded">${zap.trigger_app}</span>
+                <span class="mx-2">•</span>
+                <span>${zap.step_count} step${zap.step_count === 1 ? '' : 's'}</span>
+              </p>
+            </div>
+            
+            <!-- Status -->
+            <div class="col-span-2">
+              <span class="inline-flex items-center gap-1 px-3 py-1 ${statusBadge.bg} ${statusBadge.text} rounded-full text-xs font-semibold border ${statusBadge.border}">
+                ${statusBadge.icon} ${zap.status.toUpperCase()}
+              </span>
+            </div>
+            
+            <!-- Last Run -->
+            <div class="col-span-2 text-center">
+              <span class="text-sm text-slate-600">${lastRun}</span>
+            </div>
+            
+            <!-- Error Rate -->
+            <div class="col-span-2 text-right">
+              <span class="inline-flex items-center px-3 py-1 ${errorBadge.bg} ${errorBadge.text} rounded-full text-xs font-bold border border-current">
+                ${errorBadge.label}
+              </span>
+            </div>
+          </div>
+        </div>
+      `
+    }).join('') : `
+      <!-- Empty State -->
+      <div class="p-12 text-center">
+        <svg class="w-20 h-20 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3 class="text-xl font-bold text-slate-600 mb-2">No Zaps Found</h3>
+        <p class="text-slate-500">
+          ${currentSearchTerm ? 'Try adjusting your search terms' : 'Try changing your filter selection'}
+        </p>
+      </div>
+    `}
+  `
+  
+  // Attach click handlers to each row
+  setTimeout(() => {
+    const rows = document.querySelectorAll('.zap-row')
+    rows.forEach(row => {
+      row.addEventListener('click', () => {
+        const zapId = parseInt(row.getAttribute('data-zap-id') || '0')
+        handleZapSelect(zapId)
+      })
+    })
+  }, 100)
+}
+
+// NEW: Display Zap Selector Dashboard (initial render)
+function displayZapSelector(zaps: ZapSummary[]) {
+  const resultsEl = document.getElementById('results')
+  if (!resultsEl) return
+  
+  // Count stats for filters
+  const activeCount = zaps.filter(z => z.status.toLowerCase() === 'on').length
+  const errorCount = zaps.filter(z => z.error_rate !== null && z.error_rate > 10).length
+  
+  resultsEl.innerHTML = `
+    <div class="mt-10">
+      <!-- Dashboard Header -->
+      <div class="mb-8">
+        <h2 class="text-3xl font-black text-zinc-900 mb-2" style="letter-spacing: -0.02em;">
+          Select Zap to Audit
+        </h2>
+        <p class="text-slate-600 text-lg">
+          📊 Found <span class="font-bold text-blue-600">${zaps.length}</span> Zap${zaps.length === 1 ? '' : 's'} • Click any row to generate detailed PDF audit
+        </p>
+      </div>
+      
+      <!-- Control Panel -->
+      <div class="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
+        <div class="relative w-full md:w-96">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <input 
+            type="text" 
+            id="zapSearch" 
+            placeholder="Search Zaps by name or app..." 
+            value="${currentSearchTerm}"
+            class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+            oninput="filterZaps()"
+          >
+        </div>
+
+        <div class="flex gap-2 w-full md:w-auto overflow-x-auto">
+          <button onclick="applyStatusFilter('all')" class="px-3 py-1.5 rounded-md text-xs font-bold ${currentStatusFilter === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'} transition-all">All (${zaps.length})</button>
+          <button onclick="applyStatusFilter('on')" class="px-3 py-1.5 rounded-md text-xs font-bold ${currentStatusFilter === 'on' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'} transition-all">Active (${activeCount})</button>
+          <button onclick="applyStatusFilter('error')" class="px-3 py-1.5 rounded-md text-xs font-bold ${currentStatusFilter === 'error' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'} transition-all">High Errors (${errorCount})</button>
+        </div>
+      </div>
+      
+      <!-- Zap Table/Grid Container -->
+      <div id="zap-table-container" class="stat-card p-0 overflow-hidden">
+        <!-- Table content will be rendered by renderZapTable() -->
+      </div>
+      
+      <!-- Info Banner -->
+      <div class="mt-6 stat-card bg-blue-50 border-blue-200">
+        <p class="text-sm text-blue-700 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          💡 Click on any Zap row to run a full audit and generate a detailed PDF report
+        </p>
+      </div>
+    </div>
+  `
+  
+  // Render the table with filtered zaps
+  renderZapTable(getFilteredZaps())
+}
+
+// NEW: Handle Zap Selection (run full audit on selected Zap)
+async function handleZapSelect(zapId: number) {
+  if (!cachedZipData) {
+    updateStatus('error', 'ZIP data not cached. Please upload again.')
+    return
+  }
+  
+  const selectedZap = zapList.find(z => z.id === zapId)
+  if (!selectedZap) {
+    updateStatus('error', 'Selected Zap not found')
+    return
+  }
+  
+  updateStatus('processing', `Auditing "${selectedZap.title}"...`)
+  
+  try {
+    // Call WASM parser for single Zap audit
+    const resultJson = parse_single_zap_audit(cachedZipData, BigInt(zapId))
     const result = JSON.parse(resultJson)
     
-    console.log('Parse result:', result)
+    console.log('Single Zap audit result:', result)
     
     if (result.success) {
-      updateStatus('success', result.message)
+      updateStatus('success', `✅ Audit complete for "${selectedZap.title}"`)
       displayResults(result)
     } else {
       updateStatus('error', result.message)
     }
     
   } catch (error) {
-    console.error('Error processing file:', error)
+    console.error('Error auditing Zap:', error)
     updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
