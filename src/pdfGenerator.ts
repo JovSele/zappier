@@ -111,7 +111,8 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   yPos += 20;
   
   // Key Metrics Grid
-  const metricBoxWidth = contentWidth / 3 - 5;
+  const gap = 5;
+  const metricBoxWidth = (contentWidth - 2 * gap) / 3;
   
   // Efficiency Score Box
   pdf.setFillColor(241, 245, 249);
@@ -135,11 +136,11 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.setFillColor(241, 245, 249);
   pdf.setDrawColor(200, 200, 200);  
   pdf.setLineWidth(0.1);   
-  pdf.roundedRect(margin + metricBoxWidth + 5, yPos, metricBoxWidth, 30, 2, 2, 'FD');
+  pdf.roundedRect(margin + metricBoxWidth + gap, yPos, metricBoxWidth, 30, 2, 2, 'FD');
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('ZAPS ANALYZED', margin + metricBoxWidth + 5 + metricBoxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.text('ZAPS ANALYZED', margin + metricBoxWidth + gap + metricBoxWidth / 2, yPos + 8, { align: 'center' });
   pdf.setTextColor(15, 23, 42);
   pdf.setFontSize(28);
   pdf.setFont('helvetica', 'bold');
@@ -149,11 +150,11 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.setFillColor(241, 245, 249);
   pdf.setDrawColor(200, 200, 200);  
   pdf.setLineWidth(0.1);            
-  pdf.roundedRect(margin + 2 * (metricBoxWidth + 5), yPos, metricBoxWidth, 30, 2, 2, 'FD');
+  pdf.roundedRect(margin + 2 * (metricBoxWidth + gap), yPos, metricBoxWidth, 30, 2, 2, 'FD');
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('TOTAL STEPS', margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.text('TOTAL STEPS', margin + 2 * (metricBoxWidth + gap) + metricBoxWidth / 2, yPos + 8, { align: 'center' });
   pdf.setTextColor(15, 23, 42);
   pdf.setFontSize(28);
   pdf.setFont('helvetica', 'bold');
