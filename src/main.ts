@@ -198,7 +198,8 @@ function filterZaps() {
   const searchInput = document.getElementById('zapSearch') as HTMLInputElement
   if (searchInput) {
     currentSearchTerm = searchInput.value
-    displayZapSelector(zapList)
+    // Split rendering: Update ONLY the table, not the entire selector
+    renderZapTable(getFilteredZaps())
   }
 }
 
@@ -217,12 +218,41 @@ function applyStatusFilter(status: 'all' | 'on' | 'error') {
     activeBtn.className = 'px-3 py-1.5 rounded-md text-xs font-bold bg-blue-600 text-white shadow-sm transition-all'
   }
   
-  displayZapSelector(zapList)
+  // Split rendering: Update ONLY the table, not the entire selector
+  renderZapTable(getFilteredZaps())
+}
+
+// NEW: Reset all filters
+function resetFilters() {
+  currentSearchTerm = ''
+  currentStatusFilter = 'all'
+  
+  // Clear search input value
+  const searchInput = document.getElementById('zapSearch') as HTMLInputElement
+  if (searchInput) {
+    searchInput.value = ''
+  }
+  
+  // Update button styles to show 'all' as active
+  const buttons = document.querySelectorAll('[onclick^="applyStatusFilter"]')
+  buttons.forEach(btn => {
+    btn.className = 'px-3 py-1.5 rounded-md text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all'
+  })
+  
+  const allBtn = document.querySelector(`[onclick="applyStatusFilter('all')"]`)
+  if (allBtn) {
+    allBtn.className = 'px-3 py-1.5 rounded-md text-xs font-bold bg-blue-600 text-white shadow-sm transition-all'
+  }
+  
+  // Render full unfiltered list
+  renderZapTable(getFilteredZaps())
 }
 
 // Make functions globally available
 ;(window as any).filterZaps = filterZaps
 ;(window as any).applyStatusFilter = applyStatusFilter
+;(window as any).resetFilters = resetFilters
+;(window as any).backToSelector = backToSelector
 
 // NEW: Render only table content (optimized for filtering)
 function renderZapTable(filteredZaps: ZapSummary[]) {
@@ -318,15 +348,28 @@ function renderZapTable(filteredZaps: ZapSummary[]) {
         </div>
       `
     }).join('') : `
-      <!-- Empty State -->
+      <!-- Empty State with Reset -->
       <div class="p-12 text-center">
         <svg class="w-20 h-20 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <h3 class="text-xl font-bold text-slate-600 mb-2">No Zaps Found</h3>
-        <p class="text-slate-500">
-          ${currentSearchTerm ? 'Try adjusting your search terms' : 'Try changing your filter selection'}
+        <h3 class="text-xl font-bold text-slate-600 mb-3">No Zaps Found</h3>
+        <p class="text-slate-500 mb-6">
+          ${currentSearchTerm 
+            ? `No results matching "<span class="font-semibold text-slate-700">${currentSearchTerm}</span>"` 
+            : 'No Zaps match the selected filter'}
         </p>
+        ${currentSearchTerm || currentStatusFilter !== 'all' ? `
+          <button 
+            onclick="resetFilters()" 
+            class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all hover:scale-105"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Reset All Filters
+          </button>
+        ` : ''}
       </div>
     `}
   `
@@ -481,6 +524,17 @@ async function loadTestData() {
   }
 }
 
+// NEW: Back to Zap Selector (without re-upload)
+function backToSelector() {
+  if (zapList.length === 0) {
+    updateStatus('error', 'No Zap list available. Please upload a ZIP file.')
+    return
+  }
+  
+  updateStatus('success', `✨ Found ${zapList.length} Zap${zapList.length === 1 ? '' : 's'} - Select one to audit`)
+  displayZapSelector(zapList)
+}
+
 // Display parsing results
 function displayResults(result: ParseResult) {
   const resultsEl = document.getElementById('results')
@@ -621,6 +675,14 @@ function displayResults(result: ParseResult) {
       <div class="flex items-center justify-between mb-6 opacity-0 animate-fade-in-up">
         <h3 class="text-2xl font-bold text-zinc-900" style="letter-spacing: -0.02em;">Analysis Results</h3>
         <div class="flex gap-3">
+          ${zapList.length > 0 ? `
+            <button onclick="backToSelector()" class="inline-flex items-center gap-2 px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Selection
+            </button>
+          ` : ''}
           <button id="download-pdf-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
