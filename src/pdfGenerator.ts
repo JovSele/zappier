@@ -41,6 +41,159 @@ export interface ParseResult {
 }
 
 // ========================================
+// CHART GENERATION HELPERS (Canvas API)
+// Professional, brand-consistent visualizations
+// ========================================
+
+// Brand Colors (consistent across all charts)
+const COLORS = {
+  SUCCESS: '#10b981',    // Emerald 500
+  ERROR: '#ef4444',      // Red 500
+  TEXT_PRIMARY: '#1f2937', // Gray 900
+  TEXT_SECONDARY: '#475569', // Slate 600
+  BACKGROUND: '#ffffff'
+};
+
+// Typography (consistent font family and sizes)
+const FONTS = {
+  TITLE: 'bold 28px Helvetica, sans-serif',
+  SUBTITLE: '13px Helvetica, sans-serif',
+  LABEL: 'bold 13px Helvetica, sans-serif',
+  VALUE: 'bold 16px Helvetica, sans-serif'
+};
+
+function createDoughnutChart(successCount: number, errorCount: number): string {
+  // UNIFIED DIMENSIONS: 400x300 (same height as bar chart)
+  const canvas = document.createElement('canvas');
+  canvas.width = 400;
+  canvas.height = 300;
+  const ctx = canvas.getContext('2d')!;
+  
+  const total = successCount + errorCount;
+  if (total === 0) return ''; // No data
+  
+  // Chart positioning (centered)
+  const centerX = 200;
+  const centerY = 120;
+  const outerRadius = 85;
+  const innerRadius = 60; // Elegant thickness (25px ring)
+  
+  // Calculate angles
+  const successAngle = (successCount / total) * 2 * Math.PI;
+  
+  // Draw success arc
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, outerRadius, -Math.PI / 2, -Math.PI / 2 + successAngle);
+  ctx.arc(centerX, centerY, innerRadius, -Math.PI / 2 + successAngle, -Math.PI / 2, true);
+  ctx.closePath();
+  ctx.fillStyle = COLORS.SUCCESS;
+  ctx.fill();
+  
+  // Draw error arc
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, outerRadius, -Math.PI / 2 + successAngle, -Math.PI / 2 + 2 * Math.PI);
+  ctx.arc(centerX, centerY, innerRadius, -Math.PI / 2 + 2 * Math.PI, -Math.PI / 2 + successAngle, true);
+  ctx.closePath();
+  ctx.fillStyle = COLORS.ERROR;
+  ctx.fill();
+  
+  // Center text - percentage (unified typography)
+  const errorRate = ((errorCount / total) * 100).toFixed(1);
+  ctx.fillStyle = COLORS.TEXT_PRIMARY;
+  ctx.font = FONTS.TITLE;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${errorRate}%`, centerX, centerY - 8);
+  
+  // Subtitle
+  ctx.font = FONTS.SUBTITLE;
+  ctx.fillStyle = COLORS.TEXT_SECONDARY;
+  ctx.fillText('Error Rate', centerX, centerY + 12);
+  
+  // UNIFIED LEGEND (same style for both charts)
+  const legendY = 250;
+  const legendBoxSize = 12;
+  const legendGap = 140;
+  
+  // Success legend
+  ctx.fillStyle = COLORS.SUCCESS;
+  ctx.fillRect(50, legendY, legendBoxSize, legendBoxSize);
+  ctx.fillStyle = COLORS.TEXT_SECONDARY;
+  ctx.font = FONTS.LABEL;
+  ctx.textAlign = 'left';
+  ctx.fillText(`Success: ${successCount}`, 68, legendY + 10);
+  
+  // Error legend
+  ctx.fillStyle = COLORS.ERROR;
+  ctx.fillRect(50 + legendGap, legendY, legendBoxSize, legendBoxSize);
+  ctx.fillStyle = COLORS.TEXT_SECONDARY;
+  ctx.fillText(`Errors: ${errorCount}`, 68 + legendGap, legendY + 10);
+  
+  return canvas.toDataURL('image/png');
+}
+
+function createSavingsBarChart(currentCost: number, optimizedCost: number): string {
+  // UNIFIED DIMENSIONS: 400x300 (same height as doughnut)
+  const canvas = document.createElement('canvas');
+  canvas.width = 400;
+  canvas.height = 300;
+  const ctx = canvas.getContext('2d')!;
+  
+  // Chart dimensions (aligned with doughnut chart)
+  const maxValue = Math.max(currentCost, optimizedCost);
+  const barWidth = 70;
+  const maxBarHeight = 140;
+  const baseY = 210;
+  
+  // Calculate bar heights
+  const currentBarHeight = (currentCost / maxValue) * maxBarHeight;
+  const optimizedBarHeight = (optimizedCost / maxValue) * maxBarHeight;
+  
+  // Bar positions (centered)
+  const bar1X = 110;
+  const bar2X = 220;
+  
+  // Draw current cost bar
+  ctx.fillStyle = COLORS.ERROR;
+  ctx.fillRect(bar1X, baseY - currentBarHeight, barWidth, currentBarHeight);
+  
+  // Draw optimized cost bar
+  ctx.fillStyle = COLORS.SUCCESS;
+  ctx.fillRect(bar2X, baseY - optimizedBarHeight, barWidth, optimizedBarHeight);
+  
+  // UNIFIED TYPOGRAPHY
+  ctx.textAlign = 'center';
+  
+  // Current cost value (above bar)
+  ctx.fillStyle = COLORS.TEXT_PRIMARY;
+  ctx.font = FONTS.VALUE;
+  ctx.fillText(`$${currentCost.toFixed(0)}`, bar1X + barWidth / 2, baseY - currentBarHeight - 12);
+  
+  // Current cost label (below bar)
+  ctx.fillStyle = COLORS.TEXT_SECONDARY;
+  ctx.font = FONTS.LABEL;
+  ctx.fillText('Current', bar1X + barWidth / 2, baseY + 20);
+  
+  // Optimized cost value (above bar)
+  ctx.fillStyle = COLORS.TEXT_PRIMARY;
+  ctx.font = FONTS.VALUE;
+  ctx.fillText(`$${optimizedCost.toFixed(0)}`, bar2X + barWidth / 2, baseY - optimizedBarHeight - 12);
+  
+  // Optimized cost label (below bar)
+  ctx.fillStyle = COLORS.TEXT_SECONDARY;
+  ctx.font = FONTS.LABEL;
+  ctx.fillText('Optimized', bar2X + barWidth / 2, baseY + 20);
+  
+  // Savings indicator (unified legend position)
+  const savings = currentCost - optimizedCost;
+  ctx.fillStyle = COLORS.SUCCESS;
+  ctx.font = FONTS.VALUE;
+  ctx.fillText(`Save $${savings.toFixed(0)}/year`, 200, 260);
+  
+  return canvas.toDataURL('image/png');
+}
+
+// ========================================
 // MAIN PDF GENERATION FUNCTION
 // ========================================
 
@@ -54,6 +207,14 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.setCharSpace(0);
 
   let yPos = margin;
+  
+  // Extract Zap info (for single Zap audits)
+  const zapTitle = result.efficiency_flags.length > 0 
+    ? result.efficiency_flags[0].zap_title 
+    : result.zap_count === 1 ? 'Single Zap Audit' : 'Multi-Zap Audit';
+  const zapId = result.efficiency_flags.length > 0 
+    ? result.efficiency_flags[0].zap_id 
+    : null;
   
   // Helper function to add a new page if needed
   const checkPageBreak = (requiredSpace: number) => {
@@ -88,6 +249,26 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.text(`Prepared by ${config.agencyName}`, pageWidth / 2, 35, { align: 'center' });
   
   yPos = 60;
+  
+  // ZAP IDENTIFICATION (for single Zap audits)
+  if (result.zap_count === 1 && zapTitle !== 'Multi-Zap Audit') {
+    pdf.setFillColor(241, 245, 249); // slate-100
+    pdf.roundedRect(margin, yPos, contentWidth, 20, 2, 2, 'F');
+    
+    pdf.setTextColor(15, 23, 42); // slate-900
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`Zap: ${zapTitle}`, margin + 5, yPos + 10);
+    
+    if (zapId) {
+      pdf.setTextColor(100, 116, 139); // slate-500
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`ID: ${zapId}`, margin + 5, yPos + 16);
+    }
+    
+    yPos += 25;
+  }
   
   // Client information
   pdf.setTextColor(71, 85, 105); // slate-600
@@ -160,7 +341,63 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.setFont('helvetica', 'bold');
   pdf.text(`${result.total_nodes}`, margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 22, { align: 'center' });
   
-  yPos += 35;
+  yPos += 40;
+  
+  // VISUAL CHARTS SECTION (if applicable data exists)
+  const reliabilityFlags = result.efficiency_flags.filter(f => f.flag_type === 'error_loop');
+  const hasCharts = reliabilityFlags.length > 0 || result.estimated_savings > 0;
+  
+  if (hasCharts) {
+    checkPageBreak(60);
+    
+    // Calculate total runs and errors for reliability chart
+    let totalRuns = 0;
+    let totalErrors = 0;
+    
+    reliabilityFlags.forEach(flag => {
+      // Extract run counts from flag details if available
+      // This is a simplified extraction - in real scenario, we'd pass this data explicitly
+      const match = flag.details.match(/(\d+) errors out of (\d+) total runs/);
+      if (match) {
+        totalErrors += parseInt(match[1]);
+        totalRuns += parseInt(match[2]);
+      }
+    });
+    
+    const totalSuccess = totalRuns - totalErrors;
+    const currentAnnualCost = result.estimated_savings * 12;
+    const optimizedAnnualCost = 0; // After optimization
+    
+    // Layout: Two charts side by side
+    const chartWidth = (contentWidth - 10) / 2;
+    
+    // Left: Reliability Gauge (if error data exists)
+    if (reliabilityFlags.length > 0 && totalRuns > 0) {
+      try {
+        const reliabilityChart = createDoughnutChart(totalSuccess, totalErrors);
+        if (reliabilityChart) {
+          pdf.addImage(reliabilityChart, 'PNG', margin, yPos, chartWidth, chartWidth * 0.75);
+        }
+      } catch (e) {
+        console.warn('Failed to generate reliability chart:', e);
+      }
+    }
+    
+    // Right: Savings Bar Chart (if savings exist)
+    if (result.estimated_savings > 0) {
+      try {
+        const savingsChart = createSavingsBarChart(currentAnnualCost, optimizedAnnualCost);
+        if (savingsChart) {
+          const rightX = margin + chartWidth + 10;
+          pdf.addImage(savingsChart, 'PNG', rightX, yPos, chartWidth, chartWidth * 0.625);
+        }
+      } catch (e) {
+        console.warn('Failed to generate savings chart:', e);
+      }
+    }
+    
+    yPos += (reliabilityFlags.length > 0 ? chartWidth * 0.75 : chartWidth * 0.625) + 10;
+  }
   
   // Estimated Savings Highlight (if applicable)
   if (result.estimated_savings > 0) {
@@ -188,7 +425,6 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   }
   
   // Reliability Section (if error_loop flags exist)
-  const reliabilityFlags = result.efficiency_flags.filter(f => f.flag_type === 'error_loop');
   if (reliabilityFlags.length > 0) {
     checkPageBreak(20);
     
