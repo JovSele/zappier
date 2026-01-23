@@ -3,7 +3,7 @@ import init, { hello_world, parse_zapier_export, parse_zapfile_json, parse_zap_l
 import { generatePDFReport, type PDFConfig, type ParseResult } from './pdfGenerator'
 import { drawDebugGrid, sanitizeForPDF } from './pdfHelpers'
 
-// NEW: Type definitions for Zap Selector
+// Type definitions
 interface ZapSummary {
   id: number
   title: string
@@ -13,6 +13,22 @@ interface ZapSummary {
   last_run: string | null
   error_rate: number | null
   total_runs: number
+}
+
+interface EfficiencyFlag {
+  zap_id: number
+  zap_title: string
+  flag_type: string
+  severity: string
+  message: string
+  details: string
+  error_rate?: number  // Only present for error_loop flags
+  most_common_error?: string
+  error_trend?: string
+  max_streak?: number
+  estimated_monthly_savings: number
+  savings_explanation: string
+  is_fallback: boolean
 }
 
 interface ZapListResult {
@@ -451,6 +467,262 @@ function displayZapSelector(zaps: ZapSummary[]) {
   renderZapTable(getFilteredZaps())
 }
 
+// ============================================================================
+// HTML REPORT GENERATION (NEW)
+// ============================================================================
+
+/**
+ * Generate HTML report from template with real data injection
+ */
+async function generateHtmlReport(result: ParseResult, zapInfo: ZapSummary): Promise<string> {
+  try {
+    // Load template
+    const response = await fetch('/test-data/report_template.html')
+    if (!response.ok) {
+      throw new Error(`Failed to load template: ${response.statusText}`)
+    }
+    
+    let html = await response.text()
+    
+    // Get current date for report
+    const now = new Date()
+    const reportDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    const reportTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    
+    // Calculate derived metrics (use Math.round for whole numbers)
+    const annualSavings = Math.round(result.estimated_savings * 12).toString()
+    const scoreLabel = getScoreLabel(result.efficiency_score)
+    const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop') as EfficiencyFlag | undefined
+    const reliability = errorFlag ? Math.round(100 - (errorFlag.error_rate || 0)).toString() : '100'
+    const errorRate = errorFlag ? Math.round(errorFlag.error_rate || 0).toString() : '0'
+    
+    // PAGE 1 - Executive Overview replacements (use global RegExp)
+    html = html.replace(/62\/100/g, `${result.efficiency_score}/100`)
+    html = html.replace(/Below Optimal/g, scoreLabel)
+    html = html.replace(/Jan 21, 2026 • 09:45 AM/g, `${reportDate} • ${reportTime}`)
+    html = html.replace(/LHA-2026-X79B2/g, `LHA-${now.getFullYear()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`)
+    html = html.replace(/WordPress to Reddit Sync/g, zapInfo.title)
+    html = html.replace(/ID: 884-291-002/g, `ID: ${zapInfo.id}`)
+    html = html.replace(/Status: <span class="text-emerald-500 uppercase font-semibold">Active<\/span>/g, 
+      `Status: <span class="text-${zapInfo.status.toLowerCase() === 'on' ? 'emerald' : 'slate'}-500 uppercase font-semibold">${zapInfo.status.toUpperCase()}</span>`)
+    
+    // Savings replacements (multiple occurrences)
+    html = html.replace(/\$405\/year/g, `$${annualSavings}/year`)
+    html = html.replace(/\$405/g, `$${annualSavings}`)
+    
+    // Reliability metrics
+    html = html.replace(/62%<\/div>/g, `${reliability}%</div>`)
+    html = html.replace(/38% <span class="text-emerald-600">→ potential under 5%<\/span>/g, 
+      `${errorRate}% <span class="text-emerald-600">→ potential under 5%</span>`)
+    
+    // Replace dynamic Action Plan section
+    html = replaceActionPlan(html, result.efficiency_flags)
+    
+    // PAGE 2 - Technical Details
+    html = html.replace(/12 Steps • High Complexity/g, `${result.total_nodes} Steps • ${result.total_nodes > 8 ? 'High' : result.total_nodes > 4 ? 'Medium' : 'Low'} Complexity`)
+    html = html.replace(/12 Steps/g, `${result.total_nodes} Steps`)
+    
+    // Replace workflow architecture diagram trigger
+    const triggerInitial = zapInfo.trigger_app.charAt(0).toUpperCase()
+    html = html.replace(/<div class="w-12 h-12 bg-white rounded-lg border border-slate-200 flex items-center justify-center mx-auto mb-2 text-blue-600 font-black text-lg shadow-sm">W<\/div>/g,
+      `<div class="w-12 h-12 bg-white rounded-lg border border-slate-200 flex items-center justify-center mx-auto mb-2 text-blue-600 font-black text-lg shadow-sm">${triggerInitial}</div>`)
+    html = html.replace(/<p class="text-\[8px\] font-black text-slate-700 uppercase">WordPress<\/p>/g,
+      `<p class="text-[8px] font-black text-slate-700 uppercase">${zapInfo.trigger_app}</p>`)
+    
+    // Replace Error Analysis section (if error_loop exists)
+    html = replaceErrorAnalysis(html, result.efficiency_flags)
+    
+    // Replace Cost Waste Analysis section
+    html = replaceCostWasteAnalysis(html, result.efficiency_flags)
+    
+    // Replace reliability donut chart
+    html = html.replace(/38%<\/span>/g, `${errorRate}%</span>`)
+    html = html.replace(/62% Success/g, `${reliability}% Success`)
+    html = html.replace(/38% Errors/g, `${errorRate}% Errors`)
+    html = html.replace(/stroke-dasharray="38, 100"/g, `stroke-dasharray="${errorRate}, 100"`)
+    
+    // Replace total optimization potential
+    html = html.replace(/~\$453/g, `~$${annualSavings}`)
+    
+    return html
+  } catch (error) {
+    console.error('Error generating HTML report:', error)
+    throw error
+  }
+}
+
+/**
+ * Get score label based on efficiency score
+ */
+function getScoreLabel(score: number): string {
+  if (score >= 90) return 'Excellent'
+  if (score >= 75) return 'Good'
+  if (score >= 50) return 'Fair'
+  return 'Below Optimal'
+}
+
+/**
+ * Replace Action Plan section with dynamic flags
+ */
+function replaceActionPlan(html: string, flags: any[]): string {
+  // Sort flags by severity (high → medium → low)
+  const sortedFlags = [...flags].sort((a, b) => {
+    const severityOrder = { high: 0, medium: 1, low: 2 }
+    return (severityOrder[a.severity as keyof typeof severityOrder] || 999) - 
+           (severityOrder[b.severity as keyof typeof severityOrder] || 999)
+  })
+  
+  // Generate HTML for each flag
+  const flagsHTML = sortedFlags.slice(0, 3).map(flag => {
+    const severityClass = flag.severity === 'high' ? 'severity-critical' : 
+                         flag.severity === 'medium' ? 'severity-important' : 
+                         'severity-optimize'
+    const severityLabel = flag.severity === 'high' ? 'CRITICAL' : 
+                         flag.severity === 'medium' ? 'IMPORTANT' : 
+                         'OPTIMIZE'
+    
+    let problemText = ''
+    let fixText = ''
+    let effortText = ''
+    
+    if (flag.flag_type === 'error_loop') {
+      problemText = `Connection expired — ${flag.error_rate?.toFixed(0) || '0'}% of runs are failing right now.`
+      fixText = 'Re-authenticate the affected account in Zapier.'
+      effortText = 'Quick Fix'
+    } else if (flag.flag_type === 'late_filter_placement') {
+      problemText = 'Steps execute before conditions are checked, wasting task usage.'
+      fixText = 'Apply filtering as early as possible to stop unnecessary execution.'
+      effortText = 'Significant task reduction'
+    } else if (flag.flag_type === 'polling_trigger') {
+      problemText = 'Trigger checks for updates even when there aren\'t any.'
+      fixText = 'Use event-based triggers instead of scheduled checks where possible.'
+      effortText = 'Structural Change'
+    }
+    
+    return `
+            <div class="flex items-start gap-4 p-3 bg-white/5 rounded-lg border border-white/10">
+                <span class="${severityClass} px-2 py-0.5 rounded text-[8px] font-black uppercase shrink-0 mt-0.5">${severityLabel}</span>
+                <div>
+                    <p class="text-white text-[11px] font-bold uppercase tracking-tight mb-1">${flag.message}</p>
+                    <p class="text-slate-300 text-[10px] leading-relaxed">
+                        <strong class="text-white">Problem:</strong> ${problemText}<br>
+                        <strong class="text-white">Fix:</strong> ${fixText}<br>
+                        <strong class="${flag.severity === 'high' ? 'text-emerald-400' : flag.severity === 'medium' ? 'text-emerald-400' : 'text-amber-400'}">Effort:</strong> ${effortText}
+                    </p>
+                </div>
+            </div>
+    `
+  }).join('')
+  
+  // Find and replace the Action Plan section
+  const actionPlanRegex = /<div class="space-y-4 relative z-10">([\s\S]*?)<\/div>\s*<\/div>\s*<!-- Quick Wins -->/
+  const replacement = `<div class="space-y-4 relative z-10">${flagsHTML || '<p class="text-white text-sm">No critical issues detected!</p>'}</div>
+    </div>
+    <!-- Quick Wins -->`
+  
+  return html.replace(actionPlanRegex, replacement)
+}
+
+/**
+ * Replace Error Analysis section with real data
+ */
+function replaceErrorAnalysis(html: string, flags: any[]): string {
+  const errorFlag = flags.find(f => f.flag_type === 'error_loop')
+  
+  if (!errorFlag) {
+    // Remove error analysis section if no error_loop
+    const errorSectionRegex = /<!-- Reliability Concerns -->[\s\S]*?<\/div>\s*<\/div>\s*<!-- Optimization Checklist -->/
+    return html.replace(errorSectionRegex, '<!-- Optimization Checklist -->')
+  }
+  
+  const errorRate = (errorFlag.error_rate || 0).toFixed(0)
+  const failureCount = Math.round((errorFlag.error_rate || 0) / 10) // Approximation
+  const totalRuns = 10 // Approximation for display
+  const maxStreak = errorFlag.max_streak || 0
+  const mostCommonError = errorFlag.most_common_error || 'Connection timeout'
+  const monthlySavings = errorFlag.estimated_monthly_savings?.toFixed(0) || '0'
+  
+  // Replace error rate
+  html = html.replace(/60% Failure Rate/g, `${errorRate}% Failure Rate`)
+  html = html.replace(/6 out of your last 10 runs crashed/g, 
+    `${failureCount} out of your last ${totalRuns} runs crashed`)
+  html = html.replace(/5 runs in a row/g, `${maxStreak} runs in a row`)
+  html = html.replace(/Expired Reddit API connection\./g, mostCommonError)
+  html = html.replace(/Estimated recovery: \$12\/month/g, `Estimated recovery: $${monthlySavings}/month`)
+  
+  return html
+}
+
+/**
+ * Replace Cost Waste Analysis section with real optimization opportunities
+ */
+function replaceCostWasteAnalysis(html: string, flags: any[]): string {
+  const pollingFlag = flags.find(f => f.flag_type === 'polling_trigger')
+  const filterFlag = flags.find(f => f.flag_type === 'late_filter_placement')
+  
+  let replacementHTML = ''
+  
+  // Polling trigger section
+  if (pollingFlag) {
+    const annualSavings = ((pollingFlag.estimated_monthly_savings || 0) * 12).toFixed(0)
+    replacementHTML += `
+        <div class="m-4 p-5 bg-amber-50/50 border border-amber-100 rounded-xl">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <span class="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase">Medium Priority</span>
+                    <h3 class="text-sm font-black text-slate-800 tracking-tight">Checking For Updates Too Often</h3>
+                </div>
+            </div>
+            
+            <p class="text-[12px] text-slate-700 leading-relaxed mb-3">
+                ${pollingFlag.details}
+            </p>
+
+            <div class="flex items-center gap-2 p-2 bg-white/50 rounded-lg border border-amber-100 w-fit">
+                <div class="w-4 h-4 bg-emerald-500 rounded flex items-center justify-center text-white text-[8px] font-black">✓</div>
+                <p class="text-[10px] font-bold text-emerald-700 uppercase italic">Estimated savings: $${annualSavings}/year</p>
+            </div>
+        </div>
+    `
+  }
+  
+  // Late filter placement section
+  if (filterFlag) {
+    const annualSavings = ((filterFlag.estimated_monthly_savings || 0) * 12).toFixed(0)
+    replacementHTML += `
+        <div class="m-4 ${pollingFlag ? 'mt-0' : ''} p-5 bg-rose-50/50 border border-rose-100 rounded-xl">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <span class="bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase">High Priority</span>
+                    <h3 class="text-sm font-black text-slate-800 tracking-tight">Paying For Steps That Get Thrown Away</h3>
+                </div>
+            </div>
+            
+            <p class="text-[12px] text-slate-700 leading-relaxed mb-3">
+               ${filterFlag.details}
+            </p>
+
+            <div class="flex items-center gap-2 p-2 bg-white/50 rounded-lg border border-rose-100 w-fit">
+                <div class="w-4 h-4 bg-emerald-500 rounded flex items-center justify-center text-white text-[8px] font-black">✓</div>
+                <p class="text-[10px] font-bold text-emerald-700 uppercase italic">Estimated savings: $${annualSavings}/year</p>
+            </div>
+        </div>
+    `
+  }
+  
+  if (!replacementHTML) {
+    replacementHTML = `
+        <div class="m-4 p-5 bg-emerald-50/50 border border-emerald-100 rounded-xl text-center">
+            <p class="text-sm text-emerald-700 font-bold">✅ No cost waste detected! Your Zap is well optimized.</p>
+        </div>
+    `
+  }
+  
+  // Replace the entire Cost Waste Analysis content
+  const costWasteRegex = /(<div class="bg-blue-600 p-4 flex justify-between items-center text-white">[\s\S]*?<\/div>)([\s\S]*?)(<\/div>\s*<!-- Visual Analytics -->)/
+  return html.replace(costWasteRegex, `$1${replacementHTML}$3`)
+}
+
 // NEW: Handle Zap Selection (run full audit on selected Zap)
 async function handleZapSelect(zapId: number) {
   if (!cachedZipData) {
@@ -475,7 +747,10 @@ async function handleZapSelect(zapId: number) {
     
     if (result.success) {
       updateStatus('success', `✅ Audit complete for "${selectedZap.title}"`)
-      displayResults(result)
+      
+      // NEW: Generate HTML report and display in preview
+      const htmlReport = await generateHtmlReport(result, selectedZap)
+      displayHtmlPreview(htmlReport, result, selectedZap)
     } else {
       updateStatus('error', result.message)
     }
@@ -484,6 +759,186 @@ async function handleZapSelect(zapId: number) {
     console.error('Error auditing Zap:', error)
     updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
+}
+
+/**
+ * Display HTML report in iframe preview
+ */
+function displayHtmlPreview(htmlContent: string, result: ParseResult, zapInfo: ZapSummary) {
+  const resultsEl = document.getElementById('results')
+  if (!resultsEl) return
+  
+  // Calculate total estimated savings (sum of all flags)
+  const totalMonthlySavings = result.efficiency_flags.reduce((sum, flag) => sum + flag.estimated_monthly_savings, 0)
+  const totalAnnualSavings = (totalMonthlySavings * 12).toFixed(0)
+  
+  resultsEl.innerHTML = `
+    <div class="mt-10">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-2xl font-bold text-zinc-900" style="letter-spacing: -0.02em;">Report Preview</h3>
+        <div class="flex gap-3">
+          ${zapList.length > 0 ? `
+            <button onclick="backToSelector()" class="inline-flex items-center gap-2 px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Selection
+            </button>
+          ` : ''}
+          <button id="download-pdf-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            Download PDF Report
+          </button>
+        </div>
+      </div>
+      
+      <!-- Savings Info Card -->
+      <div class="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+        <p class="text-sm text-emerald-700 flex items-center justify-between">
+          <span class="font-bold">💰 Total Estimated Annual Savings: $${totalAnnualSavings}/year</span>
+          <span class="text-xs text-emerald-600">(Monthly: $${totalMonthlySavings.toFixed(0)})</span>
+        </p>
+      </div>
+      
+      <!-- HTML Preview in iframe -->
+      <div class="bg-white rounded-xl shadow-2xl border-2 border-slate-200 overflow-auto" style="max-height: 800px;">
+        <div class="bg-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
+          <div class="flex items-center gap-2">
+            <div class="flex gap-1.5">
+              <div class="w-3 h-3 rounded-full bg-rose-500"></div>
+              <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+              <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+            </div>
+            <span class="text-slate-300 text-sm font-mono ml-4">📄 ${zapInfo.title} - Audit Report</span>
+          </div>
+          <span class="text-slate-400 text-xs">Preview Mode</span>
+        </div>
+        <iframe 
+          id="report-preview-iframe" 
+          class="w-full border-0" 
+          style="width: 210mm; min-height: 297mm; display: block; margin: 0 auto; background: white;"
+          sandbox="allow-scripts allow-same-origin"
+        ></iframe>
+      </div>
+      
+      <!-- Info Banner -->
+      <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+        <p class="text-sm text-blue-700 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          💡 This is a live preview of your HTML report. Click "Download PDF Report" to generate the final PDF document.
+        </p>
+      </div>
+    </div>
+  `
+  
+  // Inject HTML into iframe with proper CSS and font loading
+  setTimeout(() => {
+    const iframe = document.getElementById('report-preview-iframe') as HTMLIFrameElement
+    if (iframe && iframe.contentWindow) {
+      // Ensure HTML has proper head section with Tailwind and fonts
+      let processedHTML = htmlContent
+      
+      // Check if HTML already has Tailwind script (it should from template)
+      if (!processedHTML.includes('cdn.tailwindcss.com')) {
+        // Inject Tailwind CDN if missing
+        processedHTML = processedHTML.replace(
+          '</head>',
+          '<script src="https://cdn.tailwindcss.com"></script></head>'
+        )
+      }
+      
+      // Ensure Inter font is loaded
+      if (!processedHTML.includes('fonts.googleapis.com/css2?family=Inter')) {
+        processedHTML = processedHTML.replace(
+          '</head>',
+          '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet"></head>'
+        )
+      }
+      
+      // Add global Inter font styling to ensure consistency
+      if (!processedHTML.includes('font-family: \'Inter\'')) {
+        processedHTML = processedHTML.replace(
+          '</head>',
+          '<style>* { font-family: \'Inter\', sans-serif !important; }</style></head>'
+        )
+      }
+      
+      // Write to iframe
+      iframe.contentWindow.document.open()
+      iframe.contentWindow.document.write(processedHTML)
+      iframe.contentWindow.document.close()
+      
+      // Auto-adjust iframe height after content loads
+      iframe.onload = () => {
+        try {
+          const iframeDoc = iframe.contentWindow?.document
+          if (iframeDoc) {
+            const height = iframeDoc.documentElement.scrollHeight
+            iframe.style.height = `${height}px`
+          }
+        } catch (e) {
+          console.warn('Could not auto-adjust iframe height:', e)
+        }
+      }
+    }
+    
+    // Setup PDF download button
+    const pdfBtn = document.getElementById('download-pdf-btn')
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', async () => {
+        pdfBtn.innerHTML = `
+          <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Generating PDF...
+        `
+        pdfBtn.classList.add('opacity-75', 'cursor-wait')
+        
+        try {
+          const today = new Date().toISOString().split('T')[0]
+          await generatePDFReport(result, {
+            agencyName: 'Zapier Lighthouse',
+            clientName: zapInfo.title,
+            reportDate: today
+          })
+          
+          pdfBtn.innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Downloaded!
+          `
+          pdfBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'opacity-75', 'cursor-wait')
+          pdfBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700')
+          
+          setTimeout(() => {
+            pdfBtn.innerHTML = `
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+              </svg>
+              Download PDF Report
+            `
+            pdfBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700')
+            pdfBtn.classList.add('bg-blue-600', 'hover:bg-blue-700')
+          }, 2000)
+        } catch (err) {
+          console.error('Failed to generate PDF:', err)
+          pdfBtn.innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Error
+          `
+          pdfBtn.classList.remove('opacity-75', 'cursor-wait')
+          pdfBtn.classList.add('bg-rose-600')
+        }
+      })
+    }
+  }, 100)
 }
 
 // Load test data from JSON file
