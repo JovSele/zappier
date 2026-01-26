@@ -1,8 +1,8 @@
 // PDF Generator Module for Zapier Lighthouse
-// Complete functional PDF report generation
+// Manual rendering with precise layout control
 
 import jsPDF from 'jspdf';
-import { drawDebugGrid, sanitizeForPDF } from './pdfHelpers';
+import { sanitizeForPDF } from './pdfHelpers';
 
 // ========================================
 // TYPE DEFINITIONS
@@ -10,7 +10,7 @@ import { drawDebugGrid, sanitizeForPDF } from './pdfHelpers';
 
 export interface PDFConfig {
   agencyName: string;
-  agencyLogo?: string; // Base64 or URL
+  agencyLogo?: string;
   clientName: string;
   reportDate: string;
 }
@@ -27,174 +27,287 @@ export interface ParseResult {
     severity: string;
     message: string;
     details: string;
-    // Enhanced error analytics (available for error_loop flags)
     most_common_error?: string;
-    error_trend?: string; // "increasing", "stable", "decreasing"
+    error_trend?: string;
     max_streak?: number;
-    // Dynamic savings calculation
-    estimated_monthly_savings: number; // in USD
-    savings_explanation: string; // How savings were calculated
-    is_fallback: boolean; // true = estimated/fallback, false = actual data
+    estimated_monthly_savings: number;
+    savings_explanation: string;
+    is_fallback: boolean;
   }>;
   efficiency_score: number;
   estimated_savings: number;
 }
 
 // ========================================
-// CHART GENERATION HELPERS (Canvas API)
-// Professional, brand-consistent visualizations
+// PRECISE COLOR PALETTE (HEX from HTML)
 // ========================================
-
-// Brand Colors (consistent across all charts)
 const COLORS = {
-  SUCCESS: '#10b981',    // Emerald 500
-  ERROR: '#ef4444',      // Red 500
-  TEXT_PRIMARY: '#1f2937', // Gray 900
-  TEXT_SECONDARY: '#475569', // Slate 600
-  BACKGROUND: '#ffffff'
+  BLUE: { r: 37, g: 99, b: 235 },      // #2563eb
+  GREEN: { r: 5, g: 150, b: 105 },     // #059669  
+  RED: { r: 225, g: 29, b: 72 },       // #e11d48
+  SLATE_50: { r: 248, g: 250, b: 252 },
+  SLATE_200: { r: 226, g: 232, b: 240 },
+  SLATE_400: { r: 148, g: 163, b: 184 },
+  SLATE_600: { r: 71, g: 85, b: 105 },
+  SLATE_900: { r: 15, g: 23, b: 42 }
 };
 
-// Typography (consistent font family and sizes)
-const FONTS = {
-  TITLE: 'bold 28px Helvetica, sans-serif',
-  SUBTITLE: '13px Helvetica, sans-serif',
-  LABEL: 'bold 13px Helvetica, sans-serif',
-  VALUE: 'bold 16px Helvetica, sans-serif'
-};
+// ========================================
+// HELPER SECTIONS
+// ========================================
 
-function createDoughnutChart(successCount: number, errorCount: number): string {
-  // UNIFIED DIMENSIONS: 400x300 (same height as bar chart)
-  const canvas = document.createElement('canvas');
-  canvas.width = 400;
-  canvas.height = 300;
-  const ctx = canvas.getContext('2d')!;
+/**
+ * Add Data Confidence section
+ */
+function addDataConfidence(
+  pdf: jsPDF,
+  yPos: number,
+  margin: number,
+  contentWidth: number,
+  result: ParseResult
+): number {
+  // Extract total runs
+  let totalRuns = 150; // Default
+  result.efficiency_flags.forEach(flag => {
+    const match = flag.details.match(/(\d+) total runs/);
+    if (match) {
+      totalRuns = Math.max(totalRuns, parseInt(match[1]));
+    }
+  });
   
-  const total = successCount + errorCount;
-  if (total === 0) return ''; // No data
+  // Card
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(margin, yPos, contentWidth, 22, 2, 2, 'FD');
   
-  // Chart positioning (centered)
-  const centerX = 200;
-  const centerY = 120;
-  const outerRadius = 85;
-  const innerRadius = 60; // Elegant thickness (25px ring)
+  // Header
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('DATA CONFIDENCE', margin + 5, yPos + 6);
   
-  // Calculate angles
-  const successAngle = (successCount / total) * 2 * Math.PI;
+  yPos += 12;
   
-  // Draw success arc
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, outerRadius, -Math.PI / 2, -Math.PI / 2 + successAngle);
-  ctx.arc(centerX, centerY, innerRadius, -Math.PI / 2 + successAngle, -Math.PI / 2, true);
-  ctx.closePath();
-  ctx.fillStyle = COLORS.SUCCESS;
-  ctx.fill();
+  // Coverage
+  pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.circle(margin + 6, yPos - 1, 1, 'F');
   
-  // Draw error arc
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, outerRadius, -Math.PI / 2 + successAngle, -Math.PI / 2 + 2 * Math.PI);
-  ctx.arc(centerX, centerY, innerRadius, -Math.PI / 2 + 2 * Math.PI, -Math.PI / 2 + successAngle, true);
-  ctx.closePath();
-  ctx.fillStyle = COLORS.ERROR;
-  ctx.fill();
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.text('Coverage: ', margin + 9, yPos);
   
-  // Center text - percentage (unified typography)
-  const errorRate = ((errorCount / total) * 100).toFixed(1);
-  ctx.fillStyle = COLORS.TEXT_PRIMARY;
-  ctx.font = FONTS.TITLE;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`${errorRate}%`, centerX, centerY - 8);
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('High', margin + 30, yPos);
   
-  // Subtitle
-  ctx.font = FONTS.SUBTITLE;
-  ctx.fillStyle = COLORS.TEXT_SECONDARY;
-  ctx.fillText('Error Rate', centerX, centerY + 12);
+  yPos += 5;
   
-  // UNIFIED LEGEND (same style for both charts)
-  const legendY = 250;
-  const legendBoxSize = 12;
-  const legendGap = 140;
+  // Sample
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.circle(margin + 6, yPos - 1, 1, 'F');
   
-  // Success legend
-  ctx.fillStyle = COLORS.SUCCESS;
-  ctx.fillRect(50, legendY, legendBoxSize, legendBoxSize);
-  ctx.fillStyle = COLORS.TEXT_SECONDARY;
-  ctx.font = FONTS.LABEL;
-  ctx.textAlign = 'left';
-  ctx.fillText(`Success: ${successCount}`, 68, legendY + 10);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.text('Sample: ', margin + 9, yPos);
   
-  // Error legend
-  ctx.fillStyle = COLORS.ERROR;
-  ctx.fillRect(50 + legendGap, legendY, legendBoxSize, legendBoxSize);
-  ctx.fillStyle = COLORS.TEXT_SECONDARY;
-  ctx.fillText(`Errors: ${errorCount}`, 68 + legendGap, legendY + 10);
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`${totalRuns} runs`, margin + 30, yPos);
   
-  return canvas.toDataURL('image/png');
+  yPos += 5;
+  
+  // Period
+  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.circle(margin + 6, yPos - 1, 1, 'F');
+  
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.text('Period: ', margin + 9, yPos);
+  
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('30 days', margin + 30, yPos);
+  
+  return yPos + 6;
 }
 
-function createSavingsBarChart(currentCost: number, optimizedCost: number): string {
-  // UNIFIED DIMENSIONS: 400x300 (same height as doughnut)
-  const canvas = document.createElement('canvas');
-  canvas.width = 400;
-  canvas.height = 300;
-  const ctx = canvas.getContext('2d')!;
+/**
+ * Add Before/After Comparison with horizontal lines
+ */
+function addBeforeAfterComparison(
+  pdf: jsPDF,
+  yPos: number,
+  margin: number,
+  contentWidth: number,
+  result: ParseResult
+): number {
+  // Card
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(margin, yPos, contentWidth, 28, 2, 2, 'FD');
   
-  // Chart dimensions (aligned with doughnut chart)
-  const maxValue = Math.max(currentCost, optimizedCost);
-  const barWidth = 70;
-  const maxBarHeight = 140;
-  const baseY = 210;
+  // Header
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('BEFORE VS AFTER OPTIMIZATION', margin + 5, yPos + 6);
   
-  // Calculate bar heights
-  const currentBarHeight = (currentCost / maxValue) * maxBarHeight;
-  const optimizedBarHeight = (optimizedCost / maxValue) * maxBarHeight;
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'italic');
+  pdf.text('Projected impact of recommended fixes', margin + 5, yPos + 10);
   
-  // Bar positions (centered)
-  const bar1X = 110;
-  const bar2X = 220;
+  yPos += 15;
   
-  // Draw current cost bar
-  ctx.fillStyle = COLORS.ERROR;
-  ctx.fillRect(bar1X, baseY - currentBarHeight, barWidth, currentBarHeight);
+  // Calculate values
+  const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop');
+  let currentErrorRate = 0;
+  if (errorFlag) {
+    const match = errorFlag.details.match(/(\d+\.?\d*)% error rate/);
+    if (match && match[1]) {
+      currentErrorRate = Math.round(parseFloat(match[1]));
+    }
+  }
   
-  // Draw optimized cost bar
-  ctx.fillStyle = COLORS.SUCCESS;
-  ctx.fillRect(bar2X, baseY - optimizedBarHeight, barWidth, optimizedBarHeight);
+  const hasPolling = result.efficiency_flags.some(f => f.flag_type === 'polling_trigger');
+  const currentCost = Math.round(result.estimated_savings * 12 * 2.5);
+  const optimizedCost = Math.round(result.estimated_savings * 12 * 0.1);
   
-  // UNIFIED TYPOGRAPHY
-  ctx.textAlign = 'center';
+  // Column setup
+  const col1X = margin + 5;
+  const col2X = margin + (contentWidth / 2) + 3;
+  const rowHeight = 6;
   
-  // Current cost value (above bar)
-  ctx.fillStyle = COLORS.TEXT_PRIMARY;
-  ctx.font = FONTS.VALUE;
-  ctx.fillText(`$${currentCost.toFixed(0)}`, bar1X + barWidth / 2, baseY - currentBarHeight - 12);
+  // Row 1: Error Rate & Yearly Cost
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.text('ERROR RATE', col1X, yPos);
+  pdf.text('YEARLY COST', col2X, yPos);
   
-  // Current cost label (below bar)
-  ctx.fillStyle = COLORS.TEXT_SECONDARY;
-  ctx.font = FONTS.LABEL;
-  ctx.fillText('Current', bar1X + barWidth / 2, baseY + 20);
+  yPos += 4;
   
-  // Optimized cost value (above bar)
-  ctx.fillStyle = COLORS.TEXT_PRIMARY;
-  ctx.font = FONTS.VALUE;
-  ctx.fillText(`$${optimizedCost.toFixed(0)}`, bar2X + barWidth / 2, baseY - optimizedBarHeight - 12);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.text(`${currentErrorRate}%`, col1X + 25, yPos);
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.text('→ under 5%', col1X + 35, yPos);
   
-  // Optimized cost label (below bar)
-  ctx.fillStyle = COLORS.TEXT_SECONDARY;
-  ctx.font = FONTS.LABEL;
-  ctx.fillText('Optimized', bar2X + barWidth / 2, baseY + 20);
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.text(`$${currentCost}`, col2X + 25, yPos);
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.text(`→ under $${optimizedCost}`, col2X + 40, yPos);
   
-  // Savings indicator (unified legend position)
-  const savings = currentCost - optimizedCost;
-  ctx.fillStyle = COLORS.SUCCESS;
-  ctx.font = FONTS.VALUE;
-  ctx.fillText(`Save $${savings.toFixed(0)}/year`, 200, 260);
+  yPos += 2;
   
-  return canvas.toDataURL('image/png');
+  // Horizontal line
+  pdf.setDrawColor(240, 240, 240);
+  pdf.setLineWidth(0.1);
+  pdf.line(col1X, yPos, margin + contentWidth - 5, yPos);
+  
+  yPos += 4;
+  
+  // Row 2: Sync Speed & Maintenance  
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.text('SYNC SPEED', col1X, yPos);
+  pdf.text('MAINTENANCE', col2X, yPos);
+  
+  yPos += 4;
+  
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'italic');
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  const beforeSpeed = hasPolling ? 'Polling' : 'Standard';
+  const afterSpeed = hasPolling ? 'Real-time' : 'Optimized';
+  pdf.text(beforeSpeed, col1X + 25, yPos);
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.text(`→ ${afterSpeed}`, col1X + 40, yPos);
+  
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.text('High', col2X + 25, yPos);
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.text('→ Automated', col2X + 35, yPos);
+  
+  return yPos + 8;
+}
+
+/**
+ * Add Quick Wins section
+ */
+function addQuickWins(
+  pdf: jsPDF,
+  yPos: number,
+  margin: number,
+  contentWidth: number,
+  result: ParseResult
+): number {
+  const topFlags = [...result.efficiency_flags]
+    .sort((a, b) => {
+      const severityOrder = { high: 0, medium: 1, low: 2 };
+      return (severityOrder[a.severity as keyof typeof severityOrder] || 999) - 
+             (severityOrder[b.severity as keyof typeof severityOrder] || 999);
+    })
+    .slice(0, 3);
+  
+  if (topFlags.length === 0) return yPos;
+  
+  // Card
+  pdf.setFillColor(236, 253, 245); // emerald-50
+  pdf.setDrawColor(167, 243, 208); // emerald-200
+  pdf.setLineWidth(0.5);
+  const cardHeight = 10 + (topFlags.length * 5);
+  pdf.roundedRect(margin, yPos, contentWidth, cardHeight, 2, 2, 'FD');
+  
+  // Header
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('QUICK WIN SUMMARY', margin + 5, yPos + 6);
+  
+  yPos += 12;
+  
+  topFlags.forEach((flag, i) => {
+    let actionName = '';
+    let result = '';
+    
+    if (flag.flag_type === 'error_loop') {
+      actionName = 'Fix authentication failures';
+      const errorMatch = flag.details.match(/(\d+\.?\d*)% error rate/);
+      const errorRate = errorMatch ? Math.round(parseFloat(errorMatch[1])) : 0;
+      result = `→ ${errorRate}% error reduction`;
+    } else if (flag.flag_type === 'late_filter_placement') {
+      actionName = 'Reposition filters earlier';
+      result = `→ $${flag.estimated_monthly_savings.toFixed(0)}/month savings`;
+    } else if (flag.flag_type === 'polling_trigger') {
+      actionName = 'Replace polling triggers';
+      result = `→ real-time + $${flag.estimated_monthly_savings.toFixed(0)}/month`;
+    } else {
+      actionName = flag.message.substring(0, 35);
+      result = `→ improved efficiency`;
+    }
+    
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.text(`${i + 1}. ${actionName}`, margin + 5, yPos);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.text(result, margin + 70, yPos);
+    
+    yPos += 5;
+  });
+  
+  return yPos + 3;
 }
 
 // ========================================
-// MAIN PDF GENERATION FUNCTION
+// MAIN PDF GENERATION
 // ========================================
 
 export async function generatePDFReport(result: ParseResult, config: PDFConfig) {
@@ -202,23 +315,16 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 20;
-  const contentWidth = pageWidth - 2 * margin;
+  const contentWidth = 170; // Precise width
   
-  pdf.setCharSpace(0);
-
   let yPos = margin;
   
-  // Extract Zap info (for single Zap audits)
   const zapTitle = result.efficiency_flags.length > 0 
     ? result.efficiency_flags[0].zap_title 
-    : result.zap_count === 1 ? 'Single Zap Audit' : 'Multi-Zap Audit';
-  const zapId = result.efficiency_flags.length > 0 
-    ? result.efficiency_flags[0].zap_id 
-    : null;
+    : 'Audit Report';
   
-  // Helper function to add a new page if needed
-  const checkPageBreak = (requiredSpace: number) => {
-    if (yPos + requiredSpace > pageHeight - margin) {
+  const checkPageBreak = (space: number) => {
+    if (yPos + space > pageHeight - margin) {
       pdf.addPage();
       yPos = margin;
       return true;
@@ -226,721 +332,213 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
     return false;
   };
   
-  // Header with white-label branding
-  pdf.setFillColor(15, 23, 42); // slate-900
-  pdf.rect(0, 0, pageWidth, 50, 'F');
-  
-  if (config.agencyLogo) {
-    // Add agency logo (if provided)
-    try {
-      pdf.addImage(config.agencyLogo, 'PNG', margin, 10, 30, 30);
-    } catch (e) {
-      console.warn('Failed to add logo:', e);
-    }
+
+  //HEADER
+// ============================================================================
+// PAGE HEADER (thin dark bar + light content area)
+// ============================================================================
+
+// Thin dark bar at top (10mm)
+pdf.setFillColor(30, 41, 59); // slate-800 (#1e293b)
+pdf.rect(0, 0, pageWidth, 10, 'F');
+
+yPos = 18; // Start content below the bar
+
+// LEFT: Logo + Title
+// Logo square (blue)
+pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.roundedRect(margin, yPos, 8, 8, 2, 2, 'F');
+
+// Lightning icon (white Z as placeholder)
+pdf.setTextColor(255, 255, 255);
+pdf.setFontSize(12);
+pdf.setFont('helvetica', 'bold');
+pdf.text('⚡', margin + 2, yPos + 6);
+
+// "Lighthouse" text
+pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+pdf.setFontSize(14);
+pdf.setFont('helvetica', 'bold');
+pdf.text('Lighthouse ', margin + 10, yPos + 6);
+
+// "Audit" text (blue, italic)
+pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.setFont('helvetica', 'bolditalic');
+const lighthouseWidth = pdf.getTextWidth('Lighthouse ');
+pdf.text('Audit', margin + 10 + lighthouseWidth, yPos + 6);
+
+// Subtitle
+pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+pdf.setFontSize(6);
+pdf.setFont('helvetica', 'bold');
+pdf.setCharSpace(0.5);
+pdf.text('ZAPIER AUTOMATION INTELLIGENCE REPORT', margin, yPos + 11);
+pdf.setCharSpace(0);
+
+// RIGHT: Audit Complete badge
+const badgeWidth = 25;
+const badgeX = pageWidth - margin - badgeWidth;
+pdf.setFillColor(236, 253, 245); // emerald-50
+pdf.setDrawColor(167, 243, 208); // emerald-200
+pdf.setLineWidth(0.3);
+pdf.roundedRect(badgeX, yPos, badgeWidth, 4.5, 2, 2, 'FD');
+
+pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+pdf.setFontSize(6);
+pdf.setFont('helvetica', 'bold');
+pdf.text('Audit Complete', badgeX + badgeWidth / 2, yPos + 3, { align: 'center' });
+
+// Date below badge
+pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+pdf.setFontSize(6);
+pdf.setFont('helvetica', 'italic');
+const now = new Date();
+const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+pdf.text(`${dateStr} • ${timeStr}`, pageWidth - margin, yPos + 7.5, { align: 'right' });
+
+yPos += 20;
+
+// Report ID badge (NO character spacing)
+const reportIdText = 'Report ID: LHA-2026-026-00003';
+
+pdf.setFontSize(7);
+pdf.setFont('helvetica', 'bold');
+pdf.setCharSpace(0); 
+
+const textWidth = pdf.getTextWidth(reportIdText);
+const idBadgePadding = 4;
+const idBadgeWidth = textWidth + (idBadgePadding * 2);
+const idBadgeHeight = 6;
+
+// Box
+pdf.setFillColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+pdf.roundedRect(margin, yPos, idBadgeWidth, idBadgeHeight, 3, 3, 'F');
+
+// PERFECT CENTER TEXT
+pdf.setTextColor(255, 255, 255);
+
+pdf.text(
+  reportIdText,
+  margin + idBadgeWidth / 2,
+  yPos + idBadgeHeight / 2,
+  {
+    align: 'center',
+    baseline: 'middle'  
   }
+);
+yPos += 15;
+        
+  // koniec HEADER
+
+  
+  
+  // Executive Summary
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
   
   pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(14);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('EXECUTIVE SUMMARY', margin + 5, yPos + 7.5);
+  
+  yPos += 17;
+  
+  // Metrics Grid
+  const gap = 5;
+  const boxWidth = (contentWidth - 2 * gap) / 3;
+  
+  // Score
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(margin, yPos, boxWidth, 25, 2, 2, 'FD');
+  
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFontSize(9);
+  pdf.text('EFFICIENCY SCORE', margin + boxWidth / 2, yPos + 6, { align: 'center' });
+  
+  const scoreColor = result.efficiency_score >= 75 ? COLORS.GREEN : 
+                     result.efficiency_score >= 50 ? { r: 245, g: 158, b: 11 } : COLORS.RED;
+  pdf.setTextColor(scoreColor.r, scoreColor.g, scoreColor.b);
   pdf.setFontSize(24);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('ZAPIER AUTOMATION AUDIT', pageWidth / 2, 25, { align: 'center' });
+  pdf.text(`${result.efficiency_score}`, margin + boxWidth / 2, yPos + 18, { align: 'center' });
   
-  pdf.setFontSize(12);
+  // Zaps
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+  pdf.roundedRect(margin + boxWidth + gap, yPos, boxWidth, 25, 2, 2, 'FD');
+  
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFontSize(9);
   pdf.setFont('helvetica', 'normal');
-  pdf.text(`Prepared by ${config.agencyName}`, pageWidth / 2, 35, { align: 'center' });
+  pdf.text('ZAPS ANALYZED', margin + boxWidth + gap + boxWidth / 2, yPos + 6, { align: 'center' });
   
-  yPos = 60;
-  
-  // ZAP IDENTIFICATION (for single Zap audits)
-  if (result.zap_count === 1 && zapTitle !== 'Multi-Zap Audit') {
-    pdf.setFillColor(241, 245, 249); // slate-100
-    pdf.roundedRect(margin, yPos, contentWidth, 20, 2, 2, 'F');
-    
-    pdf.setTextColor(15, 23, 42); // slate-900
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`Zap: ${zapTitle}`, margin + 5, yPos + 10);
-    
-    if (zapId) {
-      pdf.setTextColor(100, 116, 139); // slate-500
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`ID: ${zapId}`, margin + 5, yPos + 16);
-    }
-    
-    yPos += 25;
-  }
-  
-  // Client information
-  pdf.setTextColor(71, 85, 105); // slate-600
-  pdf.setFontSize(10);
-  pdf.text(`Client: ${config.clientName}`, margin, yPos);
-  pdf.text(`Report Date: ${config.reportDate}`, pageWidth - margin, yPos, { align: 'right' });
-  
-  yPos += 15;
-  
-  // Executive Summary Section
-  pdf.setFillColor(219, 234, 254); // ✅ #DBEAFE 
-  pdf.setDrawColor(147, 197, 253); // ✅ #93C5FD 
-  pdf.setLineWidth(0.1);
-  pdf.roundedRect(margin, yPos, contentWidth, 15, 2, 2, 'FD');
-    
-  pdf.setTextColor(37, 99, 235);   // ✅ #2563EB
-  pdf.setFontSize(16);
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(24);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('EXECUTIVE SUMMARY', margin + 5, yPos + 9.5);
+  pdf.text(`${result.zap_count}`, margin + boxWidth + gap + boxWidth / 2, yPos + 18, { align: 'center' });
   
-  yPos += 20;
+  // Steps
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+  pdf.roundedRect(margin + 2 * (boxWidth + gap), yPos, boxWidth, 25, 2, 2, 'FD');
   
-  // Key Metrics Grid
-  const gap = 5;
-  const metricBoxWidth = (contentWidth - 2 * gap) / 3;
-  
-  // Efficiency Score Box
-  pdf.setFillColor(241, 245, 249);
-  pdf.setDrawColor(200, 200, 200);  
-  pdf.setLineWidth(0.1);   
-  pdf.roundedRect(margin, yPos, metricBoxWidth, 30, 2, 2, 'FD');
-  pdf.setTextColor(71, 85, 105);
-  pdf.setFontSize(10);
-  pdf.text('EFFICIENCY SCORE', margin + metricBoxWidth / 2, yPos + 8, { align: 'center' });
-  
-  const scoreColor: [number, number, number] = result.efficiency_score >= 75 ? [16, 185, 129] : 
-                     result.efficiency_score >= 50 ? [245, 158, 11] : [239, 68, 68];
-  pdf.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
-  pdf.setFontSize(28);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(`${result.efficiency_score}`, margin + metricBoxWidth / 2, yPos + 22, { align: 'center' });
-  pdf.setFontSize(10);
-  pdf.text('/100', margin + metricBoxWidth / 2 + 10, yPos + 22);
-  
-  // Zaps Found Box
-  pdf.setFillColor(241, 245, 249);
-  pdf.setDrawColor(200, 200, 200);  
-  pdf.setLineWidth(0.1);   
-  pdf.roundedRect(margin + metricBoxWidth + gap, yPos, metricBoxWidth, 30, 2, 2, 'FD');
-  pdf.setTextColor(71, 85, 105);
-  pdf.setFontSize(10);
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFontSize(9);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('ZAPS ANALYZED', margin + metricBoxWidth + gap + metricBoxWidth / 2, yPos + 8, { align: 'center' });
-  pdf.setTextColor(15, 23, 42);
-  pdf.setFontSize(28);
+  pdf.text('TOTAL STEPS', margin + 2 * (boxWidth + gap) + boxWidth / 2, yPos + 6, { align: 'center' });
+  
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(24);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(`${result.zap_count}`, margin + metricBoxWidth + 5 + metricBoxWidth / 2, yPos + 22, { align: 'center' });
+  pdf.text(`${result.total_nodes}`, margin + 2 * (boxWidth + gap) + boxWidth / 2, yPos + 18, { align: 'center' });
   
-  // Total Steps Box
-  pdf.setFillColor(241, 245, 249);
-  pdf.setDrawColor(200, 200, 200);  
-  pdf.setLineWidth(0.1);            
-  pdf.roundedRect(margin + 2 * (metricBoxWidth + gap), yPos, metricBoxWidth, 30, 2, 2, 'FD');
-  pdf.setTextColor(71, 85, 105);
-  pdf.setFontSize(10);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('TOTAL STEPS', margin + 2 * (metricBoxWidth + gap) + metricBoxWidth / 2, yPos + 8, { align: 'center' });
-  pdf.setTextColor(15, 23, 42);
-  pdf.setFontSize(28);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(`${result.total_nodes}`, margin + 2 * (metricBoxWidth + 5) + metricBoxWidth / 2, yPos + 22, { align: 'center' });
+  yPos += 32;
   
-  yPos += 40;
+  // NEW SECTIONS
+  checkPageBreak(60);
+  yPos = addDataConfidence(pdf, yPos, margin, contentWidth, result);
+  yPos = addBeforeAfterComparison(pdf, yPos, margin, contentWidth, result);
+  yPos = addQuickWins(pdf, yPos, margin, contentWidth, result);
   
-  // VISUAL CHARTS SECTION (if applicable data exists)
-  const reliabilityFlags = result.efficiency_flags.filter(f => f.flag_type === 'error_loop');
-  const hasCharts = reliabilityFlags.length > 0 || result.estimated_savings > 0;
-  
-  if (hasCharts) {
-    checkPageBreak(60);
-    
-    // Calculate total runs and errors for reliability chart
-    let totalRuns = 0;
-    let totalErrors = 0;
-    
-    reliabilityFlags.forEach(flag => {
-      // Extract run counts from flag details if available
-      // This is a simplified extraction - in real scenario, we'd pass this data explicitly
-      const match = flag.details.match(/(\d+) errors out of (\d+) total runs/);
-      if (match) {
-        totalErrors += parseInt(match[1]);
-        totalRuns += parseInt(match[2]);
-      }
-    });
-    
-    const totalSuccess = totalRuns - totalErrors;
-    const currentAnnualCost = result.estimated_savings * 12;
-    const optimizedAnnualCost = 0; // After optimization
-    
-    // Layout: Two charts side by side
-    const chartWidth = (contentWidth - 10) / 2;
-    
-    // Left: Reliability Gauge (if error data exists)
-    if (reliabilityFlags.length > 0 && totalRuns > 0) {
-      try {
-        const reliabilityChart = createDoughnutChart(totalSuccess, totalErrors);
-        if (reliabilityChart) {
-          pdf.addImage(reliabilityChart, 'PNG', margin, yPos, chartWidth, chartWidth * 0.75);
-        }
-      } catch (e) {
-        console.warn('Failed to generate reliability chart:', e);
-      }
-    }
-    
-    // Right: Savings Bar Chart (if savings exist)
-    if (result.estimated_savings > 0) {
-      try {
-        const savingsChart = createSavingsBarChart(currentAnnualCost, optimizedAnnualCost);
-        if (savingsChart) {
-          const rightX = margin + chartWidth + 10;
-          pdf.addImage(savingsChart, 'PNG', rightX, yPos, chartWidth, chartWidth * 0.625);
-        }
-      } catch (e) {
-        console.warn('Failed to generate savings chart:', e);
-      }
-    }
-    
-    yPos += (reliabilityFlags.length > 0 ? chartWidth * 0.75 : chartWidth * 0.625) + 10;
-  }
-  
-  // Estimated Savings Highlight (if applicable)
+  // Savings
   if (result.estimated_savings > 0) {
-    checkPageBreak(40);
+    checkPageBreak(35);
     
-    pdf.setFillColor(209, 250, 229); 
-    pdf.setDrawColor(110, 231, 183); 
-    pdf.setLineWidth(0.1);            
-    pdf.roundedRect(margin, yPos, contentWidth, 40, 2, 2, 'FD');
+    pdf.setFillColor(209, 250, 229);
+    pdf.setDrawColor(110, 231, 183);
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(margin, yPos, contentWidth, 32, 2, 2, 'FD');
     
-    pdf.setTextColor(5, 150, 105);
-    pdf.setFontSize(12);
+    pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('ESTIMATED ANNUAL SAVINGS', margin + 5, yPos + 9.5);
+    pdf.text('ESTIMATED ANNUAL SAVINGS', margin + 5, yPos + 8);
     
-    pdf.setFontSize(32);
-    pdf.text(`$${(result.estimated_savings * 12).toFixed(0)}`, margin + 5, yPos + 25);
+    pdf.setFontSize(28);
+    pdf.text(`$${(result.estimated_savings * 12).toFixed(0)}`, margin + 5, yPos + 22);
     
-    pdf.setFontSize(10);
+    pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Monthly: $${result.estimated_savings.toFixed(0)} - Based on optimizing all detected issues`,
-             margin + 5, yPos + 32);
+    pdf.text(`Monthly: $${result.estimated_savings.toFixed(0)}`, margin + 5, yPos + 28);
     
-    yPos += 50;
+    yPos += 38;
   }
   
-  // Reliability Section (if error_loop flags exist)
-  if (reliabilityFlags.length > 0) {
-    checkPageBreak(20);
-    
-    pdf.setFillColor(254, 226, 226); 
-    pdf.setDrawColor(252, 165, 165); 
-    pdf.setLineWidth(0.1);
-    pdf.roundedRect(margin, yPos, contentWidth, 15, 2, 2, 'FD');
-    
-    pdf.setTextColor(220, 38, 38); 
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('[!] RELIABILITY CONCERNS', margin + 5, yPos + 9.5);
-    
-    pdf.setTextColor(71, 85, 105);
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`${reliabilityFlags.length} Zap${reliabilityFlags.length > 1 ? 's' : ''} with high error rates`, 
-            pageWidth - margin - 5, yPos + 10, { align: 'right' });
-    
-    yPos += 20;
-    
-    reliabilityFlags.forEach((flag, index) => {
-      // ✅ KOMPLETNÝ RESET na začiatku každého flagu
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
-      pdf.setCharSpace(0);
-      pdf.setTextColor(0, 0, 0);
-
-    // 🔍 DEBUG - vypiš do console
-      console.log('Flag details:', flag.details);
-      console.log('Flag details length:', flag.details.length);
-      console.log('Has extra spaces?', flag.details.includes('  '));
-
-      // Calculate dynamic height based on content
-      let estimatedHeight = 50;
-      
-      // Add extra space for enhanced analytics if present
-      if (flag.error_trend || flag.most_common_error || (flag.max_streak && flag.max_streak > 0)) {
-        estimatedHeight += 20;
-
-        if (flag.most_common_error && flag.most_common_error.length > 50) {
-          estimatedHeight += 10;
-        }
-      }
-      
-      // Auto-paging: check if we need a new page
-      checkPageBreak(estimatedHeight);
-      
-      // Flag box - dynamic height
-      const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 226, 226] : 
-                      flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
-
-      const borderColor: [number, number, number] = flag.severity === 'high' ? [252, 165, 165] : 
-                        flag.severity === 'medium' ? [252, 211, 77] : [147, 197, 253];
-
-      pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
-      pdf.setDrawColor(borderColor[0], borderColor[1], borderColor[2]); 
-      pdf.setLineWidth(0.1);                                              
-      pdf.roundedRect(margin, yPos, contentWidth, estimatedHeight, 2, 2, 'FD'); 
-      
-      // Severity badge
-      const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] : [217, 119, 6];
-      pdf.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
-      pdf.roundedRect(margin + 3, yPos + 3, 20, 6, 1, 1, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(flag.severity.toUpperCase(), margin + 13, yPos + 7, { align: 'center' });
-      
-      // Flag title
-      pdf.setTextColor(15, 23, 42);
-      pdf.setFontSize(11);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`${index + 1}. ${flag.zap_title}`, margin + 26, yPos + 7);
-      
-      // Flag message
-      pdf.setTextColor(51, 65, 85);
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setCharSpace(0);
-      let detailYPos = yPos + 15;
-      pdf.text(sanitizeForPDF(flag.message), margin + 5, detailYPos, {
-        maxWidth: contentWidth - 15
-      });
-
-      // Calculate how many lines the message took
-      const messageHeight = pdf.getTextDimensions(sanitizeForPDF(flag.message), {
-        maxWidth: contentWidth - 20
-      }).h;
-      detailYPos += messageHeight + 2;
-
-      // Flag details
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(71, 85, 105);
-      pdf.setCharSpace(0);
-      pdf.text(sanitizeForPDF(flag.details), margin + 5, detailYPos, {
-        maxWidth: contentWidth - 15
-      });
-
-      // Calculate how many lines the details took
-      const detailsHeight = pdf.getTextDimensions(sanitizeForPDF(flag.details), {
-        maxWidth: contentWidth - 20
-      }).h;
-      detailYPos += detailsHeight + 5;
-            
-
-      // Savings display (if available)
-      if (flag.estimated_monthly_savings > 0) {
-        pdf.setFillColor(16, 185, 129);
-        pdf.roundedRect(margin + 5, detailYPos - 2.5, 3, 3, 0.5, 0.5, 'F');
-        
-        // ✅ BOLD pre "Est. savings:" + hodnotu
-        pdf.setFontSize(8);
-        pdf.setTextColor(107, 114, 128);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`Est. savings: `, margin + 10, detailYPos);
-        
-        // ✅ BOLD pre číslo
-        const labelWidth = pdf.getTextWidth('Est. savings: ');
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`$${flag.estimated_monthly_savings.toFixed(2)}/month`, margin + 10 + labelWidth, detailYPos);
-        detailYPos += 4;
-        
-        // ✅ TMAVOSIVÝ text pre vysvetlivku
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7);
-        pdf.setTextColor(100, 100, 100); // Tmavosivá
-        const explanationLines = pdf.splitTextToSize(flag.savings_explanation, contentWidth - 25);
-        pdf.text(explanationLines, margin + 10, detailYPos);
-        detailYPos += (explanationLines.length * 3) + 3;
-      }
-      
-      
-      // Enhanced Analytics Section (only if data exists)
-      if (flag.error_trend || flag.most_common_error || (flag.max_streak && flag.max_streak > 0)) {
-        // Divider line
-        pdf.setDrawColor(203, 213, 225);
-        pdf.line(margin + 5, detailYPos - 2, pageWidth - margin - 5, detailYPos - 2);
-        
-        detailYPos += 3;
-        
-        pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(71, 85, 105);
-        pdf.text('ERROR ANALYTICS:', margin + 5, detailYPos);
-        
-        detailYPos += 5;
-        
-        // ✅ 2-STĹPCOVÝ LAYOUT - Trend a Max Streak vedľa seba
-        const column1X = margin + 7;
-        const column2X = margin + (contentWidth / 2);
-        
-        // Error Trend (ľavý stĺpec)
-        if (flag.error_trend) {
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(8);
-          
-          let trendText = '';
-          let trendColor: [number, number, number] = [71, 85, 105];
-          
-          if (flag.error_trend === 'increasing') {
-            trendText = 'Trend: DETERIORATING';
-            trendColor = [220, 38, 38];
-          } else if (flag.error_trend === 'decreasing') {
-            trendText = 'Trend: IMPROVING';
-            trendColor = [22, 163, 74];
-          } else {
-            trendText = 'Trend: Stable';
-          }
-          
-          pdf.setTextColor(trendColor[0], trendColor[1], trendColor[2]);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(trendText, column1X, detailYPos);
-        }
-        
-        // Max Streak (pravý stĺpec)
-        if (flag.max_streak && flag.max_streak > 0) {
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(8);
-          pdf.setTextColor(71, 85, 105);
-          
-          // Label normal
-          pdf.text('Max failures: ', column2X, detailYPos);
-          
-          // ✅ BOLD pre číslo
-          const labelWidth = pdf.getTextWidth('Max failures: ');
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(`${flag.max_streak}`, column2X + labelWidth, detailYPos);
-        }
-        
-        detailYPos += 4;
-        
-        // Most Common Error
-        if (flag.most_common_error) {
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(8);
-          pdf.setTextColor(71, 85, 105);
-          const errorPrefix = 'Most common error: ';
-          pdf.text(errorPrefix, margin + 7, detailYPos);
-          
-          // Error message in italic
-          pdf.setFont('helvetica', 'italic');
-          pdf.setTextColor(107, 114, 128);
-          pdf.setCharSpace(0); // RESET
-          pdf.text(flag.most_common_error, margin + 7 + pdf.getTextWidth(errorPrefix), detailYPos, {
-            maxWidth: contentWidth - 20 - pdf.getTextWidth(errorPrefix)
-          });
-          
-          // Calculate height
-          const errorHeight = pdf.getTextDimensions(flag.most_common_error, {
-            maxWidth: contentWidth - 20 - pdf.getTextWidth(errorPrefix)
-          }).h;
-          detailYPos += errorHeight;
-        }
-      }
-      
-      yPos += estimatedHeight + 5;
-    });
-    
-    yPos += 5;
-  }
-  
-  // Efficiency Findings Section
-  const efficiencyFlags = result.efficiency_flags.filter(f => f.flag_type !== 'error_loop');
-  if (efficiencyFlags.length > 0) {
-    checkPageBreak(20);
-    
-    pdf.setFillColor(219, 234, 254); // ✅ #DBEAFE 
-    pdf.setDrawColor(147, 197, 253); // ✅ #93C5FD 
-    pdf.setLineWidth(0.1);
-    pdf.roundedRect(margin, yPos, contentWidth, 15, 2, 2, 'FD');
-    
-    pdf.setTextColor(37, 99, 235); // ✅ #2563EB
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('EFFICIENCY FINDINGS', margin + 5, yPos + 9.5);
-    
-    pdf.setTextColor(71, 85, 105);
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`${efficiencyFlags.length} optimization ${efficiencyFlags.length === 1 ? 'opportunity' : 'opportunities'}`, pageWidth - margin - 5, yPos + 10, { align: 'right' });
-    
-    yPos += 20;
-    
-    efficiencyFlags.forEach((flag, index) => {
-      // Auto-paging: dynamically check space needed
-      let estimatedHeight = 30; // Base height
-  
-      // Add height for message
-      const messageLines = Math.ceil(flag.message.length / 80);
-      estimatedHeight += messageLines * 5;
-      
-      // Add height for details
-      const detailLines = Math.ceil(flag.details.length / 80);
-      estimatedHeight += detailLines * 4;
-      
-      // Add height for savings (if present)
-      if (flag.estimated_monthly_savings > 0) {
-        estimatedHeight += 15;
-      }
-      
-      checkPageBreak(estimatedHeight);
-      
-      // Flag box 
-      const flagColor: [number, number, number] = flag.severity === 'high' ? [254, 226, 226] : 
-                flag.severity === 'medium' ? [254, 243, 199] : [219, 234, 254];
-
-      const borderColor: [number, number, number] = flag.severity === 'high' ? [252, 165, 165] : 
-                        flag.severity === 'medium' ? [252, 211, 77] : [147, 197, 253];
-
-      pdf.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
-      pdf.setDrawColor(borderColor[0], borderColor[1], borderColor[2]); // ✅ pridaný border
-      pdf.setLineWidth(0.2);                                              // ✅ tenký okraj
-      pdf.roundedRect(margin, yPos, contentWidth, estimatedHeight, 2, 2, 'FD'); // ✅ 'FD'
-
-      // Severity badge - NOVÉ FARBY
-      const badgeColor: [number, number, number] = flag.severity === 'high' ? [220, 38, 38] : 
-                        flag.severity === 'medium' ? [217, 119, 6] : [37, 99, 235];
-      pdf.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
-      pdf.roundedRect(margin + 3, yPos + 3, 20, 6, 1, 1, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(flag.severity.toUpperCase(), margin + 13, yPos + 7, { align: 'center' });
-      
-      // Flag title
-      pdf.setTextColor(15, 23, 42);
-      pdf.setFontSize(11);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`${index + 1}. ${flag.zap_title}`, margin + 26, yPos + 7);
-      
-      // Flag message
-      pdf.setTextColor(51, 65, 85);
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      let detailYPos = yPos + 15;
-      pdf.setCharSpace(0);
-      pdf.text(sanitizeForPDF(flag.message), margin + 5, detailYPos, {
-        maxWidth: contentWidth - 15
-      });
-
-      // Calculate how many lines the message took
-      const messageHeight = pdf.getTextDimensions(sanitizeForPDF(flag.message), {
-        maxWidth: contentWidth - 20
-      }).h;
-      detailYPos += messageHeight + 2;
-
-      // Flag details
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(71, 85, 105);
-      pdf.setCharSpace(0);
-      pdf.text(sanitizeForPDF(flag.details), margin + 5, detailYPos, {
-        maxWidth: contentWidth - 15
-      });
-
-      // Calculate how many lines the details took
-      const detailsHeight = pdf.getTextDimensions(sanitizeForPDF(flag.details), {
-        maxWidth: contentWidth - 20
-      }).h;
-      detailYPos += detailsHeight + 5;
-      
-      // Savings display (if available)
-      // Savings display (Efficiency Flags) – unified style
-      if (flag.estimated_monthly_savings > 0) {
-        pdf.setFillColor(16, 185, 129);
-        pdf.roundedRect(margin + 5, detailYPos - 2.5, 3, 3, 0.5, 0.5, 'F');
-
-        pdf.setFontSize(8);
-
-        // Label
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(71, 85, 105);
-        const label = 'Est. savings: ';
-        pdf.text(label, margin + 10, detailYPos);
-
-        // Value (BOLD)
-        const labelWidth = pdf.getTextWidth(label);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(
-          `$${flag.estimated_monthly_savings.toFixed(2)}/month`,
-          margin + 10 + labelWidth,
-          detailYPos
-        );
-
-        detailYPos += 4;
-
-        // Explanation (tmavosivá, nie italic)
-        if (flag.savings_explanation) {
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(7);
-          pdf.setTextColor(100, 100, 100);
-
-          const explanationLines = pdf.splitTextToSize(
-            flag.savings_explanation,
-            contentWidth - 25
-          );
-
-          pdf.text(explanationLines, margin + 10, detailYPos);
-          detailYPos += explanationLines.length * 3 + 2;
-        }
-      }
-
-      
-      yPos += estimatedHeight + 5;
-    });
-  }
-  
-  // No findings case
-  if (result.efficiency_flags.length === 0) {
-    checkPageBreak(20);
-    
-    pdf.setFillColor(241, 245, 249);
-    pdf.rect(margin - 5, yPos - 5, contentWidth + 10, 12, 'F');
-    
-    pdf.setTextColor(15, 23, 42);
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('DETAILED FINDINGS', margin, yPos + 5);
-    
-    yPos += 20;
-    
-    pdf.setTextColor(16, 185, 129);
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('✓ No efficiency issues detected. Your Zaps are highly optimized!', margin, yPos);
-    yPos += 15;
-  }
-  
-  // App Inventory Section with intelligent grid layout
-  checkPageBreak(20);
-  
-  if (yPos > pageHeight - 100 && result.apps.length > 5) {
-    pdf.addPage();
-    yPos = margin;
-  }
-  
-  pdf.setFillColor(219, 234, 254); // ✅ #DBEAFE 
-  pdf.setDrawColor(147, 197, 253); // ✅ #93C5FD 
-  pdf.setLineWidth(0.1);
-  pdf.roundedRect(margin, yPos, contentWidth, 15, 2, 2, 'FD');
-
-  pdf.setTextColor(37, 99, 235);   // ✅ #2563EB
-  pdf.setFontSize(16);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('APP INVENTORY', margin + 5, yPos + 9.5);
-
-  pdf.setTextColor(71, 85, 105);
-  pdf.setFontSize(10);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text(`${result.apps.length} unique applications detected`, 
-          pageWidth - margin - 5, yPos + 10, { align: 'right' });
-
-  yPos += 20;
-  
-  // INTELLIGENT GRID LAYOUT: Use columns if many apps (better scalability)
-  if (result.apps.length > 15) {
-    // Multi-column grid layout for better space utilization
-    const numColumns = result.apps.length > 30 ? 3 : 2;
-    const gap = 4;  // ✅ medzera medzi stĺpcami
-    const columnWidth = (contentWidth - gap * (numColumns - 1)) / numColumns;  // ✅ presný výpočet
-    const itemHeight = 7;
-    let currentColumn = 0;
-    
-    result.apps.forEach((app, index) => {
-      // Check if we need a new page
-      if (yPos + itemHeight > pageHeight - margin) {
-        pdf.addPage();
-        yPos = margin;
-        currentColumn = 0;
-      }
-      
-      // ✅ PRESNÝ výpočet X pozície
-      const xPos = margin + currentColumn * (columnWidth + gap);
-      
-      // Alternating background for readability
-      const bgColor = index % 2 === 0 ? [226, 232, 240] : [241, 245, 249];
-      pdf.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-      pdf.setDrawColor(203, 213, 225);  // ✅ správny border color
-      pdf.setLineWidth(0.2);  // ✅ správna hrúbka
-      pdf.roundedRect(xPos, yPos, columnWidth, itemHeight, 2, 2, 'FD');  // ✅ presná šírka
-      
-      // App name (truncated if too long)
-      pdf.setTextColor(15, 23, 42);
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'bold');
-      const truncatedName = app.name.length > 25 ? app.name.substring(0, 22) + '...' : app.name;
-      pdf.text(truncatedName, xPos + 2, yPos + 4.5);  // ✅ padding vnútri
-      
-      // Usage count
-      pdf.setTextColor(148, 163, 184);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8);
-      pdf.text(`${app.count}×`, xPos + columnWidth - 2, yPos + 4.5, { align: 'right' });  // ✅ zarovnané
-      
-      // Move to next row or column
-      currentColumn++;
-      if (currentColumn >= numColumns) {
-        currentColumn = 0;
-        yPos += itemHeight;
-      }
-    });
-    
-    // Final yPos adjustment if not at start of new row
-    if (currentColumn > 0) {
-      yPos += itemHeight;
-    }
-  } else {
-    // Single-column list layout for smaller app inventories
-    result.apps.forEach((app, index) => {
-      checkPageBreak(10);
-      
-      // Alternating background
-      const bgColor = index % 2 === 0 ? [226, 232, 240] : [241, 245, 249];
-      pdf.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-      pdf.setDrawColor(203, 213, 225);  // ✅ správny border color
-      pdf.setLineWidth(0.2);  // ✅ správna hrúbka
-      pdf.roundedRect(margin, yPos - 2, contentWidth, 8, 2, 2, 'FD');  // ✅ PRESNE ako header
-      
-      // App name
-      pdf.setTextColor(15, 23, 42);
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(app.name, margin + 2, yPos + 3.5);  // ✅ +2 padding vnútri
-      
-      // Usage count
-      pdf.setTextColor(148, 163, 184);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`${app.count} ${app.count === 1 ? 'use' : 'uses'}`, pageWidth - margin - 2, yPos + 3.5, { align: 'right' });  // ✅ -2 padding
-      
-      yPos += 8;
-    });
-  }
-  
-  // Footer on all pages
+  // Footer
   const totalPages = pdf.internal.pages.length - 1;
   for (let i = 1; i <= totalPages; i++) {
     pdf.setPage(i);
-    pdf.setTextColor(148, 163, 184);
+    pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'normal');
     pdf.text(`Generated by Zapier Lighthouse | ${config.agencyName}`, 
              pageWidth / 2, pageHeight - 10, { align: 'center' });
     pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
-    pdf.text('Confidential', margin, pageHeight - 10);
   }
   
-  // ========================================
-  // DEBUG GRID: Draw AFTER all content (last thing before save)
-  // ========================================
-  for (let i = 1; i <= totalPages; i++) {
-    pdf.setPage(i);
-    drawDebugGrid(pdf, pageWidth, pageHeight);
-  }
-  
-  // Save PDF
-  pdf.save(`Zapier_Audit_Report_${config.clientName.replace(/\s+/g, '_')}_${config.reportDate}.pdf`);
+  // Save
+  const sanitizedTitle = zapTitle.replace(/[^a-z0-9]/gi, '_');
+  const timestamp = new Date().toISOString().split('T')[0];
+  pdf.save(`Lighthouse_${sanitizedTitle}_${timestamp}.pdf`);
 }
