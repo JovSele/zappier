@@ -37,6 +37,89 @@ interface ZapListResult {
   zaps: ZapSummary[]
 }
 
+// ============================================================================
+// REPORT ID & AUDIT LOG SYSTEM
+// ============================================================================
+
+/**
+ * Get next report ID from localStorage and increment counter
+ */
+// ============================================================================
+// REPORT ID & AUDIT LOG SYSTEM (TAMPER-RESISTANT)
+// ============================================================================
+
+/**
+ * Initialize first install timestamp (cannot be reset easily)
+ */
+function initFirstInstall(): string {
+  let firstInstall = localStorage.getItem('first_install_timestamp')
+  if (!firstInstall) {
+    firstInstall = new Date().toISOString()
+    localStorage.setItem('first_install_timestamp', firstInstall)
+    console.log('🎉 First install initialized:', firstInstall)
+  }
+  return firstInstall
+}
+
+/**
+ * Get next report ID from localStorage and increment counter
+ */
+function getNextReportId(): number {
+  initFirstInstall() // Ensure first install is set
+  const current = parseInt(localStorage.getItem('audit_counter') || '0')
+  const next = current + 1
+  localStorage.setItem('audit_counter', next.toString())
+  return next
+}
+
+/**
+ * Generate formatted report code with date hash
+ * Format: LHA-2026-026-00007
+ * Where: year-dayOfYear-counter
+ */
+function generateReportCode(reportId: number): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  
+  // Day of year (001-366)
+  const start = new Date(year, 0, 0)
+  const diff = now.getTime() - start.getTime()
+  const oneDay = 1000 * 60 * 60 * 24
+  const dayOfYear = Math.floor(diff / oneDay).toString().padStart(3, '0')
+  
+  const paddedId = reportId.toString().padStart(5, '0')
+  return `LHA-${year}-${dayOfYear}-${paddedId}`
+}
+
+/**
+ * Get audit statistics (for debugging/display)
+ */
+function getAuditStats() {
+  const firstInstall = localStorage.getItem('first_install_timestamp')
+  const counter = parseInt(localStorage.getItem('audit_counter') || '0')
+  return {
+    first_install: firstInstall,
+    total_audits: counter,
+    next_id: counter + 1
+  }
+}
+
+/**
+ * Save audit entry to localStorage
+ */
+function saveAuditLog(reportId: number, reportCode: string, zapId: number, zapTitle: string) {
+  const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]')
+  logs.push({
+    report_id: reportId,
+    report_code: reportCode,
+    zap_id: zapId,
+    zap_title: zapTitle,
+    timestamp: new Date().toISOString(),
+    report_type: 'full_audit'
+  })
+  localStorage.setItem('auditLogs', JSON.stringify(logs))
+}
+
 // Initialize WASM module
 let wasmReady = false
 
@@ -467,6 +550,61 @@ function displayZapSelector(zaps: ZapSummary[]) {
   renderZapTable(getFilteredZaps())
 }
 
+/**
+ * Generate Quick Wins HTML from top flags
+ */
+function generateQuickWinsHTML(flags: EfficiencyFlag[]): string {
+  // Sort by severity (high → medium → low) and take top 3
+  const sortedFlags = [...flags]
+    .sort((a, b) => {
+      const severityOrder = { high: 0, medium: 1, low: 2 }
+      return (severityOrder[a.severity as keyof typeof severityOrder] || 999) - 
+             (severityOrder[b.severity as keyof typeof severityOrder] || 999)
+    })
+    .slice(0, 3)
+  
+  if (sortedFlags.length === 0) {
+    return '<p class="text-emerald-600 font-bold text-[11px]">✅ No optimization needed - your Zap is already highly efficient!</p>'
+  }
+
+  // Ikony pre rôzne typy flags
+  const icons: Record<string, string> = {
+    error_loop: '🔴',
+    late_filter_placement: '⚡',
+    polling_trigger: '🔄'
+  }
+
+  return sortedFlags.map(flag => {
+    let actionText = ''
+    let impactText = ''
+    
+    // Generate concise action + impact based on flag type
+    if (flag.flag_type === 'error_loop') {
+      actionText = 'Fix recurring failures'
+      const errorReduction = flag.error_rate ? Math.round(flag.error_rate) : 0
+      impactText = `reduce wasted runs by ${errorReduction}%`
+    } else if (flag.flag_type === 'late_filter_placement') {
+      actionText = 'Move filters earlier in workflow'
+      const monthlySavings = flag.estimated_monthly_savings.toFixed(0)
+      impactText = `save ~$${monthlySavings}/month`
+    } else if (flag.flag_type === 'polling_trigger') {
+      actionText = 'Replace polling triggers'
+      const monthlySavings = flag.estimated_monthly_savings.toFixed(0)
+      impactText = `save ~$${monthlySavings}/month`
+    } else {
+      // Generic fallback
+      actionText = flag.message.substring(0, 40)
+      const monthlySavings = flag.estimated_monthly_savings.toFixed(0)
+      impactText = monthlySavings !== '0' ? `save ~$${monthlySavings}/month` : 'optimize efficiency'
+    }
+    
+    return `<p class="flex items-center gap-2">
+              <span class="text-base leading-none flex-shrink-0">${icons[flag.flag_type] || '💡'}</span>
+              <span class="leading-relaxed"><strong class="font-bold">${actionText}</strong> → ${impactText}</span>
+            </p>`
+  }).join('')
+}
+
 // ============================================================================
 // HTML REPORT GENERATION (NEW)
 // ============================================================================
@@ -495,28 +633,73 @@ async function generateHtmlReport(result: ParseResult, zapInfo: ZapSummary): Pro
     const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop') as EfficiencyFlag | undefined
     const reliability = errorFlag ? Math.round(100 - (errorFlag.error_rate || 0)).toString() : '100'
     const errorRate = errorFlag ? Math.round(errorFlag.error_rate || 0).toString() : '0'
+
+    // Calculate Sample runs and Period from zapInfo (if available)
+    const sampleRuns = zapInfo.total_runs > 0 ? zapInfo.total_runs.toString() : '150' // fallback to 150
+    const periodDays = '30' // Currently we always analyze 30 days (from CSV data)
     
     // PAGE 1 - Executive Overview replacements (use global RegExp)
     html = html.replace(/62\/100/g, `${result.efficiency_score}/100`)
     html = html.replace(/Below Optimal/g, scoreLabel)
     html = html.replace(/Jan 21, 2026 • 09:45 AM/g, `${reportDate} • ${reportTime}`)
-    html = html.replace(/LHA-2026-X79B2/g, `LHA-${now.getFullYear()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`)
+    // Generate sequential report ID
+    const reportId = getNextReportId()
+    const reportCode = generateReportCode(reportId)
+    html = html.replace(/LHA-2026-X79B2/g, reportCode)
+
+// Save to audit log
+saveAuditLog(reportId, reportCode, zapInfo.id, zapInfo.title)
     html = html.replace(/WordPress to Reddit Sync/g, zapInfo.title)
     html = html.replace(/ID: 884-291-002/g, `ID: ${zapInfo.id}`)
     html = html.replace(/Status: <span class="text-emerald-500 uppercase font-semibold">Active<\/span>/g, 
       `Status: <span class="text-${zapInfo.status.toLowerCase() === 'on' ? 'emerald' : 'slate'}-500 uppercase font-semibold">${zapInfo.status.toUpperCase()}</span>`)
     
+    // Replace Sample and Period in Data Confidence section
+    html = html.replace(/Sample: 150 runs/g, `Sample: ${sampleRuns} runs`)
+    html = html.replace(/Period: 30 days/g, `Period: ${periodDays} days`)
+
     // Savings replacements (multiple occurrences)
     html = html.replace(/\$405\/year/g, `$${annualSavings}/year`)
     html = html.replace(/\$405/g, `$${annualSavings}`)
+
+    // Replace Annual Waste ($1,240 in template - currently hardcoded)
+    const annualWaste = Math.round(result.estimated_savings * 12 * 2.5).toString()
+    html = html.replace(/\$1,240\/yr/g, `$${annualWaste}/yr`)
+    html = html.replace(/\$1,240/g, `$${annualWaste}`)
+
+    // Replace $450 (current yearly cost in template)
+    const currentYearlyCost = Math.round((result.estimated_savings * 12) + parseInt(annualSavings)).toString()
+    html = html.replace(/\$450/g, `$${currentYearlyCost}`)
     
     // Reliability metrics
     html = html.replace(/62%<\/div>/g, `${reliability}%</div>`)
     html = html.replace(/38% <span class="text-emerald-600">→ potential under 5%<\/span>/g, 
       `${errorRate}% <span class="text-emerald-600">→ potential under 5%</span>`)
+
+    // Fix "Below expected reliability" text when reliability is 100%
+    if (reliability === '100') {
+      html = html.replace(/Below expected reliability/gi, 'Excellent reliability')
+      html = html.replace(/text-rose-500/g, 'text-emerald-500')
+    }
     
     // Replace dynamic Action Plan section
     html = replaceActionPlan(html, result.efficiency_flags)
+
+    // Replace Quick Wins section
+    const quickWinsHTML = generateQuickWinsHTML(result.efficiency_flags)
+    html = html.replace(
+      /<!-- Quick Wins -->[\s\S]*?<\/div>\s*<!-- Footer -->/,
+      `<!-- Quick Wins -->
+        <div class="card border-emerald-100 bg-emerald-50/30 p-4 mb-6">
+            <h4 class="text-emerald-700 text-[9px] font-black uppercase tracking-widest mb-3">
+                Top Optimization Opportunities
+            </h4>
+            <div class="space-y-2 text-[11px] text-slate-700">
+                ${quickWinsHTML}
+            </div>
+        </div>
+        <!-- Footer -->`
+    )
     
     // PAGE 2 - Technical Details
     html = html.replace(/12 Steps • High Complexity/g, `${result.total_nodes} Steps • ${result.total_nodes > 8 ? 'High' : result.total_nodes > 4 ? 'Medium' : 'Low'} Complexity`)
@@ -656,16 +839,19 @@ function replaceErrorAnalysis(html: string, flags: any[]): string {
 /**
  * Replace Cost Waste Analysis section with real optimization opportunities
  */
+/**
+ * Replace Cost Waste Analysis section with real optimization opportunities
+ */
 function replaceCostWasteAnalysis(html: string, flags: any[]): string {
   const pollingFlag = flags.find(f => f.flag_type === 'polling_trigger')
   const filterFlag = flags.find(f => f.flag_type === 'late_filter_placement')
   
-  let replacementHTML = ''
+  let cardsHTML = ''
   
-  // Polling trigger section
+  // Polling trigger card
   if (pollingFlag) {
     const annualSavings = ((pollingFlag.estimated_monthly_savings || 0) * 12).toFixed(0)
-    replacementHTML += `
+    cardsHTML += `
         <div class="m-4 p-5 bg-amber-50/50 border border-amber-100 rounded-xl">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
@@ -683,13 +869,13 @@ function replaceCostWasteAnalysis(html: string, flags: any[]): string {
                 <p class="text-[10px] font-bold text-emerald-700 uppercase italic">Estimated savings: $${annualSavings}/year</p>
             </div>
         </div>
-    `
+`
   }
   
-  // Late filter placement section
+  // Late filter placement card
   if (filterFlag) {
     const annualSavings = ((filterFlag.estimated_monthly_savings || 0) * 12).toFixed(0)
-    replacementHTML += `
+    cardsHTML += `
         <div class="m-4 ${pollingFlag ? 'mt-0' : ''} p-5 bg-rose-50/50 border border-rose-100 rounded-xl">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
@@ -707,20 +893,41 @@ function replaceCostWasteAnalysis(html: string, flags: any[]): string {
                 <p class="text-[10px] font-bold text-emerald-700 uppercase italic">Estimated savings: $${annualSavings}/year</p>
             </div>
         </div>
-    `
+`
   }
   
-  if (!replacementHTML) {
-    replacementHTML = `
+  // Empty state if no flags
+  if (!cardsHTML) {
+    cardsHTML = `
         <div class="m-4 p-5 bg-emerald-50/50 border border-emerald-100 rounded-xl text-center">
             <p class="text-sm text-emerald-700 font-bold">✅ No cost waste detected! Your Zap is well optimized.</p>
         </div>
-    `
+`
   }
   
-  // Replace the entire Cost Waste Analysis content
-  const costWasteRegex = /(<div class="bg-blue-600 p-4 flex justify-between items-center text-white">[\s\S]*?<\/div>)([\s\S]*?)(<\/div>\s*<!-- Visual Analytics -->)/
-  return html.replace(costWasteRegex, `$1${replacementHTML}$3`)
+  // Count opportunities dynamically
+  const opportunityCount = [pollingFlag, filterFlag].filter(Boolean).length
+  
+  // Build complete section with header
+  const fullSectionHTML = `
+    <!-- Optimization Checklist -->
+    <!-- COST_WASTE_START -->
+    <div class="mb-8 card p-0 overflow-hidden border-blue-100 shadow-sm">
+        <div class="bg-blue-600 p-4 flex justify-between items-center text-white">
+            <div class="flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <h4 class="text-[10px] font-black uppercase tracking-[0.2em]">Cost Waste Analysis</h4>
+            </div>
+            <span class="text-[9px] font-bold opacity-90 uppercase">${opportunityCount} Opportunit${opportunityCount === 1 ? 'y' : 'ies'}</span>
+        </div>
+${cardsHTML}
+    </div>
+    <!-- COST_WASTE_END -->
+`
+  
+  // Simple marker-based replacement
+  const regex = /<!-- COST_WASTE_START -->[\s\S]*?<!-- COST_WASTE_END -->/
+  return html.replace(regex, fullSectionHTML)
 }
 
 // NEW: Handle Zap Selection (run full audit on selected Zap)

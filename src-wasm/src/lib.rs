@@ -643,12 +643,17 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
                             (0.0, "Insufficient execution data for savings calculation".to_string(), true) // true = fallback
                         }
                     } else {
-                        // Fallback calculation without task history (30% conservative estimate)
+                        // Fallback calculation without task history
+                        // Estimate: 100 runs/month * actions_before_filter * 30% rejection rate * $0.02/task
+                        let estimated_monthly_runs = 100.0;
+                        let fallback_savings = estimated_monthly_runs * (actions_before_filter as f32) * LATE_FILTER_FALLBACK_RATE * TASK_PRICE;
                         let explanation = format!(
-                            "Estimated using industry average {}% fallback (no execution data available)",
+                            "Estimated: ~{} monthly runs, {} actions before filter, {}% rejection rate (industry average, no execution data)",
+                            estimated_monthly_runs as u32,
+                            actions_before_filter,
                             (LATE_FILTER_FALLBACK_RATE * 100.0) as u32
                         );
-                        (0.0, explanation, true) // true = using fallback estimate
+                        (fallback_savings, explanation, true) // true = using fallback estimate
                     };
                     
                     return Some(EfficiencyFlag {
@@ -715,20 +720,36 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
         // Calculate savings: 20% reduction from polling overhead
         // NOTE: Polling trigger savings are ALWAYS fallback/estimated (no way to measure actual overhead)
         let (monthly_savings, savings_explanation, has_execution_data) = if let Some(stats) = &zap.usage_stats {
-            if stats.total_runs > 0 {
-                let savings = (stats.total_runs as f32) * TASK_PRICE * POLLING_REDUCTION_RATE;
-                let explanation = format!(
-                    "Estimated using industry average {}% fallback from {} polling executions",
-                    (POLLING_REDUCTION_RATE * 100.0) as u32,
-                    stats.total_runs
-                );
-                (savings, explanation, true) // has execution count, but savings % is still estimate
-            } else {
-                (0.0, "Insufficient execution data for savings calculation".to_string(), false)
-            }
-        } else {
-            (0.0, "Insufficient execution data for savings calculation".to_string(), false)
-        };
+    if stats.total_runs > 0 {
+        let savings = (stats.total_runs as f32) * TASK_PRICE * POLLING_REDUCTION_RATE;
+        let explanation = format!(
+            "Estimated using industry average {}% fallback from {} polling executions",
+            (POLLING_REDUCTION_RATE * 100.0) as u32,
+            stats.total_runs
+        );
+        (savings, explanation, true)
+    } else {
+        // Fallback: Zap má stats ale 0 runs
+        let estimated_monthly_checks = 100.0;
+        let fallback_savings = estimated_monthly_checks * TASK_PRICE * POLLING_REDUCTION_RATE;
+        let explanation = format!(
+            "Estimated: ~{} monthly polling checks, {}% overhead (no execution data)",
+            estimated_monthly_checks as u32,
+            (POLLING_REDUCTION_RATE * 100.0) as u32
+        );
+        (fallback_savings, explanation, true)
+    }
+} else {
+    // Fallback: Zap nemá žiadne stats
+    let estimated_monthly_checks = 100.0;
+    let fallback_savings = estimated_monthly_checks * TASK_PRICE * POLLING_REDUCTION_RATE;
+    let explanation = format!(
+        "Estimated: ~{} monthly polling checks, {}% overhead (no execution data)",
+        estimated_monthly_checks as u32,
+        (POLLING_REDUCTION_RATE * 100.0) as u32
+    );
+    (fallback_savings, explanation, true)
+};
         
         Some(EfficiencyFlag {
             zap_id: zap.id,
