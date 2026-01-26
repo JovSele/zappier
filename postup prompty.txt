@@ -56,3 +56,6 @@ Spusti vývojový server:
     https://platform.claude.com/dashboard
 Dalsi krok:
     Príprava pre klientov: Chceš do aplikácie pridať formulár, kde si klient môže pred spustením auditu zadať svoje meno a názov firmy, aby sa tieto údaje automaticky vpísali do PDF hlavičky?
+
+
+    git commit -m "feat: dynamic Quick Wins, sequential report IDs, fully dynamic HTML template"
