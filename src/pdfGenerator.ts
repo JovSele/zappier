@@ -75,26 +75,33 @@ function addBeforeAfterComparison(
 ): number {
   const cardHeight = 35;
   const innerMargin = 5;
+  const cardOffset = 1;
 
-  // 1. Pozadie karty
-  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
-  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  // 1. Shadow box (spodný, modrý)
+  pdf.setFillColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setDrawColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.roundedRect(margin, yPos, contentWidth - cardOffset, cardHeight, 3, 3, 'FD');
+
+  // 2. Main box 
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b); 
+  pdf.setDrawColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
   pdf.setLineWidth(0.1);
-  pdf.roundedRect(margin, yPos, contentWidth, cardHeight, 2, 2, 'FD');
+  pdf.roundedRect(margin + cardOffset, yPos, contentWidth - cardOffset, cardHeight, 3, 3, 'FD');
   
-  // 2. Nadpisy sekcie
-  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  // 3. Nadpisy sekcie
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b); // Tmavší modrý header
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
   pdf.setCharSpace(1);
-  pdf.text('BEFORE VS AFTER OPTIMIZATION', margin + innerMargin, yPos + 6);
+  pdf.text('BEFORE VS AFTER OPTIMIZATION', margin + innerMargin + cardOffset, yPos + 6);
   pdf.setCharSpace(0);
 
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'italic');
-  pdf.text('Projected impact of recommended fixes', margin + innerMargin, yPos + 10);
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.text('Projected impact of recommended fixes', margin + innerMargin + cardOffset, yPos + 10);
   
-  // 3. Extrakcia dát (bezpečnejšie regexy)
+  // 4. Extrakcia dát
   const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop');
   let currentErrorRate = 0;
   if (errorFlag?.details) {
@@ -105,9 +112,9 @@ function addBeforeAfterComparison(
   const currentCost = Math.round((result.estimated_savings || 0) * 12 * 2.5);
   const optimizedCost = Math.round((result.estimated_savings || 0) * 12 * 0.1);
 
-  // 4. Rozloženie stĺpcov
-  const col1X = margin + innerMargin;
-  const col2X = margin + (contentWidth / 2) + 2;
+  // 5. Rozloženie stĺpcov
+  const col1X = margin + innerMargin + cardOffset;
+  const col2X = margin + (contentWidth / 2) + 2 + cardOffset;
   let currentY = yPos + 17;
 
   // Pomocná funkcia na nakreslenie šípky
@@ -115,89 +122,86 @@ function addBeforeAfterComparison(
     pdf.setDrawColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
     pdf.setLineWidth(0.4);
     
-    // Horizontálna čiara
     pdf.line(x, y - 1, x + 2.5, y - 1);
     
-    // Hrot (trojuholník) - kratší a širší
     pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
     pdf.triangle(
-      x + 2.5, y - 2,    // horný bod (vrchná hrana)
-      x + 4, y - 1.0,      // pravý hrot
-      x + 2.5, y - 0.0,    // dolný bod (spodná hrana)
+      x + 2.5, y - 2,
+      x + 4, y - 1.0,
+      x + 2.5, y - 0.0,
       'F'
     );
     
-    return 5; // Šírka šípky v mm
+    return 5;
   };
 
-
-  // Pomocná funkcia na kreslenie riadku (label + hodnoty na jednom riadku)
+  // Pomocná funkcia na kreslenie riadku
   const drawRow = (l1: string, v1: string, n1: string, l2: string, v2: string, n2: string, isItalic = false) => {
-  const labelWidth = 32;
-  
-  // COLUMN 1
-  pdf.setFontSize(7);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text(l1, col1X, currentY);
-  
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', isItalic ? 'italic' : 'normal');
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  const v1X = col1X + labelWidth;
-  pdf.text(v1, v1X, currentY);
-  const v1Width = pdf.getTextWidth(v1);
-  
-  const arrow1X = v1X + v1Width + 2;
-  const arrow1Width = drawArrow(arrow1X, currentY);
-  
-  pdf.setFont('helvetica', isItalic ? 'italic' : 'bold');
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.text(n1, arrow1X + arrow1Width + 1, currentY);
-  
-  // COLUMN 2
-  pdf.setFontSize(7);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text(l2, col2X, currentY);
-  
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', isItalic ? 'italic' : 'normal');
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  const v2X = col2X + labelWidth;
-  pdf.text(v2, v2X, currentY);
-  const v2Width = pdf.getTextWidth(v2);
-  
-  const arrow2X = v2X + v2Width + 2;
-  const arrow2Width = drawArrow(arrow2X, currentY);
-  
-  pdf.setFont('helvetica', isItalic ? 'italic' : 'bold');
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.text(n2, arrow2X + arrow2Width + 1, currentY);
-  
-  currentY += 5;
-};
+    const labelWidth = 32;
+    
+    // COLUMN 1
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+    pdf.text(l1, col1X, currentY);
+    
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', isItalic ? 'italic' : 'normal');
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    const v1X = col1X + labelWidth;
+    pdf.text(v1, v1X, currentY);
+    const v1Width = pdf.getTextWidth(v1);
+    
+    const arrow1X = v1X + v1Width + 2;
+    const arrow1Width = drawArrow(arrow1X, currentY);
+    
+    pdf.setFont('helvetica', isItalic ? 'italic' : 'bold');
+    pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.text(n1, arrow1X + arrow1Width + 1, currentY);
+    
+    // COLUMN 2
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+    pdf.text(l2, col2X, currentY);
+    
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', isItalic ? 'italic' : 'normal');
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    const v2X = col2X + labelWidth;
+    pdf.text(v2, v2X, currentY);
+    const v2Width = pdf.getTextWidth(v2);
+    
+    const arrow2X = v2X + v2Width + 2;
+    const arrow2Width = drawArrow(arrow2X, currentY);
+    
+    pdf.setFont('helvetica', isItalic ? 'italic' : 'bold');
+    pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.text(n2, arrow2X + arrow2Width + 1, currentY);
+    
+    currentY += 5;
+  };
 
-// Riadok 1
-drawRow(
-  'ERROR RATE', `${currentErrorRate}%`, 'under 5%',
-  'YEARLY COST', `$${currentCost}`, `under $${optimizedCost}`
-);
+  // Riadok 1
+  drawRow(
+    'ERROR RATE', `${currentErrorRate}%`, 'under 5%',
+    'YEARLY COST', `$${currentCost}`, `under $${optimizedCost}`
+  );
 
-// Deliaca čiara
-currentY += -1;
-pdf.setDrawColor(240, 240, 240);
-pdf.line(col1X, currentY, margin + contentWidth - innerMargin, currentY);
-currentY += 7;
+  // Deliaca čiara
+  currentY += -1;
+  pdf.setDrawColor(240, 240, 240);
+  pdf.line(col1X, currentY, margin + contentWidth - innerMargin - cardOffset, currentY);
+  currentY += 7;
 
-// Riadok 2
-const speedBefore = hasPolling ? 'Polling' : 'Standard';
-const speedAfter = hasPolling ? 'Real-time' : 'Optimized';
-drawRow(
-  'SYNC SPEED', speedBefore, speedAfter,
-  'MAINTENANCE', 'High', 'Automated',
-  true
-);
+  // Riadok 2
+  const speedBefore = hasPolling ? 'Polling' : 'Standard';
+  const speedAfter = hasPolling ? 'Real-time' : 'Optimized';
+  drawRow(
+    'SYNC SPEED', speedBefore, speedAfter,
+    'MAINTENANCE', 'High', 'Automated',
+    true
+  );
 
   return yPos + cardHeight + 8;
 }
@@ -233,7 +237,9 @@ function addQuickWins(
   pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
   pdf.setFontSize(9);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('QUICK WIN SUMMARY', margin + 5, yPos + 6);
+  pdf.setCharSpace(1);
+  pdf.text('Top Optimization Opportunities', margin + 5, yPos + 6);
+  pdf.setCharSpace(0);
   
   yPos += 12;
   
@@ -380,7 +386,7 @@ pdf.setFont('helvetica', 'italic');
 const now = new Date();
 const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-pdf.text(`${dateStr} • ${timeStr}`, pageWidth - margin, yPos + 7.5, { align: 'right' });
+pdf.text(`${dateStr} • ${timeStr}`, pageWidth - margin, yPos + 8.5, { align: 'right' });
 
 yPos += 20;
 
@@ -417,166 +423,198 @@ yPos += 15;
   // koniec HEADER
 
   //section 1
-  // ============================================================================
-  // EFFICIENCY SCORE + DATA CONFIDENCE (2 cards side by side) - section 1
-  // ============================================================================
-  const cardGap = 4;
-  const cardWidth = (contentWidth - cardGap) / 2;
-  const cardHeight = 35;
+// ============================================================================
+// EFFICIENCY SCORE + DATA CONFIDENCE (2 cards side by side) - section 1
+// ============================================================================
+const cardGap = 4;
+const cardWidth = (contentWidth - cardGap) / 2;
+const cardHeight = 35;
+const cardOffsetS = 1;
 
-  // LEFT CARD: Efficiency Score
-  const leftCardX = margin;
+// ============================================================================
+// LEFT CARD: Efficiency Score
+// ============================================================================
+const leftCardX = margin;
 
-  pdf.setFillColor(239, 246, 255); // blue-50
-  pdf.setDrawColor(191, 219, 254); // blue-200
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(leftCardX, yPos, cardWidth, cardHeight, 3, 3, 'FD');
+// Shadow box (spodný)
+const leftShadowColor = result.efficiency_score >= 75 ? COLORS.GREEN : 
+                        result.efficiency_score >= 50 ? { r: 245, g: 158, b: 11 } : COLORS.RED;
+pdf.setFillColor(leftShadowColor.r, leftShadowColor.g, leftShadowColor.b);
+pdf.setDrawColor(leftShadowColor.r, leftShadowColor.g, leftShadowColor.b);
+pdf.roundedRect(leftCardX, yPos, cardWidth - cardOffsetS, cardHeight, 3, 3, 'FD');
 
-  // LEFT CARD - Header
-  pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
-  pdf.setFontSize(7);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('OVERALL PERFORMANCE', leftCardX + cardWidth / 2, yPos + 6, { align: 'center' });
+// Main box (vrchný, jemný odtieň podľa score)
+const leftBgColor = result.efficiency_score >= 75 ? { r: 236, g: 253, b: 245 } : // emerald-50
+                    result.efficiency_score >= 50 ? { r: 254, g: 243, b: 199 } : // amber-50
+                    { r: 255, g: 241, b: 242 }; // rose-50
+pdf.setFillColor(leftBgColor.r, leftBgColor.g, leftBgColor.b);
+pdf.setDrawColor(leftShadowColor.r, leftShadowColor.g, leftShadowColor.b);
+pdf.setLineWidth(0.1);
+pdf.roundedRect(leftCardX + cardOffsetS, yPos, cardWidth - cardOffsetS, cardHeight, 3, 3, 'FD');
 
-  // Score
-  const scoreColor = result.efficiency_score >= 75 ? COLORS.GREEN : 
-                    result.efficiency_score >= 50 ? { r: 245, g: 158, b: 11 } : COLORS.RED;
-  pdf.setTextColor(scoreColor.r, scoreColor.g, scoreColor.b);
-  pdf.setFontSize(32);
-  pdf.setFont('helvetica', 'bold');
-  const scoreText = `${result.efficiency_score}`;
-  const scoreWidth = pdf.getTextWidth(scoreText);
-  pdf.text(scoreText, leftCardX + cardWidth / 2 - scoreWidth / 2 - 3, yPos + 19);
+// Header
+pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+pdf.setFontSize(7);
+pdf.setFont('helvetica', 'bold');
+pdf.text('OVERALL PERFORMANCE', leftCardX + cardWidth / 2, yPos + 6, { align: 'center' });
 
-  pdf.setFontSize(16);
-  pdf.text('/100', leftCardX + cardWidth / 2 + scoreWidth / 2 - 3, yPos + 19);
+// Score
+const scoreColor = result.efficiency_score >= 75 ? COLORS.GREEN : 
+                  result.efficiency_score >= 50 ? { r: 245, g: 158, b: 11 } : COLORS.RED;
+pdf.setTextColor(scoreColor.r, scoreColor.g, scoreColor.b);
+pdf.setFontSize(32);
+pdf.setFont('helvetica', 'bold');
+const scoreText = `${result.efficiency_score}`;
+const scoreWidth = pdf.getTextWidth(scoreText);
+pdf.text(scoreText, leftCardX + cardWidth / 2 - scoreWidth / 2 - 3, yPos + 19);
 
-  // Label
-  const scoreLabel = result.efficiency_score >= 90 ? 'EXCELLENT' :
-                    result.efficiency_score >= 75 ? 'GOOD' :
-                    result.efficiency_score >= 50 ? 'FAIR' : 'BELOW OPTIMAL';
-  const labelColor = result.efficiency_score >= 75 ? COLORS.GREEN :
-                    result.efficiency_score >= 50 ? { r: 245, g: 158, b: 11 } : { r: 217, g: 119, b: 6 };
-  pdf.setTextColor(labelColor.r, labelColor.g, labelColor.b);
-  pdf.setFontSize(8);
-  pdf.text(scoreLabel, leftCardX + cardWidth / 2, yPos + 25, { align: 'center' });
+pdf.setFontSize(16);
+pdf.text('/100', leftCardX + cardWidth / 2 + scoreWidth / 2 - 3, yPos + 19);
 
-  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.setFontSize(7);
-  pdf.text('EFFICIENCY SCORE', leftCardX + cardWidth / 2, yPos + 30, { align: 'center' });
+// Label
+const scoreLabel = result.efficiency_score >= 90 ? 'EXCELLENT' :
+                  result.efficiency_score >= 75 ? 'GOOD' :
+                  result.efficiency_score >= 50 ? 'FAIR' : 'BELOW OPTIMAL';
+const labelColor = result.efficiency_score >= 75 ? COLORS.GREEN :
+                  result.efficiency_score >= 50 ? { r: 245, g: 158, b: 11 } : { r: 217, g: 119, b: 6 };
+pdf.setTextColor(labelColor.r, labelColor.g, labelColor.b);
+pdf.setFontSize(8);
+pdf.text(scoreLabel, leftCardX + cardWidth / 2, yPos + 25, { align: 'center' });
 
-  // RIGHT CARD: Data Confidence
-  const rightCardX = margin + cardWidth + cardGap;
+pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+pdf.setFontSize(7);
+pdf.text('EFFICIENCY SCORE', leftCardX + cardWidth / 2, yPos + 30, { align: 'center' });
 
-  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
-  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(rightCardX, yPos, cardWidth, cardHeight, 3, 3, 'FD');
+// ============================================================================
+// RIGHT CARD: Data Confidence
+// ============================================================================
+const rightCardX = margin + cardWidth + cardGap;
 
-  // RIGHT CARD - Header  
-  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.setFontSize(7);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('DATA CONFIDENCE', rightCardX + cardWidth / 2, yPos + 6, { align: 'center' });
+// Shadow box (spodný, slate)
+pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+pdf.roundedRect(rightCardX, yPos, cardWidth - cardOffsetS, cardHeight, 3, 3, 'FD');
 
-  // 3 bullet points
-  let bulletY = yPos + 14;
+// Main box (vrchný, slate-50)
+pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+pdf.setLineWidth(0.1);
+pdf.roundedRect(rightCardX + cardOffsetS, yPos, cardWidth - cardOffsetS, cardHeight, 3, 3, 'FD');
 
-  // Coverage
-  pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.circle(rightCardX + 8, bulletY, 1, 'F');
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Coverage:', rightCardX + 12, bulletY + 1);
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('High', rightCardX + 32, bulletY + 1);
+// Header  
+pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+pdf.setFontSize(7);
+pdf.setFont('helvetica', 'bold');
+pdf.text('DATA CONFIDENCE', rightCardX + cardWidth / 2, yPos + 6, { align: 'center' });
 
-  bulletY += 6;
+// 3 bullet points
+let bulletY = yPos + 14;
 
-  // Sample
-  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
-  pdf.circle(rightCardX + 8, bulletY, 1, 'F');
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Sample:', rightCardX + 12, bulletY + 1);
+// Coverage
+pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+pdf.circle(rightCardX + cardOffsetS + 8, bulletY, 1, 'F');
+pdf.setFontSize(9);
+pdf.setFont('helvetica', 'normal');
+pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+pdf.text('Coverage:', rightCardX + cardOffsetS + 12, bulletY + 1);
+pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+pdf.setFont('helvetica', 'bold');
+pdf.text('High', rightCardX + cardOffsetS + 32, bulletY + 1);
 
-  // Dynamická extrakcia totalRuns
-  const totalRuns = (() => {
-    let max = 150;
-    result.efficiency_flags.forEach(f => {
-      const m = f.details.match(/(\d+) total runs/);
-      if (m) max = Math.max(max, parseInt(m[1]));
-    });
-    return max;
-  })();
+bulletY += 6;
 
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(`${totalRuns} runs`, rightCardX + 32, bulletY + 1);
+// Sample
+pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.circle(rightCardX + cardOffsetS + 8, bulletY, 1, 'F');
+pdf.setFont('helvetica', 'normal');
+pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+pdf.text('Sample:', rightCardX + cardOffsetS + 12, bulletY + 1);
 
-  bulletY += 6;
+// Dynamická extrakcia totalRuns
+const totalRuns = (() => {
+  let max = 150;
+  result.efficiency_flags.forEach(f => {
+    const m = f.details.match(/(\d+) total runs/);
+    if (m) max = Math.max(max, parseInt(m[1]));
+  });
+  return max;
+})();
 
-  // Period
-  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.circle(rightCardX + 8, bulletY, 1, 'F');
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Period:', rightCardX + 12, bulletY + 1);
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('30 days', rightCardX + 32, bulletY + 1);
+pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+pdf.setFont('helvetica', 'bold');
+pdf.text(`${totalRuns} runs`, rightCardX + cardOffsetS + 32, bulletY + 1);
 
-  yPos += cardHeight + 6;
+bulletY += 6;
 
-  //end - section 1
+// Period
+pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+pdf.circle(rightCardX + cardOffsetS + 8, bulletY, 1, 'F');
+pdf.setFont('helvetica', 'normal');
+pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+pdf.text('Period:', rightCardX + cardOffsetS + 12, bulletY + 1);
+pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+pdf.setFont('helvetica', 'bold');
+pdf.text('30 days', rightCardX + cardOffsetS + 32, bulletY + 1);
+
+yPos += cardHeight + 6;
+
+//end - section 1
   
 
-  //section 2
-  // ============================================================================
-  // ZAP INFO BOX Analyzed Automation 
-  // ============================================================================
+ //section 2
+// ============================================================================
+// ZAP INFO BOX Analyzed Automation 
+// ============================================================================
 
-  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
-  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
-  pdf.setLineWidth(0.3);
-  pdf.roundedRect(margin, yPos, contentWidth, 25, 3, 3, 'FD'); // ✅ vyska boxu
+const zapBoxHeight = 25;
+const zapBoxOffset = 1;
 
-  // Header "ANALYZED AUTOMATION"
-  pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
-  pdf.setFontSize(8);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setCharSpace(1);
-  pdf.text('ANALYZED AUTOMATION', margin + 6, yPos + 6); // ✅ yPos + 6 - mensie cislo blizsie k vrchu  poloha "ANALYZED AUTOMATION"
-  pdf.setCharSpace(0);
+// Shadow box (spodný, modrý)
+pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.setDrawColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.roundedRect(margin, yPos, contentWidth - zapBoxOffset, zapBoxHeight, 3, 3, 'FD');
 
-  // Zap Title (väčší spacing pod headerom)
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.setFontSize(14);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(zapTitle, margin + 6, yPos + 14); // ✅ Zostáva rovnaké
+// Main box (vrchný, jemný modrý odtieň)
+pdf.setFillColor(239, 246, 255); // blue-50
+pdf.setDrawColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.setLineWidth(0.1);
+pdf.roundedRect(margin + zapBoxOffset, yPos, contentWidth - zapBoxOffset, zapBoxHeight, 3, 3, 'FD');
 
-  // Zap ID + Status (väčší spacing pod titulom)
-  const zapId = result.efficiency_flags.length > 0 
-    ? result.efficiency_flags[0].zap_id 
-    : 0;
+// Header "ANALYZED AUTOMATION"
+pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.setFontSize(8);
+pdf.setFont('helvetica', 'bold');
+pdf.setCharSpace(1);
+pdf.text('ANALYZED AUTOMATION', margin + 6 + zapBoxOffset, yPos + 6);
+pdf.setCharSpace(0);
 
-  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text(`ID: ${zapId} • Status: `, margin + 6, yPos + 21); // ✅ yPos + 17 (bol 16)
+// Zap Title
+pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+pdf.setFontSize(14);
+pdf.setFont('helvetica', 'bold');
+pdf.text(zapTitle, margin + 6 + zapBoxOffset, yPos + 14);
 
-  // Status badge
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('ACTIVE', margin + 41, yPos + 21); // ✅ yPos + 17 (bol 16)
+// Zap ID + Status
+const zapId = result.efficiency_flags.length > 0 
+  ? result.efficiency_flags[0].zap_id 
+  : 0;
 
-  yPos += 30; // ✅ Väčší spacing po boxe 
+pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+pdf.setFontSize(9);
+pdf.setFont('helvetica', 'normal');
+pdf.text(`ID: ${zapId} • Status: `, margin + 6 + zapBoxOffset, yPos + 21);
 
-  //end - Anylyzed Automation section 2
+// Status badge
+pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+pdf.setFont('helvetica', 'bold');
+pdf.text('ACTIVE', margin + 41 + zapBoxOffset, yPos + 21);
 
-// EXECUTIVE VERDICT - section 3
+yPos += zapBoxHeight + 5;
+
+//end - Analyzed Automation section 2
+
+
+// section 3
 // ============================================================================
 // EXECUTIVE VERDICT (žltý box)
 // ============================================================================
