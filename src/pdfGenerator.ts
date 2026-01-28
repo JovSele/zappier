@@ -86,9 +86,11 @@ function addBeforeAfterComparison(
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
   pdf.text('BEFORE VS AFTER OPTIMIZATION', margin + innerMargin, yPos + 6);
-  
-  pdf.setFontSize(7);
+  pdf.setCharSpace(0);
+
+  pdf.setFontSize(8);
   pdf.setFont('helvetica', 'italic');
   pdf.text('Projected impact of recommended fixes', margin + innerMargin, yPos + 10);
   
@@ -183,10 +185,10 @@ drawRow(
 );
 
 // Deliaca čiara
-currentY += 1;
+currentY += -1;
 pdf.setDrawColor(240, 240, 240);
 pdf.line(col1X, currentY, margin + contentWidth - innerMargin, currentY);
-currentY += 6;
+currentY += 7;
 
 // Riadok 2
 const speedBefore = hasPolling ? 'Polling' : 'Standard';
@@ -538,12 +540,12 @@ yPos += 15;
 
   pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
   pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(margin, yPos, contentWidth, 22, 3, 3, 'FD'); // ✅ vyska boxu
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(margin, yPos, contentWidth, 25, 3, 3, 'FD'); // ✅ vyska boxu
 
   // Header "ANALYZED AUTOMATION"
   pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
-  pdf.setFontSize(7);
+  pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
   pdf.setCharSpace(1);
   pdf.text('ANALYZED AUTOMATION', margin + 6, yPos + 6); // ✅ yPos + 6 - mensie cislo blizsie k vrchu  poloha "ANALYZED AUTOMATION"
@@ -553,7 +555,7 @@ yPos += 15;
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFontSize(14);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(zapTitle, margin + 6, yPos + 12); // ✅ Zostáva rovnaké
+  pdf.text(zapTitle, margin + 6, yPos + 14); // ✅ Zostáva rovnaké
 
   // Zap ID + Status (väčší spacing pod titulom)
   const zapId = result.efficiency_flags.length > 0 
@@ -563,26 +565,23 @@ yPos += 15;
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setFontSize(9);
   pdf.setFont('helvetica', 'normal');
-  pdf.text(`ID: ${zapId} • Status: `, margin + 6, yPos + 17); // ✅ yPos + 17 (bol 16)
+  pdf.text(`ID: ${zapId} • Status: `, margin + 6, yPos + 21); // ✅ yPos + 17 (bol 16)
 
   // Status badge
   pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('ACTIVE', margin + 41, yPos + 17); // ✅ yPos + 17 (bol 16)
+  pdf.text('ACTIVE', margin + 41, yPos + 21); // ✅ yPos + 17 (bol 16)
 
-  yPos += 26; // ✅ Väčší spacing po boxe 
+  yPos += 30; // ✅ Väčší spacing po boxe 
 
   //end - Anylyzed Automation section 2
 
-
-
-
-//EXECUTIVE VERDICT - section 3
+// EXECUTIVE VERDICT - section 3
 // ============================================================================
 // EXECUTIVE VERDICT (žltý box)
 // ============================================================================
 
-const boxHeight = 24;
+const boxHeight = 26;
 const offset = 1;
 
 // PRVÝ BOX (spodný, plnofarebný, menší)
@@ -598,7 +597,7 @@ pdf.roundedRect(margin + offset, yPos, contentWidth - offset, boxHeight, 3, 3, '
 
 // "EXECUTIVE VERDICT" label
 pdf.setTextColor(217, 119, 6); // amber-600
-pdf.setFontSize(7);
+pdf.setFontSize(8);
 pdf.setFont('helvetica', 'bold');
 pdf.setCharSpace(1);
 pdf.text('EXECUTIVE VERDICT', margin + 6, yPos + 6);
@@ -620,7 +619,7 @@ pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
 pdf.setFont('helvetica', 'bold');
 pdf.text(`up to $${annualSavings}/year.`, margin + 45, yPos + 20);
 
-yPos += 15; // spacing after box
+yPos += 11; // spacing after box
 
 // Scope text 
 pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
@@ -635,22 +634,26 @@ yPos += boxHeight + 1; // spacing after boxes
 
 
 //3 boxy - section 4
-//KEY METRICS - section 5
-// ============================================================================
-// KEY METRICS (3 cards s farebnými bottom borders)
-// ============================================================================
 
 const metricsGap = 4;
 const metricCardWidth = (contentWidth - 2 * metricsGap) / 3;
 const metricCardHeight = 32;
+const cardOffset = 1;
 
-// CARD 1: Annual Waste (rose border)
+// ============================================================================
+// CARD 1: Annual Waste (rose shadow effect)
+// ============================================================================
 
-// 1. Main card (white, zaoblené rohy)
-pdf.setFillColor(255, 255, 255);
-pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+// Shadow box (spodný, červený)
+pdf.setFillColor(239, 68, 68); // rose-500
+pdf.setDrawColor(239, 68, 68);
+pdf.roundedRect(margin, yPos, metricCardWidth - cardOffset, metricCardHeight, 3, 3, 'FD');
+
+// Main card (vrchný, biely)
+pdf.setFillColor(255, 241, 242);
+pdf.setDrawColor(239, 68, 68);
 pdf.setLineWidth(0.1);
-pdf.roundedRect(margin, yPos, metricCardWidth, metricCardHeight, 3, 3, 'FD');
+pdf.roundedRect(margin + cardOffset, yPos, metricCardWidth - cardOffset, metricCardHeight, 3, 3, 'FD');
 
 // Header
 pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
@@ -658,14 +661,17 @@ pdf.setFontSize(7);
 pdf.setFont('helvetica', 'bold');
 pdf.text('ESTIMATED ANNUAL WASTE', margin + metricCardWidth / 2, yPos + 6, { align: 'center' });
 
-// Value
+// CARD 1: Value
 const annualWaste = Math.round(result.estimated_savings * 12 * 2.5);
 pdf.setTextColor(239, 68, 68); // rose-600
 pdf.setFontSize(20);
 pdf.setFont('helvetica', 'bold');
-pdf.text(`$${annualWaste}`, margin + metricCardWidth / 2, yPos + 16, { align: 'center' });
+const waste1Text = `$${annualWaste}`;
+const waste1Width = pdf.getTextWidth(waste1Text);
+pdf.text(waste1Text, margin + metricCardWidth / 2 - waste1Width / 2 - 3, yPos + 18);
+
 pdf.setFontSize(12);
-pdf.text('/yr', margin + metricCardWidth / 2 + 12, yPos + 16);
+pdf.text('/yr', margin + metricCardWidth / 2 + waste1Width / 2 - 3, yPos + 18);
 
 // Subtitle
 pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
@@ -673,13 +679,21 @@ pdf.setFontSize(6);
 pdf.setFont('helvetica', 'bold');
 pdf.text('PAID FOR INEFFICIENT TASKS', margin + metricCardWidth / 2, yPos + 28, { align: 'center' });
 
-// CARD 2: Immediate Savings (emerald border)
+// ============================================================================
+// CARD 2: Immediate Savings (emerald shadow effect)
+// ============================================================================
 const card2X = margin + metricCardWidth + metricsGap;
 
-pdf.setFillColor(255, 255, 255);
-pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+// Shadow box (spodný, zelený)
+pdf.setFillColor(16, 185, 129); // emerald-500
+pdf.setDrawColor(16, 185, 129);
+pdf.roundedRect(card2X, yPos, metricCardWidth - cardOffset, metricCardHeight, 3, 3, 'FD');
+
+// Main card (vrchný, biely)
+pdf.setFillColor(236, 253, 245);
+pdf.setDrawColor(16, 185, 129);
 pdf.setLineWidth(0.1);
-pdf.roundedRect(card2X, yPos, metricCardWidth, metricCardHeight, 3, 3, 'FD');
+pdf.roundedRect(card2X + cardOffset, yPos, metricCardWidth - cardOffset, metricCardHeight, 3, 3, 'FD');
 
 // Header
 pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
@@ -687,13 +701,16 @@ pdf.setFontSize(7);
 pdf.setFont('helvetica', 'bold');
 pdf.text('ESTIMATED IMMEDIATE SAVINGS', card2X + metricCardWidth / 2, yPos + 6, { align: 'center' });
 
-// Value
+// CARD 2: Value
 pdf.setTextColor(16, 185, 129); // emerald-600
 pdf.setFontSize(20);
 pdf.setFont('helvetica', 'bold');
-pdf.text(`$${annualSavings}`, card2X + metricCardWidth / 2, yPos + 16, { align: 'center' });
+const savings2Text = `$${annualSavings}`;
+const savings2Width = pdf.getTextWidth(savings2Text);
+pdf.text(savings2Text, card2X + metricCardWidth / 2 - savings2Width / 2 - 3, yPos + 18);
+
 pdf.setFontSize(12);
-pdf.text('/yr', card2X + metricCardWidth / 2 + 12, yPos + 16);
+pdf.text('/yr', card2X + metricCardWidth / 2 + savings2Width / 2 - 3, yPos + 18);
 
 // Subtitle
 pdf.setTextColor(16, 185, 129); // emerald-500
@@ -701,13 +718,21 @@ pdf.setFontSize(6);
 pdf.setFont('helvetica', 'bold');
 pdf.text('LOW-HANGING FRUIT', card2X + metricCardWidth / 2, yPos + 28, { align: 'center' });
 
-// CARD 3: Reliability (blue border)
+// ============================================================================
+// CARD 3: Reliability (blue shadow effect)
+// ============================================================================
 const card3X = margin + 2 * (metricCardWidth + metricsGap);
 
-pdf.setFillColor(255, 255, 255);
-pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+// Shadow box (spodný, modrý)
+pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.setDrawColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+pdf.roundedRect(card3X, yPos, metricCardWidth - cardOffset, metricCardHeight, 3, 3, 'FD');
+
+// Main card (vrchný, biely)
+pdf.setFillColor(239, 246, 255);
+pdf.setDrawColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
 pdf.setLineWidth(0.1);
-pdf.roundedRect(card3X, yPos, metricCardWidth, metricCardHeight, 3, 3, 'FD');
+pdf.roundedRect(card3X + cardOffset, yPos, metricCardWidth - cardOffset, metricCardHeight, 3, 3, 'FD');
 
 // Header
 pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
@@ -728,11 +753,6 @@ pdf.setFontSize(24);
 pdf.setFont('helvetica', 'bold');
 pdf.text(`${reliability}%`, card3X + metricCardWidth / 2, yPos + 18, { align: 'center' });
 
-pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-pdf.setFontSize(24);
-pdf.setFont('helvetica', 'bold');
-pdf.text(`${reliability}%`, card3X + metricCardWidth / 2, yPos + 18, { align: 'center' });
-
 // Subtitle
 const reliabilityColor = reliability === 100 ? { r: 16, g: 185, b: 129 } : { r: 239, g: 68, b: 68 };
 const reliabilityText = reliability === 100 ? 'EXCELLENT RELIABILITY' : 'BELOW EXPECTED RELIABILITY';
@@ -741,9 +761,11 @@ pdf.setFontSize(6);
 pdf.setFont('helvetica', 'bold');
 pdf.text(reliabilityText, card3X + metricCardWidth / 2, yPos + 28, { align: 'center' });
 
-yPos += metricCardHeight + 8; // spacing after cards
+yPos += metricCardHeight + 8;
 
 //end -3 boxy - section 4
+
+
 
 
   // NEW SECTIONS
