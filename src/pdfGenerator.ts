@@ -298,7 +298,7 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   };
   
 
-  //HEADER
+//HEADER
 // ============================================================================
 // PAGE HEADER (thin dark bar + light content area)
 // ============================================================================
@@ -313,32 +313,32 @@ yPos = 18; // Start content below the bar
 // Logo square (blue)
 pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
 pdf.roundedRect(margin, yPos, 8, 8, 2, 2, 'F');
-
-// Lightning icon (SVG path)
+// Lightning bolt
 pdf.setFillColor(255, 255, 255);
 
 const iconX = margin + 4;
 const iconY = yPos + 4;
 
-// Horný trojuholník
-pdf.triangle(
-  iconX - 0.6, iconY - 1.2,  // ľavý horný
-  iconX + 0.4, iconY - 1.2,  // pravý horný
-  iconX + 0.9, iconY + 0.3,  // pravý hrot (prekrytie)
-  'F'
-);
+// ŠTARTOVACÍ BOD (absolútna pozícia):
+const startX = iconX + 0.8;
+const startY = iconY - 2.9;  // Vrchol hore (trochu vpravo od stredu)
 
-// Dolný trojuholník
-pdf.triangle(
-  iconX - 0.9, iconY - 0.3,  // ľavý hrot (prekrytie)
-  iconX - 0.4, iconY + 1.2,  // ľavý dolný
-  iconX + 0.6, iconY + 1.2,  // pravý dolný
-  'F'
-);
+// RELATÍVNE POHYBY od predchádzajúceho bodu:
+const lightningPath = [
+  [-1.7, 3.2],   // BOD 1: doľava -1.5mm, dole +2.8mm → ľavý zlom (stred blesku)
+  [0.6, 0],      // BOD 2: doprava +1.2mm, rovnako → pravý stred (telo blesku)
+  [-0.6, 3.2],   // BOD 3: doľava -1.5mm, dole +2.7mm → dolný hrot blesku
+  [1.7, -3.2],   // BOD 4: doprava +2.7mm, hore -2.7mm → pravý zlom (návrat hore)
+  [-0.6, 0],     // BOD 5: doľava -1.2mm, rovnako → ľavý stred (telo blesku)
+  [0.6, -3.2]    // BOD 6: doprava +0.3mm, hore -2.8mm → späť na vrchol (uzavretie)
+];
+
+pdf.lines(lightningPath, startX, startY, [1, 1], 'F', true);
+
 
 // "Lighthouse" text
 pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-pdf.setFontSize(14);
+pdf.setFontSize(18);
 pdf.setFont('helvetica', 'bold');
 pdf.text('Lighthouse ', margin + 10, yPos + 6);
 
@@ -348,30 +348,32 @@ pdf.setFont('helvetica', 'bolditalic');
 const lighthouseWidth = pdf.getTextWidth('Lighthouse ');
 pdf.text('Audit', margin + 10 + lighthouseWidth, yPos + 6);
 
+yPos += 1;
+
 // Subtitle
 pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-pdf.setFontSize(6);
+pdf.setFontSize(8);
 pdf.setFont('helvetica', 'bold');
-pdf.setCharSpace(0.5);
+pdf.setCharSpace(0.1);
 pdf.text('ZAPIER AUTOMATION INTELLIGENCE REPORT', margin, yPos + 11);
 pdf.setCharSpace(0);
 
 // RIGHT: Audit Complete badge
-const badgeWidth = 25;
+const badgeWidth = 28;
 const badgeX = pageWidth - margin - badgeWidth;
 pdf.setFillColor(236, 253, 245); // emerald-50
 pdf.setDrawColor(167, 243, 208); // emerald-200
-pdf.setLineWidth(0.3);
+pdf.setLineWidth(0.2);
 pdf.roundedRect(badgeX, yPos, badgeWidth, 4.5, 2, 2, 'FD');
 
 pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-pdf.setFontSize(6);
+pdf.setFontSize(7);
 pdf.setFont('helvetica', 'bold');
 pdf.text('Audit Complete', badgeX + badgeWidth / 2, yPos + 3, { align: 'center' });
 
 // Date below badge
 pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-pdf.setFontSize(6);
+pdf.setFontSize(8);
 pdf.setFont('helvetica', 'italic');
 const now = new Date();
 const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -383,7 +385,7 @@ yPos += 20;
 // Report ID badge (NO character spacing)
 const reportIdText = 'Report ID: LHA-2026-026-00003';
 
-pdf.setFontSize(7);
+pdf.setFontSize(8);
 pdf.setFont('helvetica', 'bold');
 pdf.setCharSpace(0); 
 
@@ -411,9 +413,8 @@ pdf.text(
 yPos += 15;
         
   // koniec HEADER
- 
 
-
+  //section 1
   // ============================================================================
   // EFFICIENCY SCORE + DATA CONFIDENCE (2 cards side by side) - section 1
   // ============================================================================
@@ -421,7 +422,7 @@ yPos += 15;
   const cardWidth = (contentWidth - cardGap) / 2;
   const cardHeight = 35;
 
-  // LEFT CARD: Efficiency Score (modrý gradient)
+  // LEFT CARD: Efficiency Score
   const leftCardX = margin;
 
   pdf.setFillColor(239, 246, 255); // blue-50
@@ -429,22 +430,24 @@ yPos += 15;
   pdf.setLineWidth(0.5);
   pdf.roundedRect(leftCardX, yPos, cardWidth, cardHeight, 3, 3, 'FD');
 
-  // Header
+  // LEFT CARD - Header
   pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
   pdf.setFontSize(7);
   pdf.setFont('helvetica', 'bold');
-  pdf.setCharSpace(1);
   pdf.text('OVERALL PERFORMANCE', leftCardX + cardWidth / 2, yPos + 6, { align: 'center' });
-  pdf.setCharSpace(0);
 
   // Score
   const scoreColor = result.efficiency_score >= 75 ? COLORS.GREEN : 
                     result.efficiency_score >= 50 ? { r: 245, g: 158, b: 11 } : COLORS.RED;
   pdf.setTextColor(scoreColor.r, scoreColor.g, scoreColor.b);
   pdf.setFontSize(32);
-  pdf.text(`${result.efficiency_score}`, leftCardX + cardWidth / 2 - 8, yPos + 20);
+  pdf.setFont('helvetica', 'bold');
+  const scoreText = `${result.efficiency_score}`;
+  const scoreWidth = pdf.getTextWidth(scoreText);
+  pdf.text(scoreText, leftCardX + cardWidth / 2 - scoreWidth / 2 - 3, yPos + 19);
+
   pdf.setFontSize(16);
-  pdf.text('/100', leftCardX + cardWidth / 2 + 12, yPos + 20);
+  pdf.text('/100', leftCardX + cardWidth / 2 + scoreWidth / 2 - 3, yPos + 19);
 
   // Label
   const scoreLabel = result.efficiency_score >= 90 ? 'EXCELLENT' :
@@ -454,13 +457,13 @@ yPos += 15;
                     result.efficiency_score >= 50 ? { r: 245, g: 158, b: 11 } : { r: 217, g: 119, b: 6 };
   pdf.setTextColor(labelColor.r, labelColor.g, labelColor.b);
   pdf.setFontSize(8);
-  pdf.text(scoreLabel, leftCardX + cardWidth / 2, yPos + 26, { align: 'center' });
+  pdf.text(scoreLabel, leftCardX + cardWidth / 2, yPos + 25, { align: 'center' });
 
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setFontSize(7);
-  pdf.text('EFFICIENCY SCORE', leftCardX + cardWidth / 2, yPos + 31, { align: 'center' });
+  pdf.text('EFFICIENCY SCORE', leftCardX + cardWidth / 2, yPos + 30, { align: 'center' });
 
-  // RIGHT CARD: Data Confidence (slate-50)
+  // RIGHT CARD: Data Confidence
   const rightCardX = margin + cardWidth + cardGap;
 
   pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
@@ -468,36 +471,34 @@ yPos += 15;
   pdf.setLineWidth(0.5);
   pdf.roundedRect(rightCardX, yPos, cardWidth, cardHeight, 3, 3, 'FD');
 
-  // Header
+  // RIGHT CARD - Header  
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setFontSize(7);
   pdf.setFont('helvetica', 'bold');
-  pdf.setCharSpace(1);
-  pdf.text('DATA CONFIDENCE', rightCardX + 5, yPos + 6);
-  pdf.setCharSpace(0);
+  pdf.text('DATA CONFIDENCE', rightCardX + cardWidth / 2, yPos + 6, { align: 'center' });
 
   // 3 bullet points
-  let bulletY = yPos + 12;
+  let bulletY = yPos + 14;
 
   // Coverage
   pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.circle(rightCardX + 6, bulletY, 1, 'F');
+  pdf.circle(rightCardX + 8, bulletY, 1, 'F');
   pdf.setFontSize(9);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Coverage: ', rightCardX + 9, bulletY + 1);
+  pdf.text('Coverage:', rightCardX + 12, bulletY + 1);
   pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('High', rightCardX + 28, bulletY + 1);
+  pdf.text('High', rightCardX + 32, bulletY + 1);
 
   bulletY += 6;
 
   // Sample
   pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
-  pdf.circle(rightCardX + 6, bulletY, 1, 'F');
+  pdf.circle(rightCardX + 8, bulletY, 1, 'F');
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Sample: ', rightCardX + 9, bulletY + 1);
+  pdf.text('Sample:', rightCardX + 12, bulletY + 1);
 
   // Dynamická extrakcia totalRuns
   const totalRuns = (() => {
@@ -511,27 +512,28 @@ yPos += 15;
 
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(`${totalRuns} runs`, rightCardX + 28, bulletY + 1);
+  pdf.text(`${totalRuns} runs`, rightCardX + 32, bulletY + 1);
 
   bulletY += 6;
 
   // Period
   pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.circle(rightCardX + 6, bulletY, 1, 'F');
+  pdf.circle(rightCardX + 8, bulletY, 1, 'F');
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Period: ', rightCardX + 9, bulletY + 1);
+  pdf.text('Period:', rightCardX + 12, bulletY + 1);
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('30 days', rightCardX + 28, bulletY + 1);
+  pdf.text('30 days', rightCardX + 32, bulletY + 1);
 
-  yPos += cardHeight + 6; // Move below both cards
+  yPos += cardHeight + 6;
 
   //end - section 1
   
-  //Anylyzed Automation section 2
+
+  //section 2
   // ============================================================================
-  // ZAP INFO BOX
+  // ZAP INFO BOX Analyzed Automation 
   // ============================================================================
 
   pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
