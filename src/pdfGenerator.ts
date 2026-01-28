@@ -52,86 +52,16 @@ const COLORS = {
   SLATE_900: { r: 15, g: 23, b: 42 }
 };
 
+// Helper funkcia na začiatok súboru (po TYPE DEFINITIONS)
+function extractErrorRate(details: string): number {
+  const match = details.match(/(\d+\.?\d*)% error rate/);
+  return match ? parseFloat(match[1]) : 0;
+}
+
 // ========================================
 // HELPER SECTIONS
 // ========================================
 
-/**
- * Add Data Confidence section
- */
-function addDataConfidence(
-  pdf: jsPDF,
-  yPos: number,
-  margin: number,
-  contentWidth: number,
-  result: ParseResult
-): number {
-  // Extract total runs
-  let totalRuns = 150; // Default
-  result.efficiency_flags.forEach(flag => {
-    const match = flag.details.match(/(\d+) total runs/);
-    if (match) {
-      totalRuns = Math.max(totalRuns, parseInt(match[1]));
-    }
-  });
-  
-  // Card
-  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
-  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(margin, yPos, contentWidth, 22, 2, 2, 'FD');
-  
-  // Header
-  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('DATA CONFIDENCE', margin + 5, yPos + 6);
-  
-  yPos += 12;
-  
-  // Coverage
-  pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.circle(margin + 6, yPos - 1, 1, 'F');
-  
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Coverage: ', margin + 9, yPos);
-  
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('High', margin + 30, yPos);
-  
-  yPos += 5;
-  
-  // Sample
-  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
-  pdf.circle(margin + 6, yPos - 1, 1, 'F');
-  
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Sample: ', margin + 9, yPos);
-  
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(`${totalRuns} runs`, margin + 30, yPos);
-  
-  yPos += 5;
-  
-  // Period
-  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.circle(margin + 6, yPos - 1, 1, 'F');
-  
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('Period: ', margin + 9, yPos);
-  
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('30 days', margin + 30, yPos);
-  
-  return yPos + 6;
-}
 
 /**
  * Add Before/After Comparison with horizontal lines
@@ -143,97 +73,131 @@ function addBeforeAfterComparison(
   contentWidth: number,
   result: ParseResult
 ): number {
-  // Card
+  const cardHeight = 35;
+  const innerMargin = 5;
+
+  // 1. Pozadie karty
   pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
   pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
   pdf.setLineWidth(0.1);
-  pdf.roundedRect(margin, yPos, contentWidth, 28, 2, 2, 'FD');
+  pdf.roundedRect(margin, yPos, contentWidth, cardHeight, 2, 2, 'FD');
   
-  // Header
+  // 2. Nadpisy sekcie
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.setFontSize(9);
+  pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('BEFORE VS AFTER OPTIMIZATION', margin + 5, yPos + 6);
+  pdf.text('BEFORE VS AFTER OPTIMIZATION', margin + innerMargin, yPos + 6);
   
   pdf.setFontSize(7);
   pdf.setFont('helvetica', 'italic');
-  pdf.text('Projected impact of recommended fixes', margin + 5, yPos + 10);
+  pdf.text('Projected impact of recommended fixes', margin + innerMargin, yPos + 10);
   
-  yPos += 15;
-  
-  // Calculate values
+  // 3. Extrakcia dát (bezpečnejšie regexy)
   const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop');
   let currentErrorRate = 0;
-  if (errorFlag) {
-    const match = errorFlag.details.match(/(\d+\.?\d*)% error rate/);
-    if (match && match[1]) {
-      currentErrorRate = Math.round(parseFloat(match[1]));
-    }
+  if (errorFlag?.details) {
+    currentErrorRate = Math.round(extractErrorRate(errorFlag.details));
   }
-  
+
   const hasPolling = result.efficiency_flags.some(f => f.flag_type === 'polling_trigger');
-  const currentCost = Math.round(result.estimated_savings * 12 * 2.5);
-  const optimizedCost = Math.round(result.estimated_savings * 12 * 0.1);
+  const currentCost = Math.round((result.estimated_savings || 0) * 12 * 2.5);
+  const optimizedCost = Math.round((result.estimated_savings || 0) * 12 * 0.1);
+
+  // 4. Rozloženie stĺpcov
+  const col1X = margin + innerMargin;
+  const col2X = margin + (contentWidth / 2) + 2;
+  let currentY = yPos + 17;
+
+  // Pomocná funkcia na nakreslenie šípky
+  const drawArrow = (x: number, y: number) => {
+    pdf.setDrawColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.setLineWidth(0.4);
+    
+    // Horizontálna čiara
+    pdf.line(x, y - 1, x + 2.5, y - 1);
+    
+    // Hrot (trojuholník) - kratší a širší
+    pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.triangle(
+      x + 2.5, y - 2,    // horný bod (vrchná hrana)
+      x + 4, y - 1.0,      // pravý hrot
+      x + 2.5, y - 0.0,    // dolný bod (spodná hrana)
+      'F'
+    );
+    
+    return 5; // Šírka šípky v mm
+  };
+
+
+  // Pomocná funkcia na kreslenie riadku (label + hodnoty na jednom riadku)
+  const drawRow = (l1: string, v1: string, n1: string, l2: string, v2: string, n2: string, isItalic = false) => {
+  const labelWidth = 32;
   
-  // Column setup
-  const col1X = margin + 5;
-  const col2X = margin + (contentWidth / 2) + 3;
-  const rowHeight = 6;
-  
-  // Row 1: Error Rate & Yearly Cost
-  pdf.setFontSize(8);
+  // COLUMN 1
+  pdf.setFontSize(7);
   pdf.setFont('helvetica', 'bold');
   pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('ERROR RATE', col1X, yPos);
-  pdf.text('YEARLY COST', col2X, yPos);
-  
-  yPos += 4;
+  pdf.text(l1, col1X, currentY);
   
   pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
+  pdf.setFont('helvetica', isItalic ? 'italic' : 'normal');
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.text(`${currentErrorRate}%`, col1X + 25, yPos);
+  const v1X = col1X + labelWidth;
+  pdf.text(v1, v1X, currentY);
+  const v1Width = pdf.getTextWidth(v1);
+  
+  const arrow1X = v1X + v1Width + 2;
+  const arrow1Width = drawArrow(arrow1X, currentY);
+  
+  pdf.setFont('helvetica', isItalic ? 'italic' : 'bold');
   pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.text('→ under 5%', col1X + 35, yPos);
+  pdf.text(n1, arrow1X + arrow1Width + 1, currentY);
   
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.text(`$${currentCost}`, col2X + 25, yPos);
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.text(`→ under $${optimizedCost}`, col2X + 40, yPos);
-  
-  yPos += 2;
-  
-  // Horizontal line
-  pdf.setDrawColor(240, 240, 240);
-  pdf.setLineWidth(0.1);
-  pdf.line(col1X, yPos, margin + contentWidth - 5, yPos);
-  
-  yPos += 4;
-  
-  // Row 2: Sync Speed & Maintenance  
-  pdf.setFontSize(8);
+  // COLUMN 2
+  pdf.setFontSize(7);
   pdf.setFont('helvetica', 'bold');
   pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.text('SYNC SPEED', col1X, yPos);
-  pdf.text('MAINTENANCE', col2X, yPos);
-  
-  yPos += 4;
+  pdf.text(l2, col2X, currentY);
   
   pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'italic');
+  pdf.setFont('helvetica', isItalic ? 'italic' : 'normal');
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  const beforeSpeed = hasPolling ? 'Polling' : 'Standard';
-  const afterSpeed = hasPolling ? 'Real-time' : 'Optimized';
-  pdf.text(beforeSpeed, col1X + 25, yPos);
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.text(`→ ${afterSpeed}`, col1X + 40, yPos);
+  const v2X = col2X + labelWidth;
+  pdf.text(v2, v2X, currentY);
+  const v2Width = pdf.getTextWidth(v2);
   
-  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.text('High', col2X + 25, yPos);
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.text('→ Automated', col2X + 35, yPos);
+  const arrow2X = v2X + v2Width + 2;
+  const arrow2Width = drawArrow(arrow2X, currentY);
   
-  return yPos + 8;
+  pdf.setFont('helvetica', isItalic ? 'italic' : 'bold');
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.text(n2, arrow2X + arrow2Width + 1, currentY);
+  
+  currentY += 5;
+};
+
+// Riadok 1
+drawRow(
+  'ERROR RATE', `${currentErrorRate}%`, 'under 5%',
+  'YEARLY COST', `$${currentCost}`, `under $${optimizedCost}`
+);
+
+// Deliaca čiara
+currentY += 1;
+pdf.setDrawColor(240, 240, 240);
+pdf.line(col1X, currentY, margin + contentWidth - innerMargin, currentY);
+currentY += 6;
+
+// Riadok 2
+const speedBefore = hasPolling ? 'Polling' : 'Standard';
+const speedAfter = hasPolling ? 'Real-time' : 'Optimized';
+drawRow(
+  'SYNC SPEED', speedBefore, speedAfter,
+  'MAINTENANCE', 'High', 'Automated',
+  true
+);
+
+  return yPos + cardHeight + 8;
 }
 
 /**
@@ -277,8 +241,7 @@ function addQuickWins(
     
     if (flag.flag_type === 'error_loop') {
       actionName = 'Fix authentication failures';
-      const errorMatch = flag.details.match(/(\d+\.?\d*)% error rate/);
-      const errorRate = errorMatch ? Math.round(parseFloat(errorMatch[1])) : 0;
+      const errorRate = Math.round(extractErrorRate(flag.details));
       resultText = `→ ${errorRate}% error reduction`;
     } else if (flag.flag_type === 'late_filter_placement') {
       actionName = 'Reposition filters earlier';
@@ -535,9 +498,20 @@ yPos += 15;
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
   pdf.text('Sample: ', rightCardX + 9, bulletY + 1);
+
+  // Dynamická extrakcia totalRuns
+  const totalRuns = (() => {
+    let max = 150;
+    result.efficiency_flags.forEach(f => {
+      const m = f.details.match(/(\d+) total runs/);
+      if (m) max = Math.max(max, parseInt(m[1]));
+    });
+    return max;
+  })();
+
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('150 runs', rightCardX + 28, bulletY + 1);
+  pdf.text(`${totalRuns} runs`, rightCardX + 28, bulletY + 1);
 
   bulletY += 6;
 
@@ -651,7 +625,7 @@ pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
 pdf.setFontSize(9);
 pdf.setFont('helvetica', 'normal');
 const Text1 = `Scope: Single Zap analysis based on last 30 days of run data. Estimates may vary based on usage patterns. `;
-pdf.text(Text1, margin + 6, yPos + 16, { maxWidth: contentWidth - 16 });
+pdf.text(Text1, margin + 6, yPos + 22, { maxWidth: contentWidth - 16 });
 
 yPos += boxHeight + 1; // spacing after boxes
 
@@ -741,7 +715,16 @@ pdf.text('ESTIMATED RELIABILITY', card3X + metricCardWidth / 2, yPos + 6, { alig
 
 // Value
 const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop');
-const reliability = errorFlag ? Math.round(100 - (errorFlag.error_rate || 0)) : 100;
+let reliability = 100;
+if (errorFlag?.details) {
+  const errorRate = extractErrorRate(errorFlag.details);
+  reliability = Math.round(100 - errorRate);
+}
+
+pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+pdf.setFontSize(24);
+pdf.setFont('helvetica', 'bold');
+pdf.text(`${reliability}%`, card3X + metricCardWidth / 2, yPos + 18, { align: 'center' });
 
 pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
 pdf.setFontSize(24);
