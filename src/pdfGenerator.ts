@@ -13,6 +13,7 @@ export interface PDFConfig {
   agencyLogo?: string;
   clientName: string;
   reportDate: string;
+  reportCode: string;
 }
 
 export interface ParseResult {
@@ -27,6 +28,7 @@ export interface ParseResult {
     severity: string;
     message: string;
     details: string;
+    error_rate?: number;
     most_common_error?: string;
     error_trend?: string;
     max_streak?: number;
@@ -58,11 +60,7 @@ const COLORS = {
 // HELPER FUNCTIONS
 // ========================================
 
-function extractErrorRate(details: string): number {
-  const match = details.match(/(\d+\.?\d*)% error rate/);
-  return match ? parseFloat(match[1]) : 0;
-}
-
+//FOOTER
 /**
  * Draw page frame with header bar and footer
  */
@@ -75,20 +73,38 @@ function drawPageFrame(pdf: jsPDF, config: PDFConfig, pageNum: number) {
   pdf.setFillColor(30, 41, 59);
   pdf.rect(0, 0, pageWidth, 10, 'F');
 
-  // Report ID v lište
-  pdf.setFontSize(7);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(255, 255, 255);
-  pdf.text("Report ID: LHA-2026-026-00003", pageWidth - margin, 6.5, { align: 'right' });
+  // ============================================================================
+  // FOOTER (spodná časť)
+  // ============================================================================
 
-  // Stránkovanie v lište
-  pdf.setFont('helvetica', 'normal');
-  pdf.text(`Page ${pageNum}`, margin, 6.5);
+  // Oddeľovacia čiara (šedá, jemná)
+  pdf.setDrawColor(203, 213, 225); // slate-300
+  pdf.setLineWidth(0.3);
+  pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
 
-  // Pätička
-  pdf.setTextColor(148, 163, 184);
+  
+  // Ľavo: Page number
+  pdf.setTextColor(148, 163, 184); // slate-400
   pdf.setFontSize(8);
-  pdf.text(`Zapier Lighthouse | ${config.agencyName}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(`Page ${pageNum}`, margin, pageHeight - 10);
+  
+  // Stred: Agency branding
+  pdf.text(
+    `Automation Intelligence Report | ${config.agencyName}`, 
+    pageWidth / 2, 
+    pageHeight - 10, 
+    { align: 'center' }
+  );
+  
+  // Pravo: Report ID
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(
+    `Report ID: ${config.reportCode}`, 
+    pageWidth - margin, 
+    pageHeight - 10, 
+    { align: 'right' }
+  );
 }
 
 //ERROR ANALYSIS
@@ -124,7 +140,7 @@ function addErrorAnalysis(
   yPos += 8;
   
   // Failure details
-  const errorRate = Math.round(extractErrorRate(errorFlag.details));
+  const errorRate = errorFlag.error_rate !== undefined ? Math.round(errorFlag.error_rate) : 0;
   const failureCount = Math.round(errorRate / 10);
   const totalRuns = 10;
   const maxStreak = errorFlag.max_streak || 5;
@@ -246,10 +262,25 @@ function addCostWasteAnalysis(
   
   const opportunityCount = [pollingFlag, filterFlag].filter(Boolean).length;
   
-  // Calculate total height
+  // ✅ DYNAMICKÁ VÝŠKA - vypočítame PRED kreslením
   let totalHeight = 14; // Header
-  if (pollingFlag) totalHeight += 28;
-  if (filterFlag) totalHeight += 28;
+  
+  // Polling card height
+  if (pollingFlag) {
+    pdf.setFontSize(7);
+    const pollingLines = pdf.splitTextToSize(pollingFlag.details, contentWidth - 30);
+    const pollingTextHeight = pollingLines.length * 3; // 3mm per line
+    totalHeight += 10 + pollingTextHeight + 8; // Header + text + savings badge + padding
+  }
+  
+  // Filter card height
+  if (filterFlag) {
+    pdf.setFontSize(7);
+    const filterLines = pdf.splitTextToSize(filterFlag.details, contentWidth - 30);
+    const filterTextHeight = filterLines.length * 3;
+    totalHeight += 10 + filterTextHeight + 8;
+  }
+  
   totalHeight += 4; // Bottom padding
   
   const cardOffset = 1;
@@ -283,97 +314,151 @@ function addCostWasteAnalysis(
   
   yPos += 14;
   
-  // Polling trigger card (MEDIUM PRIORITY)
-  if (pollingFlag) {
-    const annualSavings = ((pollingFlag.estimated_monthly_savings || 0) * 12).toFixed(0);
-    
-    // Opportunity card background
-    pdf.setFillColor(254, 243, 199); // amber-50
-    pdf.setDrawColor(251, 191, 36); // amber-400
-    pdf.setLineWidth(0.3);
-    pdf.roundedRect(margin + cardOffset + 6, yPos, contentWidth - cardOffset - 12, 24, 2, 2, 'FD');
-    
-    // Priority badge
-    pdf.setFillColor(245, 158, 11); // amber-500
-    pdf.roundedRect(margin + cardOffset + 10, yPos + 4, 24, 5, 2, 2, 'F');
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(6);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('MEDIUM PRIORITY', margin + cardOffset + 22, yPos + 7.5, { align: 'center' });
-    
-    // Title
-    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Checking For Updates Too Often', margin + cardOffset + 38, yPos + 7.5);
-    
-    // Description
-    pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
-    pdf.setFontSize(7);
-    pdf.setFont('helvetica', 'normal');
-    const pollingDesc = pollingFlag.details.substring(0, 100);
-    pdf.text(pollingDesc, margin + cardOffset + 10, yPos + 13, { maxWidth: contentWidth - 30 });
-    
-    // Estimated savings
-    pdf.setFillColor(236, 253, 245); // emerald-50
-    pdf.roundedRect(margin + cardOffset + 10, yPos + 19, 60, 4, 2, 2, 'F');
-    
-    pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-    pdf.circle(margin + cardOffset + 12, yPos + 21, 1, 'F');
-    
-    pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-    pdf.setFontSize(6);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`ESTIMATED SAVINGS: $${annualSavings}/YEAR`, margin + cardOffset + 15, yPos + 21.5);
-    
-    yPos += 26;
-  }
+  // ✅ POLLING TRIGGER CARD - kompletne prepracovaný
+if (pollingFlag) {
+  const annualSavings = ((pollingFlag.estimated_monthly_savings || 0) * 12).toFixed(0);
   
-  // Late filter placement card (HIGH PRIORITY)
-  if (filterFlag) {
-    const annualSavings = ((filterFlag.estimated_monthly_savings || 0) * 12).toFixed(0);
-    
-    // Opportunity card background
-    pdf.setFillColor(254, 242, 242); // rose-50
-    pdf.setDrawColor(251, 113, 133); // rose-400
-    pdf.setLineWidth(0.3);
-    pdf.roundedRect(margin + cardOffset + 6, yPos, contentWidth - cardOffset - 12, 24, 2, 2, 'FD');
-    
-    // Priority badge
-    pdf.setFillColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
-    pdf.roundedRect(margin + cardOffset + 10, yPos + 4, 20, 5, 2, 2, 'F');
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(6);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('HIGH PRIORITY', margin + cardOffset + 20, yPos + 7.5, { align: 'center' });
-    
-    // Title
-    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Paying For Steps That Get Thrown Away', margin + cardOffset + 34, yPos + 7.5);
-    
-    // Description
-    pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
-    pdf.setFontSize(7);
-    pdf.setFont('helvetica', 'normal');
-    const filterDesc = filterFlag.details.substring(0, 100);
-    pdf.text(filterDesc, margin + cardOffset + 10, yPos + 13, { maxWidth: contentWidth - 30 });
-    
-    // Estimated savings
-    pdf.setFillColor(236, 253, 245); // emerald-50
-    pdf.roundedRect(margin + cardOffset + 10, yPos + 19, 60, 4, 2, 2, 'F');
-    
-    pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-    pdf.circle(margin + cardOffset + 12, yPos + 21, 1, 'F');
-    
-    pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-    pdf.setFontSize(6);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`ESTIMATED SAVINGS: $${annualSavings}/YEAR`, margin + cardOffset + 15, yPos + 21.5);
-    
-    yPos += 26;
-  }
+  const cardX = margin + cardOffset + 6;
+  const cardStartY = yPos;
+  
+  // ✅ KROK 1: Vypočítaj všetky pozície NAJPRV
+  let currentY = cardStartY + 4; // Start position
+  
+  // Badge + Title area
+  currentY += 5; // Badge/title height
+  currentY += 3; // Spacing after title
+  
+  // Description text
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  const descLines = pdf.splitTextToSize(pollingFlag.details, contentWidth - 30);
+  const descStartY = currentY;
+  currentY += descLines.length * 3; // Text height
+  
+  // Savings badge
+  currentY += 2; // Spacing before savings
+  const savingsStartY = currentY;
+  currentY += 4; // Savings badge height
+  
+  // Final card height
+  currentY += 2; // Bottom padding
+  const cardHeight = currentY - cardStartY;
+  
+  // ✅ KROK 2: Teraz nakresli box s SPRÁVNOU výškou
+  pdf.setFillColor(254, 243, 199); // amber-50
+  pdf.setDrawColor(251, 191, 36); // amber-400
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(cardX, cardStartY, contentWidth - cardOffset - 12, cardHeight, 2, 2, 'FD');
+  
+  // ✅ KROK 3: Vykresli obsah na PRE-VYPOČÍTANÉ pozície
+  
+  // Priority badge
+  pdf.setFillColor(245, 158, 11); // amber-500
+  pdf.roundedRect(cardX + 4, cardStartY + 4, 24, 5, 2, 2, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(6);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('MEDIUM PRIORITY', cardX + 16, cardStartY + 7.5, { align: 'center' });
+  
+  // Title
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Checking For Updates Too Often', cardX + 32, cardStartY + 7.5);
+  
+  // Description
+  pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(descLines, cardX + 4, descStartY);
+  
+  // Estimated savings badge
+  pdf.setFillColor(236, 253, 245); // emerald-50
+  pdf.roundedRect(cardX + 4, savingsStartY, 60, 4, 2, 2, 'F');
+  
+  pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.circle(cardX + 6, savingsStartY + 2, 1, 'F');
+  
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.setFontSize(6);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`ESTIMATED SAVINGS: $${annualSavings}/YEAR`, cardX + 9, savingsStartY + 2.5);
+  
+  yPos += cardHeight + 2;
+}
+
+// ✅ LATE FILTER PLACEMENT CARD - rovnaký pattern
+if (filterFlag) {
+  const annualSavings = ((filterFlag.estimated_monthly_savings || 0) * 12).toFixed(0);
+  
+  const cardX = margin + cardOffset + 6;
+  const cardStartY = yPos;
+  
+  // ✅ KROK 1: Vypočítaj všetky pozície NAJPRV
+  let currentY = cardStartY + 4;
+  
+  // Badge + Title area
+  currentY += 5;
+  currentY += 3;
+  
+  // Description text
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  const descLines = pdf.splitTextToSize(filterFlag.details, contentWidth - 30);
+  const descStartY = currentY;
+  currentY += descLines.length * 3;
+  
+  // Savings badge
+  currentY += 2;
+  const savingsStartY = currentY;
+  currentY += 4;
+  
+  // Final card height
+  currentY += 2;
+  const cardHeight = currentY - cardStartY;
+  
+  // ✅ KROK 2: Nakresli box
+  pdf.setFillColor(254, 242, 242); // rose-50
+  pdf.setDrawColor(251, 113, 133); // rose-400
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(cardX, cardStartY, contentWidth - cardOffset - 12, cardHeight, 2, 2, 'FD');
+  
+  // ✅ KROK 3: Vykresli obsah
+  
+  // Priority badge
+  pdf.setFillColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
+  pdf.roundedRect(cardX + 4, cardStartY + 4, 20, 5, 2, 2, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(6);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('HIGH PRIORITY', cardX + 14, cardStartY + 7.5, { align: 'center' });
+  
+  // Title
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Paying For Steps That Get Thrown Away', cardX + 28, cardStartY + 7.5);
+  
+  // Description
+  pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(descLines, cardX + 4, descStartY);
+  
+  // Estimated savings badge
+  pdf.setFillColor(236, 253, 245); // emerald-50
+  pdf.roundedRect(cardX + 4, savingsStartY, 60, 4, 2, 2, 'F');
+  
+  pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.circle(cardX + 6, savingsStartY + 2, 1, 'F');
+  
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.setFontSize(6);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`ESTIMATED SAVINGS: $${annualSavings}/YEAR`, cardX + 9, savingsStartY + 2.5);
+  
+  yPos += cardHeight + 2;
+}
   
   return yPos + 4;
 }
@@ -626,8 +711,7 @@ function addWhatToFixToday(
     // Problem line (white, italic label + normal text)
     let problemText = '';
     if (flag.flag_type === 'error_loop') {
-      const errorMatch = flag.details.match(/(\d+)% error rate/);
-      const errorRate = errorMatch ? errorMatch[1] : '80';
+      const errorRate = flag.error_rate !== undefined ? Math.round(flag.error_rate) : 0;
       problemText = `Connection expired — ${errorRate}% of runs are failing right now.`;
     } else if (flag.flag_type === 'late_filter_placement') {
       problemText = 'Steps execute before conditions are checked, wasting task usage.';
@@ -734,8 +818,8 @@ function addBeforeAfterComparison(
   // Extract data
   const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop');
   let currentErrorRate = 0;
-  if (errorFlag?.details) {
-    currentErrorRate = Math.round(extractErrorRate(errorFlag.details));
+  if (errorFlag && errorFlag.error_rate !== undefined) {
+    currentErrorRate = Math.round(errorFlag.error_rate);
   }
 
   const hasPolling = result.efficiency_flags.some(f => f.flag_type === 'polling_trigger');
@@ -884,7 +968,7 @@ function addQuickWins(
 
     if (flag.flag_type === 'error_loop') {
       actionName = 'Fix authentication failures';
-      const errorRate = Math.round(extractErrorRate(flag.details));
+      const errorRate = flag.error_rate !== undefined ? Math.round(flag.error_rate) : 0;
       resultText = `${errorRate}% error reduction`;
     } else if (flag.flag_type === 'late_filter_placement') {
       actionName = 'Reposition filters earlier';
@@ -965,10 +1049,10 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.setFillColor(255, 255, 255);
   const iconX = margin + 4;
   const iconY = yPos + 4;
-  const startX = iconX + 0.8;
-  const startY = iconY - 2.9;
+  const startX = iconX + 0;
+  const startY = iconY - 3;
   const lightningPath = [
-    [-1.7, 3.2], [0.6, 0], [-0.6, 3.2], [1.7, -3.2], [-0.6, 0], [0.6, -3.2]
+    [-2.5, 3.6], [2.5, 0], [0, 2.4], [2.5, -3.6], [-2.5, 0], [0, -2.4]
   ];
   pdf.lines(lightningPath, startX, startY, [1, 1], 'F', true);
 
@@ -1018,35 +1102,9 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
 
   yPos += 20;
 
-  // Report ID badge
-  const reportIdText = 'Report ID: LHA-2026-026-00003';
+  
 
-  pdf.setFontSize(8);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setCharSpace(0);
-
-  const textWidth = pdf.getTextWidth(reportIdText);
-  const idBadgePadding = 4;
-  const idBadgeWidth = textWidth + (idBadgePadding * 2);
-  const idBadgeHeight = 6;
-
-  // Box
-  pdf.setFillColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-  pdf.roundedRect(margin, yPos, idBadgeWidth, idBadgeHeight, 3, 3, 'F');
-
-  // Center text
-  pdf.setTextColor(255, 255, 255);
-  pdf.text(
-    reportIdText,
-    margin + idBadgeWidth / 2,
-    yPos + idBadgeHeight / 2,
-    {
-      align: 'center',
-      baseline: 'middle'
-    }
-  );
-
-  yPos += 15; // ✅ SPACING PO BADGE
+  yPos += 18; // ✅ SPACING PO BADGE
 
   // ============================================================================
   // SECTION 1: EFFICIENCY SCORE + DATA CONFIDENCE
@@ -1346,9 +1404,8 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
 
   const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop');
   let reliability = 100;
-  if (errorFlag?.details) {
-    const errorRate = extractErrorRate(errorFlag.details);
-    reliability = Math.round(100 - errorRate);
+  if (errorFlag && errorFlag.error_rate !== undefined) {
+    reliability = Math.round(100 - errorFlag.error_rate);
   }
 
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);

@@ -581,7 +581,7 @@ function generateQuickWinsHTML(flags: EfficiencyFlag[]): string {
     // Generate concise action + impact based on flag type
     if (flag.flag_type === 'error_loop') {
       actionText = 'Fix recurring failures'
-      const errorReduction = flag.error_rate ? Math.round(flag.error_rate) : 0
+      const errorReduction = flag.error_rate !== undefined ? Math.round(flag.error_rate) : 0
       impactText = `reduce wasted runs by ${errorReduction}%`
     } else if (flag.flag_type === 'late_filter_placement') {
       actionText = 'Move filters earlier in workflow'
@@ -1106,11 +1106,20 @@ function displayHtmlPreview(htmlContent: string, result: ParseResult, zapInfo: Z
         pdfBtn.classList.add('opacity-75', 'cursor-wait')
         
         try {
+          // ✅ GENERUJ REPORT ID PRED VYTVORENÍM PDF
+          const reportId = getNextReportId()
+          const reportCode = generateReportCode(reportId)
+
+          // ✅ ULOŽ DO AUDIT LOGU
+          saveAuditLog(reportId, reportCode, zapInfo.id, zapInfo.title)
+
           const today = new Date().toISOString().split('T')[0]
+
           await generatePDFReport(result, {
             agencyName: 'Zapier Lighthouse',
             clientName: zapInfo.title,
-            reportDate: today
+            reportDate: today,
+            reportCode: reportCode 
           })
           
           pdfBtn.innerHTML = `
@@ -1528,12 +1537,14 @@ function displayResults(result: ParseResult) {
         pdfBtn.classList.add('opacity-75', 'cursor-wait')
         
         try {
-          // Generate PDF with default white-label config
+
           const today = new Date().toISOString().split('T')[0]
+
           await generatePDFReport(result, {
             agencyName: 'Zapier Lighthouse',
             clientName: 'Client',
-            reportDate: today
+            reportDate: today,
+            reportCode: 'LHA-TEST-REPORT' 
           })
           
           pdfBtn.innerHTML = `
