@@ -125,7 +125,7 @@ function addWhatToFixToday(
   pdf.setTextColor(96, 165, 250); // blue-400
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'bold');
-  pdf.setCharSpace(1.5);
+  pdf.setCharSpace(1);
   pdf.text('WHAT TO FIX TODAY', margin + 8, yPos + 10);
   pdf.setCharSpace(0);
 
@@ -161,7 +161,7 @@ function addWhatToFixToday(
     
     // Badge text
     pdf.setTextColor(badgeTextColor.r, badgeTextColor.g, badgeTextColor.b);
-    pdf.setFontSize(6);
+    pdf.setFontSize(8);
     pdf.setFont('helvetica', 'bold');
     pdf.text(badgeText, margin + 20, cardY + 7.5, { align: 'center' });
 
@@ -172,7 +172,7 @@ function addWhatToFixToday(
     if (flag.flag_type === 'polling_trigger') title = 'SWITCH TO WEBHOOK TRIGGER';
 
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(8);
+    pdf.setFontSize(9);
     pdf.setFont('helvetica', 'bold');
     pdf.text(title, margin + 33, cardY + 7.5);
 
@@ -191,7 +191,7 @@ function addWhatToFixToday(
     }
 
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(7);
+    pdf.setFontSize(9);
     pdf.setFont('helvetica', 'bolditalic');
     pdf.text('Problem: ', margin + 10, cardY + 13);
     
@@ -213,7 +213,7 @@ function addWhatToFixToday(
     }
 
     pdf.setTextColor(167, 243, 208);
-    pdf.setFontSize(7);
+    pdf.setFontSize(9);
     pdf.setFont('helvetica', 'bolditalic');
     pdf.text('Fix: ', margin + 10, cardY + 17);
     
@@ -235,7 +235,7 @@ function addWhatToFixToday(
     }
 
     pdf.setTextColor(234, 179, 8);
-    pdf.setFontSize(7);
+    pdf.setFontSize(9);
     pdf.setFont('helvetica', 'italic');
     pdf.text(effortText, margin + 10, cardY + 21);
 
@@ -274,7 +274,7 @@ function addBeforeAfterComparison(
 
   // Header
   pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
-  pdf.setFontSize(8);
+  pdf.setFontSize(10);
   pdf.setFont('helvetica', 'bold');
   pdf.setCharSpace(1);
   pdf.text('BEFORE VS AFTER OPTIMIZATION', margin + innerMargin + cardOffset, yPos + 6);
@@ -397,20 +397,39 @@ function addQuickWins(
 
   if (topFlags.length === 0) return yPos;
 
-  const cardHeight = 10 + (topFlags.length * 5);
-  pdf.setFillColor(236, 253, 245);
-  pdf.setDrawColor(167, 243, 208);
-  pdf.setLineWidth(0.1);
-  pdf.roundedRect(margin, yPos, contentWidth, cardHeight, 2, 2, 'FD');
+  const cardHeight = 10 + (topFlags.length * 5) + 3;
+  const offset = 1;
 
-  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-  pdf.setFontSize(9);
+  // Shadow box (spodný, zelený)
+  pdf.setFillColor(16, 185, 129); // emerald-500
+  pdf.setDrawColor(16, 185, 129);
+  pdf.roundedRect(margin, yPos, contentWidth - offset, cardHeight, 3, 3, 'FD');
+
+  // Main box (vrchný, jemný zelený odtieň)
+  pdf.setFillColor(236, 253, 245); // emerald-50
+  pdf.setDrawColor(16, 185, 129); // emerald-500
+  pdf.setLineWidth(0.1);
+  pdf.roundedRect(margin + offset, yPos, contentWidth - offset, cardHeight, 3, 3, 'FD');
+
+  // Header
+  pdf.setTextColor(5, 150, 105); // emerald-600
+  pdf.setFontSize(10);
   pdf.setFont('helvetica', 'bold');
   pdf.setCharSpace(1);
-  pdf.text('Top Optimization Opportunities', margin + 5, yPos + 6);
+  pdf.text('TOP OPTIMIZATION OPPORTUNITIES', margin + offset + 5, yPos + 6);
   pdf.setCharSpace(0);
 
   yPos += 12;
+
+  // Arrow drawing function
+  const drawArrow = (x: number, y: number) => {
+    pdf.setDrawColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.setLineWidth(0.4);
+    pdf.line(x, y - 1, x + 2.5, y - 1);
+    pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.triangle(x + 2.5, y - 2, x + 4, y - 1.0, x + 2.5, y - 0.0, 'F');
+    return 4; // Width of arrow
+  };
 
   topFlags.forEach((flag, i) => {
     let actionName = '';
@@ -419,32 +438,39 @@ function addQuickWins(
     if (flag.flag_type === 'error_loop') {
       actionName = 'Fix authentication failures';
       const errorRate = Math.round(extractErrorRate(flag.details));
-      resultText = `→ ${errorRate}% error reduction`;
+      resultText = `${errorRate}% error reduction`;
     } else if (flag.flag_type === 'late_filter_placement') {
       actionName = 'Reposition filters earlier';
-      resultText = `→ $${flag.estimated_monthly_savings.toFixed(0)}/month savings`;
+      resultText = `$${flag.estimated_monthly_savings.toFixed(0)}/month savings`;
     } else if (flag.flag_type === 'polling_trigger') {
       actionName = 'Replace polling triggers';
-      resultText = `→ real-time + $${flag.estimated_monthly_savings.toFixed(0)}/month`;
+      resultText = `real-time + $${flag.estimated_monthly_savings.toFixed(0)}/month`;
     } else {
       actionName = flag.message.substring(0, 35);
-      resultText = `→ improved efficiency`;
+      resultText = `improved efficiency`;
     }
 
+    // Action name (bold, black)
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-    pdf.text(`${i + 1}. ${actionName}`, margin + 5, yPos);
+    pdf.text(`${i + 1}. ${actionName}`, margin + offset + 5, yPos);
 
+    // Draw arrow
+    const arrowX = margin + offset + 70;
+    const arrowWidth = drawArrow(arrowX, yPos);
+
+    // Result text (green, normal)
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
-    pdf.text(resultText, margin + 70, yPos);
+    pdf.text(resultText, arrowX + arrowWidth + 2, yPos);
 
     yPos += 5;
   });
 
   return yPos + 3;
 }
+
 
 // ========================================
 // MAIN PDF GENERATION
@@ -712,7 +738,7 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.roundedRect(margin + zapBoxOffset, yPos, contentWidth - zapBoxOffset, zapBoxHeight, 3, 3, 'FD');
 
   pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
-  pdf.setFontSize(8);
+  pdf.setFontSize(10);
   pdf.setFont('helvetica', 'bold');
   pdf.setCharSpace(1);
   pdf.text('ANALYZED AUTOMATION', margin + 6 + zapBoxOffset, yPos + 6);
@@ -754,7 +780,7 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.roundedRect(margin + offset, yPos, contentWidth - offset, boxHeight, 3, 3, 'FD');
 
   pdf.setTextColor(217, 119, 6);
-  pdf.setFontSize(8);
+  pdf.setFontSize(10);
   pdf.setFont('helvetica', 'bold');
   pdf.setCharSpace(1);
   pdf.text('EXECUTIVE VERDICT', margin + 6, yPos + 6);
