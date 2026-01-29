@@ -89,6 +89,164 @@ function drawPageFrame(pdf: jsPDF, config: PDFConfig, pageNum: number) {
   pdf.text(`Zapier Lighthouse | ${config.agencyName}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 }
 
+// TECHNICAL ANALYSIS - page3
+/**
+ * Add Technical Analysis section (Page 3)
+ */
+function addTechnicalAnalysis(
+  pdf: jsPDF,
+  yPos: number,
+  margin: number,
+  contentWidth: number,
+  result: ParseResult,
+  zapInfo: { trigger_app: string; step_count: number }
+): number {
+  // Section title (no icon needed)
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Technical Analysis', margin, yPos + 6);
+  
+  yPos += 18;
+  
+  // Workflow Architecture card
+  const cardOffset = 1;
+  const cardHeight = 50;
+  
+  // Shadow box
+  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.roundedRect(margin, yPos, contentWidth - cardOffset, cardHeight, 3, 3, 'FD');
+  
+  // Main box
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.setLineWidth(0.1);
+  pdf.roundedRect(margin + cardOffset, yPos, contentWidth - cardOffset, cardHeight, 3, 3, 'FD');
+  
+  // Card header
+  pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text('WORKFLOW ARCHITECTURE', margin + cardOffset + 6, yPos + 8);
+  pdf.setCharSpace(0);
+  
+  // Complexity badge (right side)
+  const complexity = zapInfo.step_count > 8 ? 'HIGH' : zapInfo.step_count > 4 ? 'MEDIUM' : 'LOW';
+  const complexityColor = zapInfo.step_count > 8 ? COLORS.RED : zapInfo.step_count > 4 ? { r: 245, g: 158, b: 11 } : COLORS.GREEN;
+  
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  const stepsText = `${zapInfo.step_count} STEPS • `;
+  const complexityText = `${complexity} COMPLEXITY`;
+  const totalWidth = pdf.getTextWidth(stepsText + complexityText);
+  const rightX = margin + contentWidth - cardOffset - 6 - totalWidth;
+  
+  pdf.text(stepsText, rightX, yPos + 8);
+  
+  pdf.setTextColor(complexityColor.r, complexityColor.g, complexityColor.b);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(complexityText, rightX + pdf.getTextWidth(stepsText), yPos + 8);
+  
+  yPos += 18;
+  
+  // Workflow diagram (3 boxes: Trigger → Logic → Action)
+  const boxWidth = 35;
+  const boxHeight = 20;
+  const boxGap = 10;
+  const startX = margin + cardOffset + (contentWidth - cardOffset - (3 * boxWidth + 2 * boxGap)) / 2;
+  
+  // TRIGGER box
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(startX, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  
+  // Trigger icon (letter)
+  const triggerInitial = zapInfo.trigger_app.charAt(0).toUpperCase();
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.roundedRect(startX + boxWidth / 2 - 4, yPos + 4, 8, 8, 2, 2, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(triggerInitial, startX + boxWidth / 2, yPos + 9, { align: 'center' });
+  
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(zapInfo.trigger_app.toUpperCase().substring(0, 10), startX + boxWidth / 2, yPos + 15, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(6);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('TRIGGER', startX + boxWidth / 2, yPos + 18, { align: 'center' });
+  
+  // Arrow 1
+  const arrow1X = startX + boxWidth + 2;
+  const arrow1Y = yPos + boxHeight / 2;
+  pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setLineWidth(0.5);
+  pdf.line(arrow1X, arrow1Y, arrow1X + boxGap - 4, arrow1Y);
+  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.triangle(arrow1X + boxGap - 4, arrow1Y - 1, arrow1X + boxGap - 2, arrow1Y, arrow1X + boxGap - 4, arrow1Y + 1, 'F');
+  
+  // LOGIC LAYER box
+  const logic2X = startX + boxWidth + boxGap;
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.roundedRect(logic2X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  
+  // Logic badge
+  const logicSteps = Math.max(zapInfo.step_count - 2, 0);
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.roundedRect(logic2X + boxWidth / 2 - 8, yPos + 3, 16, 6, 3, 3, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`+${logicSteps}`, logic2X + boxWidth / 2, yPos + 7, { align: 'center' });
+  
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('LOGIC LAYER', logic2X + boxWidth / 2, yPos + 14, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(6);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('FILTERS & FORMATTING', logic2X + boxWidth / 2, yPos + 18, { align: 'center' });
+  
+  // Arrow 2
+  const arrow2X = logic2X + boxWidth + 2;
+  pdf.line(arrow2X, arrow1Y, arrow2X + boxGap - 4, arrow1Y);
+  pdf.triangle(arrow2X + boxGap - 4, arrow1Y - 1, arrow2X + boxGap - 2, arrow1Y, arrow2X + boxGap - 4, arrow1Y + 1, 'F');
+  
+  // REDDIT (ACTION) box
+  const action3X = logic2X + boxWidth + boxGap;
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.roundedRect(action3X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  
+  // Action icon (R for Reddit or generic)
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.roundedRect(action3X + boxWidth / 2 - 4, yPos + 4, 8, 8, 2, 2, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('R', action3X + boxWidth / 2, yPos + 9, { align: 'center' });
+  
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('REDDIT', action3X + boxWidth / 2, yPos + 15, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(6);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('ACTION', action3X + boxWidth / 2, yPos + 18, { align: 'center' });
+  
+  return yPos + boxHeight + 10;
+}
+
+
 
 // FIX TODAY SECTION
 /**
@@ -935,6 +1093,20 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   // QUICK WINS
   ensureSpace(30);
   yPos = addQuickWins(pdf, yPos, margin, contentWidth, result);
+
+
+  // ============================================================================
+  // PAGE 3: TECHNICAL ANALYSIS
+  // ============================================================================
+  pdf.addPage();
+  currentPage++;
+  drawPageFrame(pdf, config, currentPage);
+  yPos = 20;
+
+  yPos = addTechnicalAnalysis(pdf, yPos, margin, contentWidth, result, {
+    trigger_app: zapTitle.split(' ')[0] || 'Webhook', // Extract first word as trigger
+    step_count: result.total_nodes
+  });
 
   // Save
   const sanitizedTitle = zapTitle.replace(/[^a-z0-9]/gi, '_');
