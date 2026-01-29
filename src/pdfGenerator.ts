@@ -47,8 +47,10 @@ const COLORS = {
   RED: { r: 225, g: 29, b: 72 },
   SLATE_50: { r: 248, g: 250, b: 252 },
   SLATE_200: { r: 226, g: 232, b: 240 },
+  SLATE_300: { r: 203, g: 213, b: 225 }, 
   SLATE_400: { r: 148, g: 163, b: 184 },
   SLATE_600: { r: 71, g: 85, b: 105 },
+  SLATE_700: { r: 51, g: 65, b: 85 },   
   SLATE_900: { r: 15, g: 23, b: 42 }
 };
 
@@ -87,6 +89,293 @@ function drawPageFrame(pdf: jsPDF, config: PDFConfig, pageNum: number) {
   pdf.setTextColor(148, 163, 184);
   pdf.setFontSize(8);
   pdf.text(`Zapier Lighthouse | ${config.agencyName}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+}
+
+//ERROR ANALYSIS
+/**
+ * Add Error Analysis section (Red card)
+ */
+function addErrorAnalysis(
+  pdf: jsPDF,
+  yPos: number,
+  margin: number,
+  contentWidth: number,
+  result: ParseResult
+): number {
+  const errorFlag = result.efficiency_flags.find(f => f.flag_type === 'error_loop');
+  
+  if (!errorFlag) {
+    return yPos; // Skip if no error_loop
+  }
+  
+  const cardOffset = 1;
+  const startY = yPos; // ✅ Zapamätaj si začiatok
+  
+  // ✅ NAJPRV VYKRESLÍME OBSAH, POTOM ZMERÁME VÝŠKU
+  
+  yPos += 6;
+  
+  // Header (dočasne, aby sme vedeli kde sme)
+  const headerY = yPos;
+  yPos += 8;
+  
+  // Main message
+  const messageY = yPos;
+  yPos += 8;
+  
+  // Failure details
+  const errorRate = Math.round(extractErrorRate(errorFlag.details));
+  const failureCount = Math.round(errorRate / 10);
+  const totalRuns = 10;
+  const maxStreak = errorFlag.max_streak || 5;
+  
+  const fullText = `${failureCount} out of your last ${totalRuns} runs crashed. The pattern is getting worse, not better. The longest streak of consecutive failures: ${maxStreak} runs in a row.`;
+  
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  const textLines = pdf.splitTextToSize(fullText, contentWidth - 20);
+  const textHeight = textLines.length * 4; // ✅ Výška textu (4mm na riadok)
+  
+  const detailsY = yPos;
+  yPos += textHeight + 4;
+  
+  // Root Cause box
+  const rootCauseY = yPos;
+  const rootCauseHeight = 18;
+  yPos += rootCauseHeight + 4;
+  
+  // Estimated recovery
+  const recoveryY = yPos;
+  yPos += 6;
+  
+  // ✅ TERAZ POZNÁME CELKOVÚ VÝŠKU
+  const cardHeight = yPos - startY;
+  
+  // ✅ VYKRESLÍME BOXY
+  // Shadow box (červený)
+  pdf.setFillColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
+  pdf.setDrawColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
+  pdf.roundedRect(margin, startY, contentWidth - cardOffset, cardHeight, 3, 3, 'FD');
+  
+  // Main box (jemný červený odtieň)
+  pdf.setFillColor(254, 242, 242); // red-50
+  pdf.setDrawColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
+  pdf.setLineWidth(0.1);
+  pdf.roundedRect(margin + cardOffset, startY, contentWidth - cardOffset, cardHeight, 3, 3, 'FD');
+  
+  // ✅ TERAZ VYKRESLÍME OBSAH NA SPRÁVNE POZÍCIE
+  
+  // Header
+  pdf.setTextColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text('ERROR ANALYSIS', margin + cardOffset + 6, headerY);
+  pdf.setCharSpace(0);
+  
+  // Failure rate badge (right side)
+  const failureText = `${errorRate}% FAILURE RATE`;
+  const failureWidth = pdf.getTextWidth(failureText);
+  
+  pdf.setFontSize(7);
+  pdf.text(failureText, margin + contentWidth - cardOffset - 6 - failureWidth, headerY);
+  
+  // Main message
+  pdf.setTextColor(220, 38, 38); // red-600
+  pdf.setFontSize(11);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Your automation is experiencing frequent failures', margin + cardOffset + 6, messageY);
+  
+  // Failure details
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(textLines, margin + cardOffset + 6, detailsY);
+  
+  // Root Cause box
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(margin + cardOffset + 6, rootCauseY, contentWidth - cardOffset - 16, rootCauseHeight, 2, 2, 'FD');
+  
+  // ROOT CAUSE label
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('ROOT CAUSE', margin + cardOffset + 10, rootCauseY + 5);
+  
+  // Error description
+  const mostCommonError = errorFlag.most_common_error || 'Timeout';
+  const causeFullText = `${mostCommonError} When authentication fails, the entire workflow stops. Reconnecting your Reddit account will fix this immediately.`;
+  
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(causeFullText, margin + cardOffset + 10, rootCauseY + 10, { maxWidth: contentWidth - 30 });
+  
+  // Estimated recovery
+  const monthlySavings = errorFlag.estimated_monthly_savings?.toFixed(0) || '0';
+  pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.circle(margin + cardOffset + 10, recoveryY, 2, 'F');
+  
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`ESTIMATED RECOVERY: $${monthlySavings}/MONTH IN WASTED TASKS`, margin + cardOffset + 14, recoveryY + 1);
+  
+  return yPos + 4; // ✅ Vrátime pozíciu pod celou kartou
+}
+
+//COST WASTE ANALYSIS
+/**
+ * Add Cost Waste Analysis section (Blue card with opportunity cards)
+ */
+function addCostWasteAnalysis(
+  pdf: jsPDF,
+  yPos: number,
+  margin: number,
+  contentWidth: number,
+  result: ParseResult
+): number {
+  const pollingFlag = result.efficiency_flags.find(f => f.flag_type === 'polling_trigger');
+  const filterFlag = result.efficiency_flags.find(f => f.flag_type === 'late_filter_placement');
+  
+  if (!pollingFlag && !filterFlag) {
+    return yPos; // Skip if no cost waste flags
+  }
+  
+  const opportunityCount = [pollingFlag, filterFlag].filter(Boolean).length;
+  
+  // Calculate total height
+  let totalHeight = 14; // Header
+  if (pollingFlag) totalHeight += 28;
+  if (filterFlag) totalHeight += 28;
+  totalHeight += 4; // Bottom padding
+  
+  const cardOffset = 1;
+  
+  // Shadow box (modrý)
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.setDrawColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.roundedRect(margin, yPos, contentWidth - cardOffset, totalHeight, 3, 3, 'FD');
+  
+  // Main box (jemný modrý odtieň)
+  pdf.setFillColor(239, 246, 255); // blue-50
+  pdf.setDrawColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.setLineWidth(0.1);
+  pdf.roundedRect(margin + cardOffset, yPos, contentWidth - cardOffset, totalHeight, 3, 3, 'FD');
+  
+  // Header
+  pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text('COST WASTE ANALYSIS', margin + cardOffset + 6, yPos + 6);
+  pdf.setCharSpace(0);
+  
+  // Opportunity count (right side)
+  pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'bold');
+  const oppText = `${opportunityCount} OPPORTUNIT${opportunityCount === 1 ? 'Y' : 'IES'}`;
+  const oppWidth = pdf.getTextWidth(oppText);
+  pdf.text(oppText, margin + contentWidth - cardOffset - 6 - oppWidth, yPos + 6);
+  
+  yPos += 14;
+  
+  // Polling trigger card (MEDIUM PRIORITY)
+  if (pollingFlag) {
+    const annualSavings = ((pollingFlag.estimated_monthly_savings || 0) * 12).toFixed(0);
+    
+    // Opportunity card background
+    pdf.setFillColor(254, 243, 199); // amber-50
+    pdf.setDrawColor(251, 191, 36); // amber-400
+    pdf.setLineWidth(0.3);
+    pdf.roundedRect(margin + cardOffset + 6, yPos, contentWidth - cardOffset - 12, 24, 2, 2, 'FD');
+    
+    // Priority badge
+    pdf.setFillColor(245, 158, 11); // amber-500
+    pdf.roundedRect(margin + cardOffset + 10, yPos + 4, 24, 5, 2, 2, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('MEDIUM PRIORITY', margin + cardOffset + 22, yPos + 7.5, { align: 'center' });
+    
+    // Title
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Checking For Updates Too Often', margin + cardOffset + 38, yPos + 7.5);
+    
+    // Description
+    pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'normal');
+    const pollingDesc = pollingFlag.details.substring(0, 100);
+    pdf.text(pollingDesc, margin + cardOffset + 10, yPos + 13, { maxWidth: contentWidth - 30 });
+    
+    // Estimated savings
+    pdf.setFillColor(236, 253, 245); // emerald-50
+    pdf.roundedRect(margin + cardOffset + 10, yPos + 19, 60, 4, 2, 2, 'F');
+    
+    pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.circle(margin + cardOffset + 12, yPos + 21, 1, 'F');
+    
+    pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`ESTIMATED SAVINGS: $${annualSavings}/YEAR`, margin + cardOffset + 15, yPos + 21.5);
+    
+    yPos += 26;
+  }
+  
+  // Late filter placement card (HIGH PRIORITY)
+  if (filterFlag) {
+    const annualSavings = ((filterFlag.estimated_monthly_savings || 0) * 12).toFixed(0);
+    
+    // Opportunity card background
+    pdf.setFillColor(254, 242, 242); // rose-50
+    pdf.setDrawColor(251, 113, 133); // rose-400
+    pdf.setLineWidth(0.3);
+    pdf.roundedRect(margin + cardOffset + 6, yPos, contentWidth - cardOffset - 12, 24, 2, 2, 'FD');
+    
+    // Priority badge
+    pdf.setFillColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
+    pdf.roundedRect(margin + cardOffset + 10, yPos + 4, 20, 5, 2, 2, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('HIGH PRIORITY', margin + cardOffset + 20, yPos + 7.5, { align: 'center' });
+    
+    // Title
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Paying For Steps That Get Thrown Away', margin + cardOffset + 34, yPos + 7.5);
+    
+    // Description
+    pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'normal');
+    const filterDesc = filterFlag.details.substring(0, 100);
+    pdf.text(filterDesc, margin + cardOffset + 10, yPos + 13, { maxWidth: contentWidth - 30 });
+    
+    // Estimated savings
+    pdf.setFillColor(236, 253, 245); // emerald-50
+    pdf.roundedRect(margin + cardOffset + 10, yPos + 19, 60, 4, 2, 2, 'F');
+    
+    pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.circle(margin + cardOffset + 12, yPos + 21, 1, 'F');
+    
+    pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`ESTIMATED SAVINGS: $${annualSavings}/YEAR`, margin + cardOffset + 15, yPos + 21.5);
+    
+    yPos += 26;
+  }
+  
+  return yPos + 4;
 }
 
 // TECHNICAL ANALYSIS - page3
@@ -243,7 +532,7 @@ function addTechnicalAnalysis(
   pdf.setFont('helvetica', 'normal');
   pdf.text('ACTION', action3X + boxWidth / 2, yPos + 18, { align: 'center' });
   
-  return yPos + boxHeight + 10;
+  return yPos + boxHeight + 18;
 }
 
 
@@ -1107,6 +1396,12 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
     trigger_app: zapTitle.split(' ')[0] || 'Webhook', // Extract first word as trigger
     step_count: result.total_nodes
   });
+
+  ensureSpace(65);
+  yPos = addErrorAnalysis(pdf, yPos, margin, contentWidth, result);
+
+  ensureSpace(50);
+  yPos = addCostWasteAnalysis(pdf, yPos, margin, contentWidth, result);
 
   // Save
   const sanitizedTitle = zapTitle.replace(/[^a-z0-9]/gi, '_');
