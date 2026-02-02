@@ -1704,14 +1704,14 @@ export async function generateDeveloperEditionPDF(
   pdf.addPage();
   currentPage++;
   drawPageFrame(pdf, config, currentPage);
-  yPos = 20;
+  yPos = 20; // ✅ RESET
 
   // Page title
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('System Health & Scope', margin, yPos + 6);
-  yPos += 18;
+  pdf.text('System Health & Scope', margin, yPos);
+  yPos += 12; // ✅ Spacing after title
 
   // SYSTEM HEALTH OVERVIEW Card
   const healthHeight = 40;
@@ -1828,13 +1828,13 @@ export async function generateDeveloperEditionPDF(
   pdf.addPage();
   currentPage++;
   drawPageFrame(pdf, config, currentPage);
-  yPos = 20;
+  yPos = 20; // ✅ RESET
 
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Pattern-Level Findings', margin, yPos + 6);
-  yPos += 18;
+  pdf.text('Pattern-Level Findings', margin, yPos);
+  yPos += 12; // ✅ Spacing after title
 
   // Draw pattern cards
   const patterns = batchResult.patterns.slice(0, 5); // Top 5 patterns
@@ -1898,7 +1898,7 @@ export async function generateDeveloperEditionPDF(
     pdf.addPage();
     currentPage++;
     drawPageFrame(pdf, config, currentPage);
-    yPos = 20;
+    yPos = 20; // ✅ RESET
 
     // Zap header
     const zapTitle = result.efficiency_flags.length > 0 
@@ -1908,14 +1908,14 @@ export async function generateDeveloperEditionPDF(
     pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
     pdf.setFontSize(14);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(zapTitle.substring(0, 50), margin, yPos + 6);
+    pdf.text(zapTitle.substring(0, 50), margin, yPos);
     
     pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`${result.total_nodes} steps • ${result.efficiency_flags.length} issues • Score: ${result.efficiency_score}/100`, margin, yPos + 12);
+    pdf.text(`${result.total_nodes} steps • ${result.efficiency_flags.length} issues • Score: ${result.efficiency_score}/100`, margin, yPos + 6);
     
-    yPos += 20;
+    yPos += 18; // ✅ Spacing after header
 
     // ASCII DIAGRAM BOX
     ensureSpace(55);
@@ -1926,14 +1926,15 @@ export async function generateDeveloperEditionPDF(
     pdf.setFillColor(30, 41, 59); // slate-800
     pdf.roundedRect(margin + 1, yPos, contentWidth - 1, diagramHeight, 3, 3, 'FD');
 
+    // ✅ ASCII HEADER - Courier bold
     pdf.setTextColor(96, 165, 250); // blue-400
     pdf.setFontSize(8);
     pdf.setFont('courier', 'bold');
     pdf.text('WORKFLOW ARCHITECTURE', margin + 6, yPos + 6);
 
-    // ASCII diagram (Courier font for monospaced)
+    // ✅ ASCII diagram - Courier normal for monospaced
     pdf.setFont('courier', 'normal');
-    pdf.setFontSize(7);
+    pdf.setFontSize(8); // ✅ Increased from 7 to 8 for better readability
     pdf.setTextColor(229, 231, 235); // gray-200
 
     let diagramY = yPos + 14;
@@ -1961,9 +1962,12 @@ export async function generateDeveloperEditionPDF(
 
     asciiLines.forEach(line => {
       pdf.text(line, margin + 6, diagramY);
-      diagramY += 3;
+      diagramY += 4; // ✅ Increased from 3 to 4 for better spacing
     });
 
+    // ✅ Reset font to helvetica after ASCII diagram
+    pdf.setFont('helvetica', 'normal');
+    
     yPos += diagramHeight + 8;
 
     // Issues for this Zap
