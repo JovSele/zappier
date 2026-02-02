@@ -1,6 +1,6 @@
 import './style.css'
-import init, { hello_world, parse_zapier_export, parse_zapfile_json, parse_zap_list, parse_single_zap_audit } from '../src-wasm/pkg/zapier_lighthouse_wasm'
-import { generatePDFReport, type PDFConfig, type ParseResult } from './pdfGenerator'
+import init, { hello_world, parse_zapier_export, parse_zapfile_json, parse_zap_list, parse_single_zap_audit, parse_batch_audit } from '../src-wasm/pkg/zapier_lighthouse_wasm'
+import { generatePDFReport, generateDeveloperEditionPDF, type PDFConfig, type ParseResult, type BatchParseResult } from './pdfGenerator'
 import { drawDebugGrid, sanitizeForPDF } from './pdfHelpers'
 
 // Type definitions
@@ -126,6 +126,9 @@ let wasmReady = false
 // NEW: State management for cached ZIP data
 let cachedZipData: Uint8Array | null = null
 let zapList: ZapSummary[] = []
+
+// NEW: Batch Selection State Management
+let selectedZapIds: Set<number> = new Set()
 
 async function initWasm() {
   try {
@@ -289,6 +292,19 @@ function getFilteredZaps(): ZapSummary[] {
     filtered = filtered.filter(zap => zap.error_rate !== null && zap.error_rate > 10)
   }
   
+  // Sort: Active first, then by total_runs descending
+  filtered.sort((a, b) => {
+    const aIsActive = a.status.toLowerCase() === 'on'
+    const bIsActive = b.status.toLowerCase() === 'on'
+    
+    // Active Zaps first
+    if (aIsActive && !bIsActive) return -1
+    if (!aIsActive && bIsActive) return 1
+    
+    // Within same status group, sort by total_runs descending
+    return b.total_runs - a.total_runs
+  })
+  
   return filtered
 }
 
@@ -353,6 +369,260 @@ function resetFilters() {
 ;(window as any).resetFilters = resetFilters
 ;(window as any).backToSelector = backToSelector
 
+// NEW: Batch Selection Helper Functions
+function toggleZapSelection(zapId: number) {
+  if (selectedZapIds.has(zapId)) {
+    selectedZapIds.delete(zapId)
+  } else {
+    selectedZapIds.add(zapId)
+  }
+  renderZapTable(getFilteredZaps())
+  updateAnalyzeButton()
+}
+
+function selectAllActive() {
+  const filtered = getFilteredZaps()
+  filtered.forEach(zap => {
+    if (zap.status.toLowerCase() === 'on') {
+      selectedZapIds.add(zap.id)
+    }
+  })
+  renderZapTable(filtered)
+  updateAnalyzeButton()
+}
+
+function deselectAll() {
+  selectedZapIds.clear()
+  renderZapTable(getFilteredZaps())
+  updateAnalyzeButton()
+}
+
+function updateAnalyzeButton() {
+  const analyzeBtn = document.getElementById('analyze-selected-btn')
+  if (analyzeBtn) {
+    const count = selectedZapIds.size
+    const btnText = analyzeBtn.querySelector('.btn-text')
+    const btnCount = analyzeBtn.querySelector('.btn-count')
+    
+    if (btnText) {
+      btnText.textContent = count === 0 ? 'Select Zaps to Analyze' : 'Analyze Selected Zaps'
+    }
+    if (btnCount) {
+      btnCount.textContent = count.toString()
+    }
+    
+    if (count === 0) {
+      analyzeBtn.classList.add('opacity-50', 'cursor-not-allowed')
+      analyzeBtn.classList.remove('hover:scale-105', 'hover:shadow-lg')
+    } else {
+      analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed')
+      analyzeBtn.classList.add('hover:scale-105', 'hover:shadow-lg')
+    }
+  }
+}
+
+async function handleAnalyzeSelected() {
+  if (selectedZapIds.size === 0) {
+    return
+  }
+  
+  if (!cachedZipData) {
+    updateStatus('error', 'ZIP data not cached. Please upload again.')
+    return
+  }
+  
+  const selectedIds = Array.from(selectedZapIds)
+  updateStatus('processing', `Analyzing ${selectedIds.length} Zap${selectedIds.length === 1 ? '' : 's'}...`)
+  
+  try {
+    // Call WASM batch parser (Developer Edition)
+    const resultJson = parse_batch_audit(cachedZipData, selectedIds)
+    const batchResult: BatchParseResult = JSON.parse(resultJson)
+    
+    console.log('📦 Batch audit result (Developer Edition):', batchResult)
+    
+    if (batchResult.success) {
+      updateStatus('success', `✅ Successfully analyzed ${batchResult.zap_count} Zap${batchResult.zap_count === 1 ? '' : 's'}`)
+      
+      // Display Developer Edition results UI
+      displayDeveloperEditionResults(batchResult)
+    } else {
+      updateStatus('error', batchResult.message)
+    }
+  } catch (error) {
+    console.error('Error in batch analysis:', error)
+    updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+/**
+ * Display Developer Edition batch analysis results with PDF download button
+ */
+function displayDeveloperEditionResults(batchResult: BatchParseResult) {
+  const resultsEl = document.getElementById('results')
+  if (!resultsEl) return
+  
+  resultsEl.innerHTML = `
+    <div class="mt-10">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-2xl font-bold text-zinc-900" style="letter-spacing: -0.02em;">Developer Edition Results</h3>
+        <div class="flex gap-3">
+          <button onclick="backToSelector()" class="inline-flex items-center gap-2 px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Selection
+          </button>
+          <button id="download-dev-pdf-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            Download Developer Edition PDF
+          </button>
+        </div>
+      </div>
+      
+      <!-- Project Summary Card -->
+      <div class="stat-card mb-8 bg-gradient-to-br from-blue-600 to-blue-700 border-2 border-blue-500">
+        <h4 class="text-white text-xl font-black mb-4">📊 PROJECT SUMMARY</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-white/10 rounded-lg p-4 text-center">
+            <p class="text-3xl font-black text-white">${batchResult.zap_count}</p>
+            <p class="text-sm text-blue-100 mt-1">Zaps Analyzed</p>
+          </div>
+          <div class="bg-white/10 rounded-lg p-4 text-center">
+            <p class="text-3xl font-black text-white">${batchResult.total_flags}</p>
+            <p class="text-sm text-blue-100 mt-1">Issues Found</p>
+          </div>
+          <div class="bg-white/10 rounded-lg p-4 text-center">
+            <p class="text-3xl font-black text-white">$${Math.round(batchResult.total_estimated_savings)}</p>
+            <p class="text-sm text-blue-100 mt-1">Monthly Savings</p>
+          </div>
+          <div class="bg-white/10 rounded-lg p-4 text-center">
+            <p class="text-3xl font-black text-white">${Math.round(batchResult.average_efficiency_score)}/100</p>
+            <p class="text-sm text-blue-100 mt-1">Avg Score</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Patterns Card -->
+      ${batchResult.patterns && batchResult.patterns.length > 0 ? `
+        <div class="stat-card mb-8">
+          <h4 class="text-lg font-bold text-slate-900 mb-4">🔍 Pattern Detection</h4>
+          <div class="space-y-3">
+            ${batchResult.patterns.map(p => `
+              <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div class="flex-1">
+                  <p class="font-bold text-slate-900">${p.pattern_name}</p>
+                  <p class="text-sm text-slate-600">${p.affected_count} Zaps affected • $${Math.round(p.total_waste_usd)}/month waste</p>
+                </div>
+                <span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
+                  ${p.severity.toUpperCase()}
+                </span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- System Metrics -->
+      <div class="stat-card mb-8">
+        <h4 class="text-lg font-bold text-slate-900 mb-4">⚙️ System Metrics</h4>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div class="p-4 bg-slate-50 rounded-lg">
+            <p class="text-2xl font-bold text-slate-900">${batchResult.system_metrics.avg_steps_per_zap.toFixed(1)}</p>
+            <p class="text-sm text-slate-600">Avg Steps/Zap</p>
+          </div>
+          <div class="p-4 bg-slate-50 rounded-lg">
+            <p class="text-2xl font-bold text-slate-900">${batchResult.system_metrics.polling_trigger_count}</p>
+            <p class="text-sm text-slate-600">Polling Triggers</p>
+          </div>
+          <div class="p-4 bg-slate-50 rounded-lg">
+            <p class="text-2xl font-bold text-slate-900">${batchResult.system_metrics.instant_trigger_count}</p>
+            <p class="text-sm text-slate-600">Instant Triggers</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Info Banner -->
+      <div class="stat-card bg-blue-50 border-blue-200">
+        <p class="text-sm text-blue-700 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          💡 Click "Download Developer Edition PDF" to generate a comprehensive multi-Zap technical report with patterns, ASCII diagrams, and optimization checklist.
+        </p>
+      </div>
+    </div>
+  `
+  
+  // Setup Developer Edition PDF download button
+  setTimeout(() => {
+    const pdfBtn = document.getElementById('download-dev-pdf-btn')
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', async () => {
+        pdfBtn.innerHTML = `
+          <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Generating Developer Edition PDF...
+        `
+        pdfBtn.classList.add('opacity-75', 'cursor-wait')
+        
+        try {
+          const reportId = getNextReportId()
+          const reportCode = generateReportCode(reportId)
+          const today = new Date().toISOString().split('T')[0]
+
+          await generateDeveloperEditionPDF(batchResult, {
+            agencyName: 'Zapier Lighthouse',
+            clientName: 'Batch Analysis',
+            reportDate: today,
+            reportCode: reportCode 
+          })
+          
+          pdfBtn.innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Downloaded!
+          `
+          pdfBtn.classList.remove('opacity-75', 'cursor-wait')
+          pdfBtn.classList.remove('from-blue-600', 'to-blue-700')
+          pdfBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700')
+          
+          setTimeout(() => {
+            pdfBtn.innerHTML = `
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+              </svg>
+              Download Developer Edition PDF
+            `
+            pdfBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700')
+            pdfBtn.classList.add('bg-gradient-to-r', 'from-blue-600', 'to-blue-700')
+          }, 2000)
+        } catch (err) {
+          console.error('Failed to generate Developer Edition PDF:', err)
+          pdfBtn.innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Error
+          `
+          pdfBtn.classList.remove('opacity-75', 'cursor-wait')
+          pdfBtn.classList.add('bg-rose-600')
+        }
+      })
+    }
+  }, 100)
+}
+
+// Make batch functions globally available
+;(window as any).toggleZapSelection = toggleZapSelection
+;(window as any).selectAllActive = selectAllActive
+;(window as any).deselectAll = deselectAll
+;(window as any).handleAnalyzeSelected = handleAnalyzeSelected
+
 // NEW: Render only table content (optimized for filtering)
 function renderZapTable(filteredZaps: ZapSummary[]) {
   const tableContainer = document.getElementById('zap-table-container')
@@ -377,10 +647,15 @@ function renderZapTable(filteredZaps: ZapSummary[]) {
     <!-- Table Header -->
     <div class="bg-slate-50 px-6 py-3 border-b border-slate-200">
       <div class="grid grid-cols-12 gap-4 items-center">
-        <div class="col-span-1">
+        <div class="col-span-1 flex items-center gap-2">
+          <input 
+            type="checkbox" 
+            id="select-all-checkbox"
+            class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+          />
           <span class="text-xs font-bold text-slate-500 uppercase">#</span>
         </div>
-        <div class="col-span-5">
+        <div class="col-span-4">
           <span class="text-xs font-bold text-slate-500 uppercase">Zap Name</span>
         </div>
         <div class="col-span-2">
@@ -389,8 +664,11 @@ function renderZapTable(filteredZaps: ZapSummary[]) {
         <div class="col-span-2 text-center">
           <span class="text-xs font-bold text-slate-500 uppercase">Last Run</span>
         </div>
-        <div class="col-span-2 text-right">
+        <div class="col-span-2 text-center">
           <span class="text-xs font-bold text-slate-500 uppercase">Error Rate</span>
+        </div>
+        <div class="col-span-1 text-center">
+          <span class="text-xs font-bold text-slate-500 uppercase">Runs</span>
         </div>
       </div>
     </div>
@@ -400,21 +678,29 @@ function renderZapTable(filteredZaps: ZapSummary[]) {
       const statusBadge = getStatusBadge(zap.status)
       const errorBadge = getErrorRateBadge(zap.error_rate)
       const lastRun = formatRelativeTime(zap.last_run)
+      const isSelected = selectedZapIds.has(zap.id)
       
       return `
         <div 
-          class="zap-row group cursor-pointer p-6 border-b border-slate-100 last:border-0 hover:bg-blue-50 transition-all duration-200 hover:scale-[1.01]" 
+          class="zap-row group p-6 border-b border-slate-100 last:border-0 transition-all duration-200 ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-slate-50'}" 
           data-zap-id="${zap.id}"
           style="animation: fade-in-up 0.3s ease-out ${index * 0.05}s both;"
         >
           <div class="grid grid-cols-12 gap-4 items-center">
-            <!-- Index -->
-            <div class="col-span-1">
+            <!-- Checkbox + Index -->
+            <div class="col-span-1 flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                class="zap-checkbox w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                data-zap-id="${zap.id}"
+                ${isSelected ? 'checked' : ''}
+                onclick="event.stopPropagation(); toggleZapSelection(${zap.id})"
+              />
               <span class="text-slate-400 font-mono text-sm">#${index + 1}</span>
             </div>
             
             <!-- Title & Trigger -->
-            <div class="col-span-5">
+            <div class="col-span-4">
               <h3 class="font-bold text-slate-900 group-hover:text-blue-600 transition-colors mb-1">
                 ${zap.title}
               </h3>
@@ -438,10 +724,15 @@ function renderZapTable(filteredZaps: ZapSummary[]) {
             </div>
             
             <!-- Error Rate -->
-            <div class="col-span-2 text-right">
+            <div class="col-span-2 text-center">
               <span class="inline-flex items-center px-3 py-1 ${errorBadge.bg} ${errorBadge.text} rounded-full text-xs font-bold border border-current">
                 ${errorBadge.label}
               </span>
+            </div>
+            
+            <!-- Total Runs -->
+            <div class="col-span-1 text-center">
+              <span class="text-sm font-mono text-slate-700">${zap.total_runs}</span>
             </div>
           </div>
         </div>
@@ -473,15 +764,19 @@ function renderZapTable(filteredZaps: ZapSummary[]) {
     `}
   `
   
-  // Attach click handlers to each row
+  // Setup "Select All" checkbox handler
   setTimeout(() => {
-    const rows = document.querySelectorAll('.zap-row')
-    rows.forEach(row => {
-      row.addEventListener('click', () => {
-        const zapId = parseInt(row.getAttribute('data-zap-id') || '0')
-        handleZapSelect(zapId)
+    const selectAllCheckbox = document.getElementById('select-all-checkbox') as HTMLInputElement
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement
+        if (target.checked) {
+          selectAllActive()
+        } else {
+          deselectAll()
+        }
       })
-    })
+    }
   }, 100)
 }
 
@@ -534,13 +829,55 @@ function displayZapSelector(zaps: ZapSummary[]) {
         <!-- Table content will be rendered by renderZapTable() -->
       </div>
       
+      <!-- Bulk Actions & Analyze Button -->
+      <div class="mt-6 flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
+        <!-- Bulk Action Buttons -->
+        <div class="flex gap-3 w-full md:w-auto">
+          <button 
+            onclick="selectAllActive()" 
+            class="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-lg border border-slate-300 transition-all hover:scale-105 shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Select All Active
+          </button>
+          <button 
+            onclick="deselectAll()" 
+            class="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-lg border border-slate-300 transition-all hover:scale-105 shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Deselect All
+          </button>
+        </div>
+        
+        <!-- Main Analyze Button -->
+        <button 
+          id="analyze-selected-btn"
+          onclick="handleAnalyzeSelected()"
+          class="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-lg font-black rounded-xl shadow-lg transition-all hover:scale-105 hover:shadow-xl opacity-50 cursor-not-allowed w-full md:w-auto justify-center"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <div class="flex flex-col items-start">
+            <span class="btn-text">Select Zaps to Analyze</span>
+            <span class="text-xs font-normal opacity-90">
+              <span class="btn-count font-bold">0</span> Zap${selectedZapIds.size === 1 ? '' : 's'} selected
+            </span>
+          </div>
+        </button>
+      </div>
+      
       <!-- Info Banner -->
       <div class="mt-6 stat-card bg-blue-50 border-blue-200">
         <p class="text-sm text-blue-700 flex items-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          💡 Click on any Zap row to run a full audit and generate a detailed PDF report
+          💡 Select one or more Zaps using checkboxes, then click the Analyze button to generate reports
         </p>
       </div>
     </div>

@@ -40,6 +40,63 @@ export interface ParseResult {
   estimated_savings: number;
 }
 
+// NEW: Developer Edition interfaces for batch analysis
+export interface ZapSummary {
+  id: number;
+  title: string;
+  status: string;
+  step_count: number;
+  trigger_app: string;
+  last_run: string | null;
+  error_rate: number | null;
+  total_runs: number;
+}
+
+export interface PatternFinding {
+  pattern_type: string;
+  pattern_name: string;
+  affected_zap_ids: number[];
+  affected_count: number;
+  median_chain_length: number | null;
+  total_waste_tasks: number;
+  total_waste_usd: number;
+  refactor_guidance: string;
+  severity: string;
+}
+
+export interface ScopeMetadata {
+  total_zaps_in_account: number;
+  analyzed_count: number;
+  excluded_count: number;
+  analyzed_zap_summaries: ZapSummary[];
+  excluded_zap_summaries: ZapSummary[];
+}
+
+export interface SystemMetrics {
+  avg_steps_per_zap: number;
+  avg_tasks_per_run: number;
+  polling_trigger_count: number;
+  instant_trigger_count: number;
+  total_monthly_tasks: number;
+  formatter_usage_density: string;
+  fan_out_flows: number;
+}
+
+export interface BatchParseResult {
+  success: boolean;
+  message: string;
+  zap_count: number;
+  individual_results: ParseResult[];
+  total_nodes: number;
+  total_estimated_savings: number;
+  average_efficiency_score: number;
+  total_flags: number;
+  combined_apps: Array<{ name: string; raw_api: string; count: number }>;
+  patterns: PatternFinding[];
+  scope_metadata: ScopeMetadata;
+  system_metrics: SystemMetrics;
+}
+
 // ========================================
 // PRECISE COLOR PALETTE (HEX from HTML)
 // ========================================
@@ -1464,4 +1521,613 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   const sanitizedTitle = zapTitle.replace(/[^a-z0-9]/gi, '_');
   const timestamp = new Date().toISOString().split('T')[0];
   pdf.save(`Lighthouse_${sanitizedTitle}_${timestamp}.pdf`);
+}
+
+// ========================================
+// DEVELOPER EDITION PDF GENERATION
+// ========================================
+
+/**
+ * Generate Developer Edition PDF for batch analysis
+ * Multi-Zap technical report with patterns, scope, and per-Zap breakdown
+ */
+export async function generateDeveloperEditionPDF(
+  batchResult: BatchParseResult,
+  config: PDFConfig
+) {
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 20;
+  const contentWidth = 170;
+
+  let currentPage = 1;
+  let yPos = 20;
+
+  // Draw frame for first page
+  drawPageFrame(pdf, config, currentPage);
+
+  // Ensure space function
+  const ensureSpace = (spaceNeeded: number) => {
+    if (yPos + spaceNeeded > pageHeight - margin - 15) {
+      pdf.addPage();
+      currentPage++;
+      drawPageFrame(pdf, config, currentPage);
+      yPos = 20;
+      return true;
+    }
+    return false;
+  };
+
+  // Calculate severity breakdown
+  const severityBreakdown = { high: 0, medium: 0, low: 0 };
+  batchResult.individual_results.forEach(result => {
+    result.efficiency_flags.forEach(flag => {
+      if (flag.severity === 'high') severityBreakdown.high++;
+      else if (flag.severity === 'medium') severityBreakdown.medium++;
+      else if (flag.severity === 'low') severityBreakdown.low++;
+    });
+  });
+
+  // ============================================================================
+  // PAGE 1: TECHNICAL COVER (Hero Page)
+  // ============================================================================
+
+  // Logo + Title
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.roundedRect(margin, yPos, 8, 8, 2, 2, 'F');
+  pdf.setFillColor(255, 255, 255);
+  const iconX = margin + 4;
+  const iconY = yPos + 4;
+  const lightningPath = [[-2.5, 3.6], [2.5, 0], [0, 2.4], [2.5, -3.6], [-2.5, 0], [0, -2.4]];
+  pdf.lines(lightningPath, iconX, iconY - 3, [1, 1], 'F', true);
+
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(18);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Lighthouse ', margin + 10, yPos + 6);
+  
+  pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.setFont('helvetica', 'bolditalic');
+  const lighthouseWidth = pdf.getTextWidth('Lighthouse ');
+  pdf.text('Developer Edition', margin + 10 + lighthouseWidth, yPos + 6);
+
+  yPos += 12;
+
+  // Subtitle
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(0.1);
+  pdf.text('MULTI-ZAP BATCH ANALYSIS REPORT', margin, yPos + 6);
+  pdf.setCharSpace(0);
+
+  // Report metadata (right side)
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'normal');
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  pdf.text(dateStr, pageWidth - margin, yPos + 6, { align: 'right' });
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`Report ID: ${config.reportCode}`, pageWidth - margin, yPos + 10, { align: 'right' });
+
+  yPos += 25;
+
+  // PROJECT SNAPSHOT Card
+  const snapshotHeight = 45;
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.roundedRect(margin, yPos, contentWidth - 1, snapshotHeight, 3, 3, 'FD');
+  pdf.setFillColor(239, 246, 255);
+  pdf.roundedRect(margin + 1, yPos, contentWidth - 1, snapshotHeight, 3, 3, 'FD');
+
+  pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text('PROJECT SNAPSHOT', margin + 8, yPos + 8);
+  pdf.setCharSpace(0);
+
+  // Metrics in 2x2 grid
+  const snapMetrics = [
+    { label: 'Zaps Analyzed', value: batchResult.zap_count.toString() },
+    { label: 'Total Anti-Patterns', value: batchResult.total_flags.toString() },
+    { label: 'Monthly Waste', value: `$${Math.round(batchResult.total_estimated_savings)}` },
+    { label: 'Avg Efficiency', value: `${Math.round(batchResult.average_efficiency_score)}/100` }
+  ];
+
+  const gridCols = 2;
+  const gridGap = 10;
+  const cellWidth = (contentWidth - 20 - gridGap) / 2;
+  let gridY = yPos + 16;
+
+  snapMetrics.forEach((metric, i) => {
+    const col = i % gridCols;
+    const row = Math.floor(i / gridCols);
+    const x = margin + 8 + col * (cellWidth + gridGap);
+    const y = gridY + row * 12;
+
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.text(metric.value, x, y);
+
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+    pdf.text(metric.label.toUpperCase(), x, y + 5);
+  });
+
+  yPos += snapshotHeight + 8;
+
+  // SEVERITY BREAKDOWN Card
+  ensureSpace(35);
+  const sevHeight = 30;
+  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.roundedRect(margin, yPos, contentWidth - 1, sevHeight, 3, 3, 'FD');
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+  pdf.roundedRect(margin + 1, yPos, contentWidth - 1, sevHeight, 3, 3, 'FD');
+
+  pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text('SEVERITY BREAKDOWN', margin + 8, yPos + 8);
+  pdf.setCharSpace(0);
+
+  let sevY = yPos + 18;
+  const sevItems = [
+    { emoji: '🔴', label: 'High', count: severityBreakdown.high },
+    { emoji: '🟡', label: 'Medium', count: severityBreakdown.medium },
+    { emoji: '🟢', label: 'Low', count: severityBreakdown.low }
+  ];
+
+  sevItems.forEach(item => {
+    pdf.setFontSize(10);
+    pdf.text(item.emoji, margin + 8, sevY);
+    
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`${item.label}:`, margin + 15, sevY);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`${item.count} issue${item.count === 1 ? '' : 's'}`, margin + 35, sevY);
+    
+    sevY += 6;
+  });
+
+  yPos += sevHeight + 8;
+
+  // ============================================================================
+  // PAGE 2: SYSTEM HEALTH & SCOPE
+  // ============================================================================
+  pdf.addPage();
+  currentPage++;
+  drawPageFrame(pdf, config, currentPage);
+  yPos = 20;
+
+  // Page title
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('System Health & Scope', margin, yPos + 6);
+  yPos += 18;
+
+  // SYSTEM HEALTH OVERVIEW Card
+  const healthHeight = 40;
+  pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.roundedRect(margin, yPos, contentWidth - 1, healthHeight, 3, 3, 'FD');
+  pdf.setFillColor(236, 253, 245);
+  pdf.roundedRect(margin + 1, yPos, contentWidth - 1, healthHeight, 3, 3, 'FD');
+
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text('SYSTEM HEALTH OVERVIEW', margin + 8, yPos + 8);
+  pdf.setCharSpace(0);
+
+  let healthY = yPos + 18;
+  const metrics = batchResult.system_metrics;
+  const healthItems = [
+    `• Avg Steps/Zap: ${metrics.avg_steps_per_zap.toFixed(1)}`,
+    `• Polling Triggers: ${metrics.polling_trigger_count}/${batchResult.zap_count} (${Math.round(metrics.polling_trigger_count / batchResult.zap_count * 100)}%)`,
+    `• Instant Triggers: ${metrics.instant_trigger_count}/${batchResult.zap_count} (${Math.round(metrics.instant_trigger_count / batchResult.zap_count * 100)}%)`,
+    `• Formatter Density: ${metrics.formatter_usage_density}`
+  ];
+
+  pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  healthItems.forEach(item => {
+    pdf.text(item, margin + 8, healthY);
+    healthY += 5;
+  });
+
+  yPos += healthHeight + 8;
+
+  // ANALYZED & EXCLUDED - Two Columns
+  ensureSpace(100);
+  
+  const colWidth = (contentWidth - 4) / 2;
+  
+  // LEFT: Analyzed Zaps
+  pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.roundedRect(margin, yPos, colWidth, 80, 3, 3, 'FD');
+  pdf.setFillColor(239, 246, 255);
+  pdf.roundedRect(margin + 1, yPos, colWidth - 1, 80, 3, 3, 'FD');
+
+  pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text(`ANALYZED (${batchResult.scope_metadata.analyzed_count})`, margin + 6, yPos + 7);
+  pdf.setCharSpace(0);
+
+  let listY = yPos + 15;
+  const analyzed = batchResult.scope_metadata.analyzed_zap_summaries.slice(0, 10);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+
+  for (const zap of analyzed) {
+    if (listY > yPos + 75) {
+      pdf.text('...', margin + 6, listY);
+      break;
+    }
+    const title = zap.title.substring(0, 20) + (zap.title.length > 20 ? '...' : '');
+    pdf.text(`• ${title}`, margin + 6, listY);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(6);
+    pdf.text(`${zap.step_count} steps`, margin + 10, listY + 3);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    listY += 7;
+  }
+
+  // RIGHT: Excluded Zaps
+  const rightX = margin + colWidth + 4;
+  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.roundedRect(rightX, yPos, colWidth, 80, 3, 3, 'FD');
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+  pdf.roundedRect(rightX + 1, yPos, colWidth - 1, 80, 3, 3, 'FD');
+
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text(`EXCLUDED (${batchResult.scope_metadata.excluded_count})`, rightX + 6, yPos + 7);
+  pdf.setCharSpace(0);
+
+  listY = yPos + 15;
+  const excluded = batchResult.scope_metadata.excluded_zap_summaries.slice(0, 10);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+
+  for (const zap of excluded) {
+    if (listY > yPos + 75) {
+      pdf.text('...', rightX + 6, listY);
+      break;
+    }
+    const title = zap.title.substring(0, 20) + (zap.title.length > 20 ? '...' : '');
+    pdf.text(`• ${title}`, rightX + 6, listY);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(6);
+    pdf.text(`(${zap.status})`, rightX + 10, listY + 3);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    listY += 7;
+  }
+
+  yPos += 85;
+
+  // ============================================================================
+  // PAGE 3: PATTERN-LEVEL FINDINGS
+  // ============================================================================
+  pdf.addPage();
+  currentPage++;
+  drawPageFrame(pdf, config, currentPage);
+  yPos = 20;
+
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Pattern-Level Findings', margin, yPos + 6);
+  yPos += 18;
+
+  // Draw pattern cards
+  const patterns = batchResult.patterns.slice(0, 5); // Top 5 patterns
+  
+  for (const pattern of patterns) {
+    ensureSpace(35);
+    
+    const cardHeight = 28;
+    const severityColor = pattern.severity === 'high' ? COLORS.RED :
+      pattern.severity === 'medium' ? { r: 245, g: 158, b: 11 } : COLORS.GREEN;
+    
+    pdf.setFillColor(severityColor.r, severityColor.g, severityColor.b);
+    pdf.roundedRect(margin, yPos, contentWidth - 1, cardHeight, 3, 3, 'FD');
+    
+    const bgColor = pattern.severity === 'high' ? { r: 254, g: 242, b: 242 } :
+      pattern.severity === 'medium' ? { r: 254, g: 243, b: 199 } : { r: 236, g: 253, b: 245 };
+    pdf.setFillColor(bgColor.r, bgColor.g, bgColor.b);
+    pdf.roundedRect(margin + 1, yPos, contentWidth - 1, cardHeight, 3, 3, 'FD');
+
+    // Pattern header
+    pdf.setTextColor(severityColor.r, severityColor.g, severityColor.b);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setCharSpace(1);
+    pdf.text(pattern.pattern_name.toUpperCase(), margin + 8, yPos + 7);
+    pdf.setCharSpace(0);
+
+    // Affected count badge
+    pdf.setFontSize(8);
+    pdf.text(`${pattern.affected_count} Zaps`, pageWidth - margin - 20, yPos + 7, { align: 'right' });
+
+    // Details
+    let detailY = yPos + 15;
+    pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`• Waste: ${pattern.total_waste_tasks} tasks/month ($${Math.round(pattern.total_waste_usd)})`, margin + 8, detailY);
+    
+    detailY += 5;
+    if (pattern.median_chain_length) {
+      pdf.text(`• Avg Chain Length: ${pattern.median_chain_length.toFixed(1)} steps`, margin + 8, detailY);
+      detailY += 5;
+    }
+    
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(7);
+    const guidance = pattern.refactor_guidance.substring(0, 80) + (pattern.refactor_guidance.length > 80 ? '...' : '');
+    pdf.text(`Fix: ${guidance}`, margin + 8, detailY, { maxWidth: contentWidth - 16 });
+
+    yPos += cardHeight + 4;
+  }
+
+  // ============================================================================
+  // PAGES 4+: PER-ZAP BREAKDOWN (with ASCII diagrams)
+  // ============================================================================
+  const topZaps = batchResult.individual_results.slice(0, 5); // Top 5 zaps with most flags
+  
+  for (let zapIndex = 0; zapIndex < topZaps.length; zapIndex++) {
+    const result = topZaps[zapIndex];
+    
+    pdf.addPage();
+    currentPage++;
+    drawPageFrame(pdf, config, currentPage);
+    yPos = 20;
+
+    // Zap header
+    const zapTitle = result.efficiency_flags.length > 0 
+      ? result.efficiency_flags[0].zap_title 
+      : `Zap ${zapIndex + 1}`;
+    
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(zapTitle.substring(0, 50), margin, yPos + 6);
+    
+    pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`${result.total_nodes} steps • ${result.efficiency_flags.length} issues • Score: ${result.efficiency_score}/100`, margin, yPos + 12);
+    
+    yPos += 20;
+
+    // ASCII DIAGRAM BOX
+    ensureSpace(55);
+    const diagramHeight = 50;
+    
+    pdf.setFillColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.roundedRect(margin, yPos, contentWidth - 1, diagramHeight, 3, 3, 'FD');
+    pdf.setFillColor(30, 41, 59); // slate-800
+    pdf.roundedRect(margin + 1, yPos, contentWidth - 1, diagramHeight, 3, 3, 'FD');
+
+    pdf.setTextColor(96, 165, 250); // blue-400
+    pdf.setFontSize(8);
+    pdf.setFont('courier', 'bold');
+    pdf.text('WORKFLOW ARCHITECTURE', margin + 6, yPos + 6);
+
+    // ASCII diagram (Courier font for monospaced)
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(229, 231, 235); // gray-200
+
+    let diagramY = yPos + 14;
+    const triggerApp = result.apps.length > 0 ? result.apps[0].name : 'Webhook';
+    const actionApp = result.apps.length > 1 ? result.apps[1].name : 'Unknown';
+    
+    // Generate simple ASCII flow
+    const asciiLines = [
+      `  ┌────────────────┐`,
+      `  │   ${triggerApp.substring(0, 12).padEnd(12, ' ')}   │  TRIGGER`,
+      `  └────────┬───────┘`,
+      `           │`,
+      `           ▼`,
+      `  ┌────────────────┐`,
+      `  │  LOGIC LAYER   │  ${result.total_nodes - 2} steps`,
+      `  │  (filters,     │`,
+      `  │   formatters)  │`,
+      `  └────────┬───────┘`,
+      `           │`,
+      `           ▼`,
+      `  ┌────────────────┐`,
+      `  │   ${actionApp.substring(0, 12).padEnd(12, ' ')}   │  ACTION`,
+      `  └────────────────┘`
+    ];
+
+    asciiLines.forEach(line => {
+      pdf.text(line, margin + 6, diagramY);
+      diagramY += 3;
+    });
+
+    yPos += diagramHeight + 8;
+
+    // Issues for this Zap
+    ensureSpace(30);
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Identified Issues', margin, yPos + 6);
+    yPos += 12;
+
+    const zapFlags = result.efficiency_flags.slice(0, 3);
+    for (const flag of zapFlags) {
+      ensureSpace(20);
+      
+      const issueHeight = 16;
+      const sevColor = flag.severity === 'high' ? COLORS.RED :
+        flag.severity === 'medium' ? { r: 245, g: 158, b: 11 } : COLORS.GREEN;
+      
+      pdf.setFillColor(sevColor.r, sevColor.g, sevColor.b);
+      pdf.roundedRect(margin, yPos, contentWidth - 1, issueHeight, 2, 2, 'FD');
+      
+      const issueBg = flag.severity === 'high' ? { r: 254, g: 242, b: 242 } :
+        flag.severity === 'medium' ? { r: 254, g: 243, b: 199 } : { r: 236, g: 253, b: 245 };
+      pdf.setFillColor(issueBg.r, issueBg.g, issueBg.b);
+      pdf.roundedRect(margin + 1, yPos, contentWidth - 1, issueHeight, 2, 2, 'FD');
+
+      pdf.setTextColor(sevColor.r, sevColor.g, sevColor.b);
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(flag.flag_type.toUpperCase().replace(/_/g, ' '), margin + 6, yPos + 6);
+
+      pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+      pdf.setFontSize(7);
+      pdf.setFont('helvetica', 'normal');
+      const msg = flag.message.substring(0, 70) + (flag.message.length > 70 ? '...' : '');
+      pdf.text(msg, margin + 6, yPos + 11);
+
+      yPos += issueHeight + 3;
+    }
+  }
+
+  // ============================================================================
+  // TECH DEBT SCOREBOARD
+  // ============================================================================
+  pdf.addPage();
+  currentPage++;
+  drawPageFrame(pdf, config, currentPage);
+  yPos = 20;
+
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Tech Debt Scoreboard', margin, yPos + 6);
+  yPos += 18;
+
+  // Table header
+  pdf.setFillColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.roundedRect(margin, yPos, contentWidth, 8, 2, 2, 'F');
+  
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('ZAP NAME', margin + 4, yPos + 5.5);
+  pdf.text('COMPLEXITY', margin + 60, yPos + 5.5);
+  pdf.text('RISK', margin + 90, yPos + 5.5);
+  pdf.text('WASTE', margin + 110, yPos + 5.5);
+  pdf.text('PRIORITY', margin + 140, yPos + 5.5);
+  
+  yPos += 10;
+
+  // Table rows
+  const scoreboardZaps = batchResult.individual_results.slice(0, 10);
+  
+  for (let i = 0; i < scoreboardZaps.length; i++) {
+    const res = scoreboardZaps[i];
+    ensureSpace(8);
+    
+    // Alternating row colors
+    if (i % 2 === 0) {
+      pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+      pdf.rect(margin, yPos, contentWidth, 6, 'F');
+    }
+
+    const zapName = res.efficiency_flags.length > 0 
+      ? res.efficiency_flags[0].zap_title.substring(0, 25) 
+      : `Zap ${i + 1}`;
+    
+    const complexity = res.total_nodes > 8 ? 'High' : res.total_nodes > 4 ? 'Med' : 'Low';
+    const risk = res.efficiency_flags.length > 2 ? 'High' : res.efficiency_flags.length > 0 ? 'Med' : 'Low';
+    const waste = `$${Math.round(res.estimated_savings * 12)}`;
+    const priority = res.efficiency_score < 50 ? '🔴' : res.efficiency_score < 75 ? '🟡' : '🟢';
+
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(zapName, margin + 4, yPos + 4);
+    pdf.text(complexity, margin + 60, yPos + 4);
+    pdf.text(risk, margin + 90, yPos + 4);
+    pdf.text(waste, margin + 110, yPos + 4);
+    pdf.text(priority, margin + 140, yPos + 4);
+
+    yPos += 6;
+  }
+
+  // ============================================================================
+  // OPTIMIZATION CHECKLIST
+  // ============================================================================
+  yPos += 10;
+  ensureSpace(40);
+
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Optimization Checklist', margin, yPos + 6);
+  yPos += 18;
+
+  // Dynamic checklist based on patterns
+  const checklistItems: string[] = [];
+  
+  batchResult.patterns.forEach(pattern => {
+    if (pattern.pattern_type === 'polling_trigger') {
+      checklistItems.push(`Replace ${pattern.affected_count} polling triggers with webhooks`);
+    } else if (pattern.pattern_type === 'formatter_chain') {
+      checklistItems.push(`Consolidate ${pattern.affected_count} formatter chains into single steps`);
+    } else if (pattern.pattern_type === 'late_filter') {
+      checklistItems.push(`Reposition filters earlier in ${pattern.affected_count} workflows`);
+    } else {
+      checklistItems.push(`Address ${pattern.pattern_name} in ${pattern.affected_count} Zaps`);
+    }
+  });
+
+  // Add generic items
+  checklistItems.push('Review error handling for all high-risk Zaps');
+  checklistItems.push('Document complex workflows for team knowledge');
+  checklistItems.push('Set up monitoring for critical automations');
+
+  // Draw checklist
+  const checklistHeight = 10 + checklistItems.length * 7;
+  pdf.setFillColor(COLORS.SLATE_50.r, COLORS.SLATE_50.g, COLORS.SLATE_50.b);
+  pdf.roundedRect(margin, yPos, contentWidth, checklistHeight, 3, 3, 'F');
+
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Action Items', margin + 6, yPos + 7);
+
+  let checkY = yPos + 15;
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+
+  for (const item of checklistItems) {
+    // Empty checkbox
+    pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.setLineWidth(0.3);
+    pdf.rect(margin + 8, checkY - 3, 3, 3);
+    
+    pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+    pdf.text(item, margin + 14, checkY);
+    
+    checkY += 7;
+    if (checkY > pageHeight - margin - 20) break;
+  }
+
+  // Save
+  const timestamp = new Date().toISOString().split('T')[0];
+  pdf.save(`Lighthouse_Developer_Edition_${timestamp}.pdf`);
 }
