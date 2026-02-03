@@ -117,6 +117,70 @@ const COLORS = {
 // HELPER FUNCTIONS
 // ========================================
 
+/**
+ * Draw severity badge (replaces emoji)
+ */
+function drawSeverityBadge(
+  pdf: jsPDF,
+  severity: string,
+  x: number,
+  y: number,
+  showLabel: boolean = true
+) {
+  const config: Record<string, { color: { r: number; g: number; b: number }; label: string }> = {
+    high: { color: COLORS.RED, label: 'HIGH' },
+    medium: { color: { r: 245, g: 158, b: 11 }, label: 'MED' },
+    low: { color: COLORS.GREEN, label: 'LOW' }
+  };
+  
+  const severityLower = severity.toLowerCase();
+  const { color, label } = config[severityLower] || config.high;
+  
+  if (showLabel) {
+    // Colored badge with text
+    pdf.setFillColor(color.r, color.g, color.b);
+    pdf.roundedRect(x, y - 3, 18, 5, 1, 1, 'F');
+    
+    // White text
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(label, x + 9, y, { align: 'center' });
+  } else {
+    // Just colored circle
+    pdf.setFillColor(color.r, color.g, color.b);
+    pdf.circle(x, y, 2, 'F');
+  }
+}
+
+/**
+ * Format waste amount (fixes "$0" display)
+ */
+function formatWasteAmount(tasks: number, usd: number): string {
+  if (usd === 0) {
+    return `${tasks} tasks/month (negligible cost)`;
+  } else if (usd < 1) {
+    return `${tasks} tasks/month ($${usd.toFixed(2)})`;
+  } else {
+    return `${tasks} tasks/month (~$${Math.round(usd)})`;
+  }
+}
+
+/**
+ * Calculate priority level (replaces emoji)
+ */
+function calculatePriority(efficiencyScore: number, wasteUsd: number): string {
+  if (efficiencyScore < 50 && wasteUsd > 5) {
+    return 'CRIT';
+  } else if (efficiencyScore < 50 || wasteUsd > 3) {
+    return 'HIGH';
+  } else if (efficiencyScore < 75) {
+    return 'MED';
+  } else {
+    return 'LOW';
+  }
+}
+
 //FOOTER
 /**
  * Draw page frame with header bar and footer
@@ -1677,16 +1741,17 @@ export async function generateDeveloperEditionPDF(
 
   let sevY = yPos + 18;
   const sevItems = [
-    { emoji: '🔴', label: 'High', count: severityBreakdown.high },
-    { emoji: '🟡', label: 'Medium', count: severityBreakdown.medium },
-    { emoji: '🟢', label: 'Low', count: severityBreakdown.low }
+    { severity: 'high', label: 'High', count: severityBreakdown.high },
+    { severity: 'medium', label: 'Medium', count: severityBreakdown.medium },
+    { severity: 'low', label: 'Low', count: severityBreakdown.low }
   ];
 
   sevItems.forEach(item => {
-    pdf.setFontSize(10);
-    pdf.text(item.emoji, margin + 8, sevY);
+    // ✅ Use drawSeverityBadge instead of emoji
+    drawSeverityBadge(pdf, item.severity, margin + 8, sevY, false);
     
     pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(9);
     pdf.setFont('helvetica', 'bold');
     pdf.text(`${item.label}:`, margin + 15, sevY);
     
@@ -1917,58 +1982,150 @@ export async function generateDeveloperEditionPDF(
     
     yPos += 18; // ✅ Spacing after header
 
-    // ASCII DIAGRAM BOX
-    ensureSpace(55);
-    const diagramHeight = 50;
-    
-    pdf.setFillColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
-    pdf.roundedRect(margin, yPos, contentWidth - 1, diagramHeight, 3, 3, 'FD');
-    pdf.setFillColor(30, 41, 59); // slate-800
-    pdf.roundedRect(margin + 1, yPos, contentWidth - 1, diagramHeight, 3, 3, 'FD');
+    // WORKFLOW ARCHITECTURE - Box-based rendering
+    ensureSpace(60);
 
-    // ✅ ASCII HEADER - Courier bold
-    pdf.setTextColor(96, 165, 250); // blue-400
+    const cardOffset = 1;
+    const cardHeight = 50;
+
+    // Shadow box
+    pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.roundedRect(margin, yPos, contentWidth - cardOffset, cardHeight, 3, 3, 'FD');
+
+    // Main box
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+    pdf.setLineWidth(0.1);
+    pdf.roundedRect(margin + cardOffset, yPos, contentWidth - cardOffset, cardHeight, 3, 3, 'FD');
+
+    // Card header
+    pdf.setTextColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
     pdf.setFontSize(8);
-    pdf.setFont('courier', 'bold');
-    pdf.text('WORKFLOW ARCHITECTURE', margin + 6, yPos + 6);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setCharSpace(1);
+    pdf.text('WORKFLOW ARCHITECTURE', margin + cardOffset + 6, yPos + 6);
+    pdf.setCharSpace(0);
 
-    // ✅ ASCII diagram - Courier normal for monospaced
-    pdf.setFont('courier', 'normal');
-    pdf.setFontSize(8); // ✅ Increased from 7 to 8 for better readability
-    pdf.setTextColor(229, 231, 235); // gray-200
+    // Complexity badge (right side)
+    const complexity = result.total_nodes > 8 ? 'HIGH' : result.total_nodes > 4 ? 'MEDIUM' : 'LOW';
+    const complexityColor = result.total_nodes > 8 ? COLORS.RED : 
+                            result.total_nodes > 4 ? { r: 245, g: 158, b: 11 } : 
+                            COLORS.GREEN;
 
-    let diagramY = yPos + 14;
-    const triggerApp = result.apps.length > 0 ? result.apps[0].name : 'Webhook';
-    const actionApp = result.apps.length > 1 ? result.apps[1].name : 'Unknown';
-    
-    // Generate simple ASCII flow
-    const asciiLines = [
-      `  ┌────────────────┐`,
-      `  │   ${triggerApp.substring(0, 12).padEnd(12, ' ')}   │  TRIGGER`,
-      `  └────────┬───────┘`,
-      `           │`,
-      `           ▼`,
-      `  ┌────────────────┐`,
-      `  │  LOGIC LAYER   │  ${result.total_nodes - 2} steps`,
-      `  │  (filters,     │`,
-      `  │   formatters)  │`,
-      `  └────────┬───────┘`,
-      `           │`,
-      `           ▼`,
-      `  ┌────────────────┐`,
-      `  │   ${actionApp.substring(0, 12).padEnd(12, ' ')}   │  ACTION`,
-      `  └────────────────┘`
-    ];
-
-    asciiLines.forEach(line => {
-      pdf.text(line, margin + 6, diagramY);
-      diagramY += 4; // ✅ Increased from 3 to 4 for better spacing
-    });
-
-    // ✅ Reset font to helvetica after ASCII diagram
+    pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.setFontSize(7);
     pdf.setFont('helvetica', 'normal');
-    
-    yPos += diagramHeight + 8;
+    const stepsText = `${result.total_nodes} STEPS • `;
+    const complexityText = `${complexity} COMPLEXITY`;
+    const totalWidth = pdf.getTextWidth(stepsText + complexityText);
+    const rightX = margin + contentWidth - cardOffset - 6 - totalWidth;
+
+    pdf.text(stepsText, rightX, yPos + 6);
+
+    pdf.setTextColor(complexityColor.r, complexityColor.g, complexityColor.b);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(complexityText, rightX + pdf.getTextWidth(stepsText), yPos + 6);
+
+    yPos += 14;
+
+    // Workflow diagram (3 boxes: Trigger → Logic → Action)
+    const boxWidth = 35;
+    const boxHeight = 20;
+    const boxGap = 10;
+    const startX = margin + cardOffset + (contentWidth - cardOffset - (3 * boxWidth + 2 * boxGap)) / 2;
+
+    // Get app names from result
+    const triggerApp = result.apps.length > 0 ? result.apps[0].name : 'Webhook';
+    const actionApp = result.apps.length > 1 ? result.apps[result.apps.length - 1].name : 'Unknown';
+
+    // TRIGGER box
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+    pdf.setLineWidth(0.3);
+    pdf.roundedRect(startX, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+
+    // Trigger icon (letter)
+    const triggerInitial = triggerApp.charAt(0).toUpperCase();
+    pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+    pdf.roundedRect(startX + boxWidth / 2 - 4, yPos + 4, 8, 8, 2, 2, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(triggerInitial, startX + boxWidth / 2, yPos + 10, { align: 'center' });
+
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(triggerApp.toUpperCase().substring(0, 10), startX + boxWidth / 2, yPos + 15, { align: 'center' });
+    pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('TRIGGER', startX + boxWidth / 2, yPos + 18, { align: 'center' });
+
+    // Arrow 1
+    const arrow1X = startX + boxWidth + 2;
+    const arrow1Y = yPos + boxHeight / 2;
+    pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.setLineWidth(0.5);
+    pdf.line(arrow1X, arrow1Y, arrow1X + boxGap - 4, arrow1Y);
+    pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.triangle(arrow1X + boxGap - 4, arrow1Y - 1, arrow1X + boxGap - 2, arrow1Y, arrow1X + boxGap - 4, arrow1Y + 1, 'F');
+
+    // LOGIC LAYER box
+    const logic2X = startX + boxWidth + boxGap;
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+    pdf.roundedRect(logic2X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+
+    // Logic badge
+    const logicSteps = Math.max(result.total_nodes - 2, 0);
+    pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+    pdf.roundedRect(logic2X + boxWidth / 2 - 8, yPos + 3, 16, 6, 3, 3, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`+${logicSteps}`, logic2X + boxWidth / 2, yPos + 7, { align: 'center' });
+
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('LOGIC LAYER', logic2X + boxWidth / 2, yPos + 14, { align: 'center' });
+    pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('FILTERS & FORMATTING', logic2X + boxWidth / 2, yPos + 18, { align: 'center' });
+
+    // Arrow 2
+    const arrow2X = logic2X + boxWidth + 2;
+    pdf.line(arrow2X, arrow1Y, arrow2X + boxGap - 4, arrow1Y);
+    pdf.triangle(arrow2X + boxGap - 4, arrow1Y - 1, arrow2X + boxGap - 2, arrow1Y, arrow2X + boxGap - 4, arrow1Y + 1, 'F');
+
+    // ACTION box
+    const action3X = logic2X + boxWidth + boxGap;
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+    pdf.roundedRect(action3X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+
+    // Action icon (letter)
+    const actionInitial = actionApp.charAt(0).toUpperCase();
+    pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
+    pdf.roundedRect(action3X + boxWidth / 2 - 4, yPos + 4, 8, 8, 2, 2, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(actionInitial, action3X + boxWidth / 2, yPos + 10, { align: 'center' });
+
+    pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(actionApp.toUpperCase().substring(0, 10), action3X + boxWidth / 2, yPos + 15, { align: 'center' });
+    pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('ACTION', action3X + boxWidth / 2, yPos + 18, { align: 'center' });
+
+    yPos += boxHeight + 16;
 
     // Issues for this Zap
     ensureSpace(30);
@@ -2057,8 +2214,15 @@ export async function generateDeveloperEditionPDF(
     
     const complexity = res.total_nodes > 8 ? 'High' : res.total_nodes > 4 ? 'Med' : 'Low';
     const risk = res.efficiency_flags.length > 2 ? 'High' : res.efficiency_flags.length > 0 ? 'Med' : 'Low';
-    const waste = `$${Math.round(res.estimated_savings * 12)}`;
-    const priority = res.efficiency_score < 50 ? '🔴' : res.efficiency_score < 75 ? '🟡' : '🟢';
+    const wasteUsd = res.estimated_savings * 12;
+    const waste = `$${Math.round(wasteUsd)}`;
+    
+    // ✅ Use calculatePriority instead of emoji
+    const priority = calculatePriority(res.efficiency_score, wasteUsd);
+    const priorityColor = priority === 'CRIT' ? COLORS.RED :
+                          priority === 'HIGH' ? { r: 245, g: 158, b: 11 } :
+                          priority === 'MED' ? { r: 245, g: 158, b: 11 } :
+                          COLORS.GREEN;
 
     pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
     pdf.setFontSize(7);
@@ -2067,6 +2231,10 @@ export async function generateDeveloperEditionPDF(
     pdf.text(complexity, margin + 60, yPos + 4);
     pdf.text(risk, margin + 90, yPos + 4);
     pdf.text(waste, margin + 110, yPos + 4);
+    
+    // ✅ Draw priority as colored text badge
+    pdf.setTextColor(priorityColor.r, priorityColor.g, priorityColor.b);
+    pdf.setFont('helvetica', 'bold');
     pdf.text(priority, margin + 140, yPos + 4);
 
     yPos += 6;
