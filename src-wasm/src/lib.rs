@@ -409,7 +409,7 @@ fn attach_usage_stats(zapfile: &mut ZapFile, task_history_map: &HashMap<u64, Usa
 /// Detect error loops (high failure rate in Zap executions)
 /// Flags Zaps where error rate exceeds 10% threshold
 /// Enhanced with trend analysis, streak detection, and common error identification
-fn detect_error_loop(zap: &Zap) -> Option<EfficiencyFlag> {
+fn detect_error_loop(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFlag> {
     if let Some(stats) = &zap.usage_stats {
         // Only flag if there's actual execution data and error rate exceeds threshold
         if stats.total_runs > 0 && stats.error_rate > 10.0 {
@@ -458,10 +458,10 @@ fn detect_error_loop(zap: &Zap) -> Option<EfficiencyFlag> {
             );
             
             // Calculate dynamic savings: each error = wasted task
-            let monthly_savings = (stats.error_count as f32) * TASK_PRICE;
+            let monthly_savings = (stats.error_count as f32) * price_per_task;
             let savings_explanation = format!(
-                "Based on ${:.2} per task and eliminating {} failed executions",
-                TASK_PRICE,
+                "Based on ${:.4} per task and eliminating {} failed executions",
+                price_per_task,
                 stats.error_count
             );
             
@@ -583,7 +583,7 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
     let apps = extract_app_inventory(&zapfile);
 
     // Detect efficiency issues (now includes error loop detection)
-    let efficiency_flags = detect_efficiency_flags(&zapfile);
+    let efficiency_flags = detect_efficiency_flags(&zapfile, TASK_PRICE);
 
     // Calculate efficiency score
     let efficiency_score = calculate_efficiency_score(&efficiency_flags);
@@ -610,22 +610,22 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
 }
 
 /// Detect efficiency issues and optimization opportunities
-fn detect_efficiency_flags(zapfile: &ZapFile) -> Vec<EfficiencyFlag> {
+fn detect_efficiency_flags(zapfile: &ZapFile, price_per_task: f32) -> Vec<EfficiencyFlag> {
     let mut flags = Vec::new();
     
     for zap in &zapfile.zaps {
         // Detect polling triggers
-        if let Some(flag) = detect_polling_trigger(zap) {
+        if let Some(flag) = detect_polling_trigger(zap, price_per_task) {
             flags.push(flag);
         }
         
         // Detect inefficient filter placement
-        if let Some(flag) = detect_late_filter_placement(zap) {
+        if let Some(flag) = detect_late_filter_placement(zap, price_per_task) {
             flags.push(flag);
         }
         
         // Detect error loops (high failure rates)
-        if let Some(flag) = detect_error_loop(zap) {
+        if let Some(flag) = detect_error_loop(zap, price_per_task) {
             flags.push(flag);
         }
     }
@@ -635,7 +635,7 @@ fn detect_efficiency_flags(zapfile: &ZapFile) -> Vec<EfficiencyFlag> {
 
 /// Detect if a filter step is placed too late in the workflow
 /// Filters should be placed right after the trigger to save task consumption
-fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
+fn detect_late_filter_placement(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFlag> {
     // Build ordered list of nodes by following parent_id chain
     let mut ordered_nodes: Vec<&Node> = Vec::new();
     
@@ -684,11 +684,11 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
                             
                             // Wasted tasks = actions_before_filter * rejected_items
                             let wasted_tasks_per_month = (stats.total_runs as f32) * (actions_before_filter as f32) * filter_rejection_rate;
-                            let savings = wasted_tasks_per_month * TASK_PRICE;
+                            let savings = wasted_tasks_per_month * price_per_task;
                             
                             let explanation = format!(
-                                "Based on ${:.2} per task, {} actions before filter, and {:.0}% actual filter rejection rate from {} executions",
-                                TASK_PRICE,
+                                "Based on ${:.4} per task, {} actions before filter, and {:.0}% actual filter rejection rate from {} executions",
+                                price_per_task,
                                 actions_before_filter,
                                 filter_rejection_rate * 100.0,
                                 stats.total_runs
@@ -744,7 +744,7 @@ fn detect_late_filter_placement(zap: &Zap) -> Option<EfficiencyFlag> {
 
 /// Detect if a Zap uses a polling trigger
 /// Polling triggers consume tasks even when no data is processed
-fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
+fn detect_polling_trigger(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFlag> {
     // Find the root/trigger node (node with no parent_id)
     let trigger_node = zap.nodes.values()
         .find(|node| node.parent_id.is_none() && node.type_of == "read")?;
@@ -776,7 +776,7 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
         // NOTE: Polling trigger savings are ALWAYS fallback/estimated (no way to measure actual overhead)
         let (monthly_savings, savings_explanation, has_execution_data) = if let Some(stats) = &zap.usage_stats {
     if stats.total_runs > 0 {
-        let savings = (stats.total_runs as f32) * TASK_PRICE * POLLING_REDUCTION_RATE;
+        let savings = (stats.total_runs as f32) * price_per_task * POLLING_REDUCTION_RATE;
         let explanation = format!(
             "Estimated using industry average {}% fallback from {} polling executions",
             (POLLING_REDUCTION_RATE * 100.0) as u32,
@@ -786,7 +786,7 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
     } else {
         // Fallback: Zap má stats ale 0 runs
         let estimated_monthly_checks = 100.0;
-        let fallback_savings = estimated_monthly_checks * TASK_PRICE * POLLING_REDUCTION_RATE;
+        let fallback_savings = estimated_monthly_checks * price_per_task * POLLING_REDUCTION_RATE;
         let explanation = format!(
             "Estimated: ~{} monthly polling checks, {}% overhead (no execution data)",
             estimated_monthly_checks as u32,
@@ -797,7 +797,7 @@ fn detect_polling_trigger(zap: &Zap) -> Option<EfficiencyFlag> {
 } else {
     // Fallback: Zap nemá žiadne stats
     let estimated_monthly_checks = 100.0;
-    let fallback_savings = estimated_monthly_checks * TASK_PRICE * POLLING_REDUCTION_RATE;
+    let fallback_savings = estimated_monthly_checks * price_per_task * POLLING_REDUCTION_RATE;
     let explanation = format!(
         "Estimated: ~{} monthly polling checks, {}% overhead (no execution data)",
         estimated_monthly_checks as u32,
@@ -952,7 +952,7 @@ pub fn parse_zapfile_json(json_content: &str) -> String {
     let apps = extract_app_inventory(&zapfile);
 
     // Detect efficiency issues
-    let efficiency_flags = detect_efficiency_flags(&zapfile);
+    let efficiency_flags = detect_efficiency_flags(&zapfile, TASK_PRICE);
 
     // Calculate efficiency score
     let efficiency_score = calculate_efficiency_score(&efficiency_flags);
@@ -1204,7 +1204,7 @@ pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64) -> String {
     let apps = extract_app_inventory(&zapfile);
 
     // Detect efficiency issues (FULL AUDIT - includes all heuristics)
-    let efficiency_flags = detect_efficiency_flags(&zapfile);
+    let efficiency_flags = detect_efficiency_flags(&zapfile, TASK_PRICE);
 
     // Calculate efficiency score
     let efficiency_score = calculate_efficiency_score(&efficiency_flags);
@@ -1233,7 +1233,7 @@ pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64) -> String {
 /// Analyzes multiple selected Zaps in one pass
 /// Optimized: Opens ZIP once, filters by IDs, aggregates results
 #[wasm_bindgen]
-pub fn parse_batch_audit(zip_data: &[u8], zap_ids_js: JsValue) -> String {
+pub fn parse_batch_audit(zip_data: &[u8], zap_ids_js: JsValue, price_per_task: f32) -> String {
     // Deserialize JS array of zap IDs
     let zap_ids: Vec<u64> = match serde_wasm_bindgen::from_value(zap_ids_js) {
         Ok(ids) => ids,
@@ -1371,7 +1371,7 @@ pub fn parse_batch_audit(zip_data: &[u8], zap_ids_js: JsValue) -> String {
         }
         
         // Detect efficiency flags
-        let flags = detect_efficiency_flags(&single_zap_file);
+        let flags = detect_efficiency_flags(&single_zap_file, price_per_task);
         total_flags_count += flags.len();
         
         // Collect all flags for pattern detection

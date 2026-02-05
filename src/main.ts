@@ -130,6 +130,12 @@ let zapList: ZapSummary[] = []
 // NEW: Batch Selection State Management
 let selectedZapIds: Set<number> = new Set()
 
+// NEW: Cost Calibration State
+let pricePerTask: number = 0.02 // Default: $0.02/task (industry benchmark)
+let isCustomPrice: boolean = false // Track if user provided custom pricing
+let monthlyBill: number = 0
+let includedTasks: number = 0
+
 async function initWasm() {
   try {
     await init()
@@ -421,6 +427,77 @@ function updateAnalyzeButton() {
   }
 }
 
+// NEW: Apply Cost Calibration (LIVE - no button needed)
+function applyCostCalibration() {
+  const monthlyBillInput = document.getElementById('monthly-bill') as HTMLInputElement
+  const includedTasksInput = document.getElementById('included-tasks') as HTMLInputElement
+  
+  const bill = parseFloat(monthlyBillInput?.value || '0')
+  const tasks = parseFloat(includedTasksInput?.value || '0')
+  
+  // Ticho fallback na benchmark ak sú polia prázdne alebo nevalidné
+  if (!bill || !tasks || bill <= 0 || tasks <= 0) {
+    pricePerTask = 0.02
+    isCustomPrice = false
+    monthlyBill = 0
+    includedTasks = 0
+    updateCalibrationBadge()
+    return
+  }
+  
+  // Vypočítaj efektívnu sadzbu
+  monthlyBill = bill
+  includedTasks = tasks
+  pricePerTask = bill / tasks
+  isCustomPrice = true
+  
+  updateCalibrationBadge()
+  
+  console.log(`💰 Live calibration: $${pricePerTask.toFixed(4)}/task (from $${bill}/${tasks} tasks)`)
+}
+
+// NEW: Update calibration badge with visual feedback
+function updateCalibrationBadge() {
+  const badgeEl = document.getElementById('calibration-badge')
+  if (!badgeEl) return
+  
+  const percentDiff = ((pricePerTask - 0.02) / 0.02) * 100
+  const isHigher = pricePerTask > 0.02
+  const isLower = pricePerTask < 0.02
+  
+  // Farebné zvýraznenie podľa ceny
+  let colorClass = 'bg-amber-200 text-amber-800' // Default (benchmark)
+  let icon = '💰'
+  
+  if (isHigher) {
+    colorClass = 'bg-rose-200 text-rose-800' // Vyššia cena - červená
+    icon = '📈'
+  } else if (isLower) {
+    colorClass = 'bg-emerald-200 text-emerald-800' // Nižšia cena - zelená
+    icon = '📉'
+  }
+  
+  badgeEl.className = `ml-auto px-3 py-1 ${colorClass} text-xs font-bold rounded-full transition-all`
+  badgeEl.innerHTML = `${icon} $${pricePerTask.toFixed(4)}/task ${isCustomPrice ? `(${percentDiff > 0 ? '+' : ''}${percentDiff.toFixed(1)}%)` : '(Benchmark)'}`
+}
+
+// NEW: Quick preset for common Zapier plans
+function applyQuickPreset(bill: number, tasks: number) {
+  const monthlyBillInput = document.getElementById('monthly-bill') as HTMLInputElement
+  const includedTasksInput = document.getElementById('included-tasks') as HTMLInputElement
+  
+  if (monthlyBillInput && includedTasksInput) {
+    monthlyBillInput.value = bill.toString()
+    includedTasksInput.value = tasks.toString()
+    applyCostCalibration()
+  }
+}
+
+// Make functions globally available
+;(window as any).applyCostCalibration = applyCostCalibration
+;(window as any).updateCalibrationBadge = updateCalibrationBadge
+;(window as any).applyQuickPreset = applyQuickPreset
+
 async function handleAnalyzeSelected() {
   if (selectedZapIds.size === 0) {
     return
@@ -435,8 +512,8 @@ async function handleAnalyzeSelected() {
   updateStatus('processing', `Analyzing ${selectedIds.length} Zap${selectedIds.length === 1 ? '' : 's'}...`)
   
   try {
-    // Call WASM batch parser (Developer Edition)
-    const resultJson = parse_batch_audit(cachedZipData, selectedIds)
+    // Call WASM batch parser with dynamic price_per_task
+    const resultJson = parse_batch_audit(cachedZipData, selectedIds, pricePerTask)
     const batchResult: BatchParseResult = JSON.parse(resultJson)
     
     console.log('📦 Batch audit result (Developer Edition):', batchResult)
@@ -791,6 +868,86 @@ function displayZapSelector(zaps: ZapSummary[]) {
   
   resultsEl.innerHTML = `
     <div class="mt-10">
+      <!-- Cost Calibration Panel (LIVE UPDATE) -->
+      <div class="mb-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl shadow-sm">
+        <div class="flex items-center gap-3 mb-4">
+          <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 class="text-lg font-black text-amber-900">Cost Calibration (Optional)</h3>
+          <span id="calibration-badge" class="ml-auto px-3 py-1 bg-amber-200 text-amber-800 text-xs font-bold rounded-full transition-all">💰 $${pricePerTask.toFixed(4)}/task (Benchmark)</span>
+        </div>
+        <p class="text-sm text-amber-700 mb-4">💡 Start typing to see live calculation. We'll use your actual costs for precise financial projections.</p>
+        <div class="flex flex-col md:flex-row gap-3 items-stretch mb-3">
+          <div class="flex-1">
+            <label class="block text-xs font-bold text-amber-800 mb-1">Monthly Zapier Bill ($)</label>
+            <input 
+              type="number" 
+              id="monthly-bill" 
+              placeholder="e.g., 49.99" 
+              step="0.01"
+              oninput="applyCostCalibration()"
+              class="w-full px-4 py-2 border-2 border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none text-slate-900 transition-all"
+            />
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs font-bold text-amber-800 mb-1">Included Tasks in Plan</label>
+            <input 
+              type="number" 
+              id="included-tasks" 
+              placeholder="e.g., 750" 
+              step="1"
+              oninput="applyCostCalibration()"
+              class="w-full px-4 py-2 border-2 border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none text-slate-900 transition-all"
+            />
+          </div>
+        </div>
+        
+        <!-- Quick Select Presets -->
+        <div class="mb-2">
+          <p class="text-xs font-bold text-amber-800 mb-2">Quick Select:</p>
+          <div class="flex flex-wrap gap-2">
+            <button 
+              onclick="applyQuickPreset(19.99, 750)" 
+              class="px-3 py-1.5 bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-all hover:scale-105 hover:border-amber-400 shadow-sm"
+            >
+              Starter ($19.99 / 750)
+            </button>
+            <button 
+              onclick="applyQuickPreset(49.00, 2000)" 
+              class="px-3 py-1.5 bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-all hover:scale-105 hover:border-amber-400 shadow-sm"
+            >
+              Professional ($49 / 2K)
+            </button>
+            <button 
+              onclick="applyQuickPreset(299.00, 50000)" 
+              class="px-3 py-1.5 bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-all hover:scale-105 hover:border-amber-400 shadow-sm"
+            >
+              Team ($299 / 50K)
+            </button>
+            <button 
+              onclick="applyQuickPreset(599.00, 100000)" 
+              class="px-3 py-1.5 bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-all hover:scale-105 hover:border-amber-400 shadow-sm"
+            >
+              Company ($599 / 100K)
+            </button>
+          </div>
+        </div>
+        
+        <!-- Help Link -->
+        <p class="text-xs text-amber-700">
+          💡 Don't know your plan details? 
+          <a 
+            href="https://zapier.com/app/billing" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="text-amber-900 font-bold underline hover:text-amber-950 transition-colors"
+          >
+            Find them in your Zapier Billing Settings →
+          </a>
+        </p>
+      </div>
+
       <!-- Dashboard Header -->
       <div class="mb-8">
         <h2 class="text-3xl font-black text-zinc-900 mb-2" style="letter-spacing: -0.02em;">
