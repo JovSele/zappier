@@ -136,6 +136,50 @@ let isCustomPrice: boolean = false // Track if user provided custom pricing
 let monthlyBill: number = 0
 let includedTasks: number = 0
 
+// Pricing Tier Slider State
+let currentPlanType: 'professional' | 'team' = 'professional'
+let currentTierIndex: number = 0
+
+// Exact pricing tiers from Zapier
+const PRICING_TIERS = {
+  professional: [
+    [750, 19.99],
+    [1500, 39],
+    [2000, 49],
+    [5000, 89],
+    [10000, 129],
+    [20000, 189],
+    [50000, 289],
+    [100000, 489],
+    [200000, 769],
+    [300000, 1069],
+    [400000, 1269],
+    [500000, 1499],
+    [750000, 1999],
+    [1000000, 2199],
+    [1500000, 2999],
+    [1750000, 3199],
+    [2000000, 3389]
+  ] as Array<[number, number]>,
+  team: [
+    [2000, 69],
+    [5000, 119],
+    [10000, 169],
+    [20000, 249],
+    [50000, 399],
+    [100000, 599],
+    [200000, 999],
+    [300000, 1199],
+    [400000, 1399],
+    [500000, 1799],
+    [750000, 2199],
+    [1000000, 2499],
+    [1500000, 3399],
+    [1750000, 3799],
+    [2000000, 3999]
+  ] as Array<[number, number]>
+}
+
 async function initWasm() {
   try {
     await init()
@@ -481,22 +525,111 @@ function updateCalibrationBadge() {
   badgeEl.innerHTML = `${icon} $${pricePerTask.toFixed(4)}/task ${isCustomPrice ? `(${percentDiff > 0 ? '+' : ''}${percentDiff.toFixed(1)}%)` : '(Benchmark)'}`
 }
 
-// NEW: Quick preset for common Zapier plans
-function applyQuickPreset(bill: number, tasks: number) {
-  const monthlyBillInput = document.getElementById('monthly-bill') as HTMLInputElement
-  const includedTasksInput = document.getElementById('included-tasks') as HTMLInputElement
+// ============================================================================
+// PRICING TIER SLIDER HELPERS
+// ============================================================================
+
+function formatNumber(num: number): string {
+  return num.toLocaleString('en-US')
+}
+
+function formatCurrencyDisplay(amount: number): string {
+  return `$${amount.toFixed(2)}`
+}
+
+function formatRate(rate: number): string {
+  return `$${rate.toFixed(4)}`
+}
+
+function getCurrentTier(): [number, number] {
+  return PRICING_TIERS[currentPlanType][currentTierIndex]
+}
+
+function handlePlanToggle(newPlan: 'professional' | 'team') {
+  currentPlanType = newPlan
+  currentTierIndex = 0 // Reset to first tier
+  updateSliderMax()
+  updatePreviewCard()
+  autoFillInputs()
+  updateCalibrationBadge()
   
-  if (monthlyBillInput && includedTasksInput) {
-    monthlyBillInput.value = bill.toString()
-    includedTasksInput.value = tasks.toString()
-    applyCostCalibration()
+  // Update toggle buttons visually
+  const profBtn = document.getElementById('plan-toggle-professional')
+  const teamBtn = document.getElementById('plan-toggle-team')
+  
+  if (profBtn && teamBtn) {
+    if (newPlan === 'professional') {
+      profBtn.className = 'flex-1 px-4 py-3 bg-amber-500 text-white font-bold rounded-lg transition-all duration-200'
+      teamBtn.className = 'flex-1 px-4 py-3 bg-white text-slate-600 font-bold rounded-lg border-2 border-slate-200 transition-all duration-200'
+    } else {
+      profBtn.className = 'flex-1 px-4 py-3 bg-white text-slate-600 font-bold rounded-lg border-2 border-slate-200 transition-all duration-200'
+      teamBtn.className = 'flex-1 px-4 py-3 bg-blue-500 text-white font-bold rounded-lg transition-all duration-200'
+    }
   }
+}
+
+function handleSliderChange(value: number) {
+  currentTierIndex = value
+  updatePreviewCard()
+  autoFillInputs()
+  updateCalibrationBadge()
+}
+
+function updateSliderMax() {
+  const slider = document.getElementById('pricing-tier-slider') as HTMLInputElement
+  if (slider) {
+    slider.max = (PRICING_TIERS[currentPlanType].length - 1).toString()
+    slider.value = currentTierIndex.toString()
+  }
+}
+
+function autoFillInputs() {
+  const [tasks, price] = getCurrentTier()
+  const billInput = document.getElementById('monthly-bill') as HTMLInputElement
+  const tasksInput = document.getElementById('included-tasks') as HTMLInputElement
+  
+  if (billInput) billInput.value = price.toFixed(2)
+  if (tasksInput) tasksInput.value = tasks.toString()
+  
+  // Update state
+  monthlyBill = price
+  includedTasks = tasks
+  pricePerTask = price / tasks
+  isCustomPrice = true
+}
+
+function updatePreviewCard() {
+  const [tasks, price] = getCurrentTier()
+  const rate = price / tasks
+  
+  const card = document.getElementById('tier-preview-card')
+  if (!card) return
+  
+  const borderColor = currentPlanType === 'professional' ? 'border-l-amber-500' : 'border-l-blue-500'
+  
+  card.className = `p-4 bg-white rounded-lg border-l-4 ${borderColor} shadow-sm`
+  card.setAttribute('aria-live', 'polite')
+  card.innerHTML = `
+    <div class="text-sm font-bold text-slate-600 mb-1">
+      ${currentPlanType === 'professional' ? 'Professional' : 'Team'} Plan
+    </div>
+    <div class="text-2xl font-black text-slate-900 mb-1">
+      ${formatNumber(tasks)} tasks/month
+    </div>
+    <div class="text-lg font-bold text-slate-700">
+      ${formatCurrencyDisplay(price)}/month
+    </div>
+    <div class="text-sm text-slate-500 mt-2">
+      ≈ ${formatRate(rate)} per task
+    </div>
+  `
 }
 
 // Make functions globally available
 ;(window as any).applyCostCalibration = applyCostCalibration
 ;(window as any).updateCalibrationBadge = updateCalibrationBadge
-;(window as any).applyQuickPreset = applyQuickPreset
+;(window as any).handlePlanToggle = handlePlanToggle
+;(window as any).handleSliderChange = handleSliderChange
 
 async function handleAnalyzeSelected() {
   if (selectedZapIds.size === 0) {
@@ -512,8 +645,19 @@ async function handleAnalyzeSelected() {
   updateStatus('processing', `Analyzing ${selectedIds.length} Zap${selectedIds.length === 1 ? '' : 's'}...`)
   
   try {
-    // Call WASM batch parser with dynamic price_per_task
-    const resultJson = parse_batch_audit(cachedZipData, selectedIds, pricePerTask)
+    // ✅ DEBUG: Log parameters before WASM call
+    console.log('🔍 WASM Call Parameters:', {
+      zipDataSize: cachedZipData.byteLength,
+      selectedIds: selectedIds,
+      plan: 'professional',
+      usage: includedTasks || 2000
+    })
+    
+    // ✅ FIXED: Call WASM batch parser with tier-based pricing (plan + usage)
+    const plan = 'professional' // Default to Professional plan
+    const usage = includedTasks || 2000 // Use calibrated tasks or default to 2000
+    
+    const resultJson = parse_batch_audit(cachedZipData, selectedIds, plan, usage)
     const batchResult: BatchParseResult = JSON.parse(resultJson)
     
     console.log('📦 Batch audit result (Developer Edition):', batchResult)
@@ -902,35 +1046,55 @@ function displayZapSelector(zaps: ZapSummary[]) {
             />
           </div>
         </div>
+         
+        <!-- Plan Toggle -->
+        <div class="mb-4">
+          <p class="text-xs font-bold text-amber-800 mb-2">Select Your Zapier Plan:</p>
+          <div class="flex gap-2">
+            <button 
+              id="plan-toggle-professional"
+              onclick="handlePlanToggle('professional')"
+              class="flex-1 px-4 py-3 bg-amber-500 text-white font-bold rounded-lg transition-all duration-200"
+            >
+              Professional
+            </button>
+            <button 
+              id="plan-toggle-team"
+              onclick="handlePlanToggle('team')"
+              class="flex-1 px-4 py-3 bg-white text-slate-600 font-bold rounded-lg border-2 border-slate-200 transition-all duration-200"
+            >
+              Team
+            </button>
+          </div>
+        </div>
         
-        <!-- Quick Select Presets -->
-        <div class="mb-2">
-          <p class="text-xs font-bold text-amber-800 mb-2">Quick Select:</p>
-          <div class="flex flex-wrap gap-2">
-            <button 
-              onclick="applyQuickPreset(19.99, 750)" 
-              class="px-3 py-1.5 bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-all hover:scale-105 hover:border-amber-400 shadow-sm"
-            >
-              Starter ($19.99 / 750)
-            </button>
-            <button 
-              onclick="applyQuickPreset(49.00, 2000)" 
-              class="px-3 py-1.5 bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-all hover:scale-105 hover:border-amber-400 shadow-sm"
-            >
-              Professional ($49 / 2K)
-            </button>
-            <button 
-              onclick="applyQuickPreset(299.00, 50000)" 
-              class="px-3 py-1.5 bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-all hover:scale-105 hover:border-amber-400 shadow-sm"
-            >
-              Team ($299 / 50K)
-            </button>
-            <button 
-              onclick="applyQuickPreset(599.00, 100000)" 
-              class="px-3 py-1.5 bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-900 text-xs font-bold rounded-lg transition-all hover:scale-105 hover:border-amber-400 shadow-sm"
-            >
-              Company ($599 / 100K)
-            </button>
+        <!-- Live Preview Card -->
+        <div id="tier-preview-card" class="p-4 bg-white rounded-lg border-l-4 border-l-amber-500 shadow-sm mb-4" aria-live="polite">
+          <div class="text-sm font-bold text-slate-600 mb-1">Professional Plan</div>
+          <div class="text-2xl font-black text-slate-900 mb-1">750 tasks/month</div>
+          <div class="text-lg font-bold text-slate-700">$19.99/month</div>
+          <div class="text-sm text-slate-500 mt-2">≈ $0.0266 per task</div>
+        </div>
+        
+        <!-- Range Slider -->
+        <div class="mb-4">
+          <input 
+            type="range" 
+            id="pricing-tier-slider"
+            min="0"
+            max="16"
+            value="0"
+            aria-label="Select pricing tier"
+            oninput="handleSliderChange(parseInt(this.value))"
+            class="w-full h-3 bg-gradient-to-r from-amber-200 to-amber-500 rounded-lg appearance-none cursor-pointer"
+            style="accent-color: #f59e0b;"
+          />
+          <div class="flex justify-between text-xs text-slate-400 mt-1">
+            <span>750</span>
+            <span>5K</span>
+            <span>50K</span>
+            <span>200K</span>
+            <span>2M</span>
           </div>
         </div>
         
@@ -1042,6 +1206,12 @@ function displayZapSelector(zaps: ZapSummary[]) {
   
   // Render the table with filtered zaps
   renderZapTable(getFilteredZaps())
+
+// Initialize pricing tier slider after render
+  setTimeout(() => {
+    updatePreviewCard()
+    updateSliderMax()
+  }, 100)
 }
 
 /**

@@ -5,13 +5,144 @@ use zip::ZipArchive;
 use serde::{Deserialize, Serialize};
 use csv::ReaderBuilder;
 
-// Pricing constants for savings calculations
-const TASK_PRICE: f32 = 0.02; // $0.02 per task (conservative estimate)
-const MONTHS_PER_YEAR: u32 = 12;
+// ============================================================================
+// ZAPIER TIER-BASED BILLING ENGINE (PRODUCTION-GRADE PRICING)
+// ============================================================================
 
-// Savings calculation constants (conservative percentages)
-const POLLING_REDUCTION_RATE: f32 = 0.20; // 20% reduction from polling overhead
-const LATE_FILTER_FALLBACK_RATE: f32 = 0.30; // 30% fallback if no task history
+/// Zapier plan types (extracted from official pricing page)
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ZapierPlan {
+    Professional,
+    Team,
+}
+
+/// Pricing tier definition
+#[derive(Debug, Clone, Copy)]
+struct PricingTier {
+    tasks: u32,      // Task limit for this tier
+    price: f32,      // Monthly price in USD
+}
+
+/// Resolved pricing result after tier selection
+#[derive(Debug, Clone, Serialize)]
+pub struct PricingResult {
+    plan: ZapierPlan,
+    tier_tasks: u32,         // Selected tier's task limit
+    tier_price: f32,         // Selected tier's monthly price
+    cost_per_task: f32,      // Effective cost: tier_price / tier_tasks
+    actual_usage: u32,       // User's actual monthly task usage
+}
+
+/// Official Zapier pricing tiers (SOURCE OF TRUTH)
+/// Data extracted from https://zapier.com/pricing
+struct ZapierPricing;
+
+impl ZapierPricing {
+    /// Professional plan tiers
+    const PROFESSIONAL: &'static [(u32, f32)] = &[
+        (750, 19.99),
+        (1_500, 39.0),
+        (2_000, 49.0),
+        (5_000, 89.0),
+        (10_000, 129.0),
+        (20_000, 189.0),
+        (50_000, 289.0),
+        (100_000, 489.0),
+        (200_000, 769.0),
+        (300_000, 1_069.0),
+        (400_000, 1_269.0),
+        (500_000, 1_499.0),
+        (750_000, 1_999.0),
+        (1_000_000, 2_199.0),
+        (1_500_000, 2_999.0),
+        (1_750_000, 3_199.0),
+        (2_000_000, 3_389.0),
+    ];
+
+    /// Team plan tiers
+    const TEAM: &'static [(u32, f32)] = &[
+        (2_000, 69.0),
+        (5_000, 119.0),
+        (10_000, 169.0),
+        (20_000, 249.0),
+        (50_000, 399.0),
+        (100_000, 599.0),
+        (200_000, 999.0),
+        (300_000, 1_199.0),
+        (400_000, 1_399.0),
+        (500_000, 1_799.0),
+        (750_000, 2_199.0),
+        (1_000_000, 2_499.0),
+        (1_500_000, 3_399.0),
+        (1_750_000, 3_799.0),
+        (2_000_000, 3_999.0),
+    ];
+
+    /// Resolve pricing tier based on plan and actual usage
+    /// 
+    /// Algorithm: Find smallest tier where tier_tasks >= actual_usage
+    /// This mimics Zapier's billing behavior (always ceiling to next tier)
+    pub fn resolve(plan: ZapierPlan, actual_usage: u32) -> PricingResult {
+        let tiers = match plan {
+            ZapierPlan::Professional => Self::PROFESSIONAL,
+            ZapierPlan::Team => Self::TEAM,
+        };
+
+        // Find the smallest tier that can accommodate the usage
+        let (tier_tasks, tier_price) = tiers
+            .iter()
+            .find(|(tasks, _)| *tasks >= actual_usage)
+            .copied()
+            .unwrap_or_else(|| {
+                // If usage exceeds max tier, use highest tier
+                *tiers.last().unwrap()
+            });
+
+        let cost_per_task = if tier_tasks > 0 {
+            tier_price / tier_tasks as f32
+        } else {
+            0.0
+        };
+
+        PricingResult {
+            plan,
+            tier_tasks,
+            tier_price,
+            cost_per_task,
+            actual_usage,
+        }
+    }
+
+    /// Get default pricing when no usage data is available
+    /// Uses Professional 2000-task tier as conservative fallback
+    pub fn default_fallback() -> PricingResult {
+        Self::resolve(ZapierPlan::Professional, 2_000)
+    }
+}
+
+// ============================================================================
+// FALLBACK CONSTANTS (For estimation when no execution data available)
+// ============================================================================
+
+/// Conservative monthly run estimate when no CSV data exists
+const FALLBACK_MONTHLY_RUNS: f32 = 500.0;
+
+/// Estimated polling overhead percentage (inherent to polling triggers)
+const POLLING_REDUCTION_RATE: f32 = 0.20; // 20%
+
+/// Estimated filter rejection rate when no execution history available
+const LATE_FILTER_FALLBACK_RATE: f32 = 0.30; // 30%
+
+// Legacy constant for backward compatibility in pattern detection
+// TODO: Remove after full tier-based migration
+const TASK_PRICE: f32 = 0.0245; // Professional 2000-tier benchmark
+
+/// Helper function to calculate task volume correctly
+/// Formula: runs × steps (each run executes all steps)
+fn calculate_task_volume(runs: u32, steps: usize) -> u32 {
+    runs * steps as u32
+}
 
 // Triple stores metadata
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -123,6 +254,8 @@ struct EfficiencyFlag {
     estimated_monthly_savings: f32, // in USD
     savings_explanation: String, // How savings were calculated
     is_fallback: bool, // true = using estimated fallback data, false = using actual execution data
+    // PHASE 1: Confidence system
+    confidence: String, // "high" | "medium" | "low"
 }
 
 #[derive(Serialize)]
@@ -457,12 +590,17 @@ fn detect_error_loop(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFlag> {
                 to avoid wasting tasks on failed executions."
             );
             
-            // Calculate dynamic savings: each error = wasted task
-            let monthly_savings = (stats.error_count as f32) * price_per_task;
+            // ✅ FIX: Calculate dynamic savings correctly
+            // Each error wastes ALL steps in the Zap (entire run fails)
+            let steps_per_run = zap.nodes.len();
+            let wasted_tasks = calculate_task_volume(stats.error_count, steps_per_run);
+            let monthly_savings = (wasted_tasks as f32) * price_per_task;
             let savings_explanation = format!(
-                "Based on ${:.4} per task and eliminating {} failed executions",
+                "Based on ${:.4} per task, {} failed runs × {} steps = {} wasted tasks",
                 price_per_task,
-                stats.error_count
+                stats.error_count,
+                steps_per_run,
+                wasted_tasks
             );
             
             return Some(EfficiencyFlag {
@@ -480,6 +618,7 @@ fn detect_error_loop(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFlag> {
                 estimated_monthly_savings: monthly_savings,
                 savings_explanation,
                 is_fallback: false, // Error loop detection always uses actual execution data
+                confidence: "high".to_string(), // Real CSV data = high confidence
             });
         }
     }
@@ -698,17 +837,26 @@ fn detect_late_filter_placement(zap: &Zap, price_per_task: f32) -> Option<Effici
                             (0.0, "Insufficient execution data for savings calculation".to_string(), true) // true = fallback
                         }
                     } else {
-                        // Fallback calculation without task history
-                        // Estimate: 100 runs/month * actions_before_filter * 30% rejection rate * $0.02/task
-                        let estimated_monthly_runs = 100.0;
-                        let fallback_savings = estimated_monthly_runs * (actions_before_filter as f32) * LATE_FILTER_FALLBACK_RATE * TASK_PRICE;
+                        // ✅ FIX: Conservative fallback with proper task calculation
+                        let estimated_monthly_runs = FALLBACK_MONTHLY_RUNS; // 500 runs (conservative)
+                        let wasted_tasks = estimated_monthly_runs * (actions_before_filter as f32) * LATE_FILTER_FALLBACK_RATE;
+                        let fallback_savings = wasted_tasks * TASK_PRICE;
                         let explanation = format!(
-                            "Estimated: ~{} monthly runs, {} actions before filter, {}% rejection rate (industry average, no execution data)",
+                            "Estimated: ~{} monthly runs, {} actions before filter, {}% rejection rate (conservative estimate, no execution data)",
                             estimated_monthly_runs as u32,
                             actions_before_filter,
                             (LATE_FILTER_FALLBACK_RATE * 100.0) as u32
                         );
                         (fallback_savings, explanation, true) // true = using fallback estimate
+                    };
+                    
+                    // PHASE 1: Determine confidence based on data quality
+                    let confidence = if !is_fallback && monthly_savings > 0.0 {
+                        "high".to_string() // Real execution data = high confidence
+                    } else if monthly_savings == 0.0 {
+                        "low".to_string() // No data = low confidence
+                    } else {
+                        "medium".to_string() // Estimated data = medium confidence
                     };
                     
                     return Some(EfficiencyFlag {
@@ -733,6 +881,7 @@ fn detect_late_filter_placement(zap: &Zap, price_per_task: f32) -> Option<Effici
                         estimated_monthly_savings: monthly_savings,
                         savings_explanation,
                         is_fallback, // Track whether we used actual data or fallback estimate
+                        confidence, // PHASE 1: Confidence system
                     });
                 }
             }
@@ -774,37 +923,56 @@ fn detect_polling_trigger(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFl
     if is_polling {
         // Calculate savings: 20% reduction from polling overhead
         // NOTE: Polling trigger savings are ALWAYS fallback/estimated (no way to measure actual overhead)
+        // ✅ FIX: Use conservative fallback for polling overhead calculation
         let (monthly_savings, savings_explanation, has_execution_data) = if let Some(stats) = &zap.usage_stats {
-    if stats.total_runs > 0 {
-        let savings = (stats.total_runs as f32) * price_per_task * POLLING_REDUCTION_RATE;
-        let explanation = format!(
-            "Estimated using industry average {}% fallback from {} polling executions",
-            (POLLING_REDUCTION_RATE * 100.0) as u32,
-            stats.total_runs
-        );
-        (savings, explanation, true)
-    } else {
-        // Fallback: Zap má stats ale 0 runs
-        let estimated_monthly_checks = 100.0;
-        let fallback_savings = estimated_monthly_checks * price_per_task * POLLING_REDUCTION_RATE;
-        let explanation = format!(
-            "Estimated: ~{} monthly polling checks, {}% overhead (no execution data)",
-            estimated_monthly_checks as u32,
-            (POLLING_REDUCTION_RATE * 100.0) as u32
-        );
-        (fallback_savings, explanation, true)
-    }
-} else {
-    // Fallback: Zap nemá žiadne stats
-    let estimated_monthly_checks = 100.0;
-    let fallback_savings = estimated_monthly_checks * price_per_task * POLLING_REDUCTION_RATE;
-    let explanation = format!(
-        "Estimated: ~{} monthly polling checks, {}% overhead (no execution data)",
-        estimated_monthly_checks as u32,
-        (POLLING_REDUCTION_RATE * 100.0) as u32
-    );
-    (fallback_savings, explanation, true)
-};
+            if stats.total_runs > 0 {
+                // Use actual runs but overhead is always estimated
+                let steps_per_run = zap.nodes.len();
+                let total_tasks = calculate_task_volume(stats.total_runs, steps_per_run);
+                let savings = (total_tasks as f32) * price_per_task * POLLING_REDUCTION_RATE;
+                let explanation = format!(
+                    "Estimated: {} runs × {} steps × {}% polling overhead = {:.0} wasted tasks",
+                    stats.total_runs,
+                    steps_per_run,
+                    (POLLING_REDUCTION_RATE * 100.0) as u32,
+                    (total_tasks as f32) * POLLING_REDUCTION_RATE
+                );
+                (savings, explanation, true)
+            } else {
+                // ✅ Conservative fallback: No runs data
+                let estimated_monthly_runs = FALLBACK_MONTHLY_RUNS; // 500 (conservative)
+                let steps_per_run = zap.nodes.len();
+                let estimated_tasks = estimated_monthly_runs * (steps_per_run as f32);
+                let fallback_savings = estimated_tasks * price_per_task * POLLING_REDUCTION_RATE;
+                let explanation = format!(
+                    "Estimated: ~{} monthly runs × {} steps × {}% polling overhead (conservative, no execution data)",
+                    estimated_monthly_runs as u32,
+                    steps_per_run,
+                    (POLLING_REDUCTION_RATE * 100.0) as u32
+                );
+                (fallback_savings, explanation, true)
+            }
+        } else {
+            // ✅ Conservative fallback: No stats at all
+            let estimated_monthly_runs = FALLBACK_MONTHLY_RUNS; // 500 (conservative)
+            let steps_per_run = zap.nodes.len();
+            let estimated_tasks = estimated_monthly_runs * (steps_per_run as f32);
+            let fallback_savings = estimated_tasks * price_per_task * POLLING_REDUCTION_RATE;
+            let explanation = format!(
+                "Estimated: ~{} monthly runs × {} steps × {}% polling overhead (conservative, no execution data)",
+                estimated_monthly_runs as u32,
+                steps_per_run,
+                (POLLING_REDUCTION_RATE * 100.0) as u32
+            );
+            (fallback_savings, explanation, true)
+        };
+        
+        // PHASE 1: Polling overhead is always estimated = medium confidence
+        let confidence = if has_execution_data {
+            "medium".to_string() // Real run data but overhead is estimated
+        } else {
+            "low".to_string() // No data = low confidence
+        };
         
         Some(EfficiencyFlag {
             zap_id: zap.id,
@@ -826,6 +994,7 @@ fn detect_polling_trigger(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFl
             estimated_monthly_savings: monthly_savings,
             savings_explanation,
             is_fallback: !has_execution_data || monthly_savings > 0.0, // Always fallback for polling (no way to measure actual overhead)
+            confidence, // PHASE 1: Confidence system
         })
     } else {
         None
@@ -1232,8 +1401,23 @@ pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64) -> String {
 /// NEW: Parse Batch Audit (Multi-Zap Analysis)
 /// Analyzes multiple selected Zaps in one pass
 /// Optimized: Opens ZIP once, filters by IDs, aggregates results
+/// 
+/// # Arguments
+/// * `zip_data` - ZIP file contents
+/// * `zap_ids_js` - JavaScript array of zap IDs to analyze
+/// * `plan_str` - Zapier plan ("professional" or "team")
+/// * `actual_usage` - User's actual monthly task usage
 #[wasm_bindgen]
-pub fn parse_batch_audit(zip_data: &[u8], zap_ids_js: JsValue, price_per_task: f32) -> String {
+pub fn parse_batch_audit(zip_data: &[u8], zap_ids_js: JsValue, plan_str: &str, actual_usage: u32) -> String {
+    // Resolve tier-based pricing
+    let plan = match plan_str.to_lowercase().as_str() {
+        "professional" => ZapierPlan::Professional,
+        "team" => ZapierPlan::Team,
+        _ => ZapierPlan::Professional, // Default fallback
+    };
+    
+    let pricing = ZapierPricing::resolve(plan, actual_usage);
+    let price_per_task = pricing.cost_per_task;
     // Deserialize JS array of zap IDs
     let zap_ids: Vec<u64> = match serde_wasm_bindgen::from_value(zap_ids_js) {
         Ok(ids) => ids,

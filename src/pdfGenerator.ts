@@ -35,6 +35,7 @@ export interface ParseResult {
     estimated_monthly_savings: number;
     savings_explanation: string;
     is_fallback: boolean;
+    confidence: string; // "high" | "medium" | "low"
   }>;
   efficiency_score: number;
   estimated_savings: number;
@@ -154,15 +155,26 @@ function drawSeverityBadge(
 }
 
 /**
+ * Format currency with proper precision for small values
+ * Critical for tier-based pricing accuracy
+ */
+function formatCurrency(amount: number): string {
+  if (amount < 1) {
+    return `$${amount.toFixed(2)}`; // Show cents for values < $1
+  }
+  return `$${Math.round(amount)}`;
+}
+
+/**
  * Format waste amount (fixes "$0" display)
  */
 function formatWasteAmount(tasks: number, usd: number): string {
   if (usd === 0) {
     return `${tasks} tasks/month (negligible cost)`;
   } else if (usd < 1) {
-    return `${tasks} tasks/month ($${usd.toFixed(2)})`;
+    return `${tasks} tasks/month (${formatCurrency(usd)})`;
   } else {
-    return `${tasks} tasks/month (~$${Math.round(usd)})`;
+    return `${tasks} tasks/month (~${formatCurrency(usd)})`;
   }
 }
 
