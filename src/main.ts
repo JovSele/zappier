@@ -29,6 +29,7 @@ interface EfficiencyFlag {
   estimated_monthly_savings: number
   savings_explanation: string
   is_fallback: boolean
+  confidence: string  // "high" | "medium" | "low" - PHASE 2: Trust indicator
 }
 
 interface ZapListResult {
@@ -471,7 +472,37 @@ function updateAnalyzeButton() {
   }
 }
 
+// ============================================================================
+// PHASE 2: CONFIDENCE BADGE HELPERS
+// ============================================================================
+
+/**
+ * Get confidence badge color (hex codes matching PDF)
+ * Returns HTML/CSS color classes for UI consistency
+ */
+function getConfidenceBadgeColor(confidence: string): { dot: string; hex: string } {
+  const confidenceLower = confidence.toLowerCase()
+  if (confidenceLower === 'high') {
+    return { dot: 'bg-emerald-500', hex: '#10b981' } // Green - matches PDF COLORS.GREEN
+  } else if (confidenceLower === 'medium') {
+    return { dot: 'bg-amber-500', hex: '#f59e0b' } // Amber - matches PDF amber color
+  } else {
+    return { dot: 'bg-rose-500', hex: '#ef4444' } // Red - matches PDF COLORS.RED
+  }
+}
+
+/**
+ * Generate confidence badge HTML for UI display
+ */
+function renderConfidenceBadge(confidence: string): string {
+  const colors = getConfidenceBadgeColor(confidence)
+  return `<div class="inline-flex items-center gap-1">
+    <div class="${colors.dot} w-2 h-2 rounded-full"></div>
+  </div>`
+}
+
 // NEW: Apply Cost Calibration (LIVE - no button needed)
+// ✅ PHASE 2: Added zero-division guard
 function applyCostCalibration() {
   const monthlyBillInput = document.getElementById('monthly-bill') as HTMLInputElement
   const includedTasksInput = document.getElementById('included-tasks') as HTMLInputElement
@@ -479,17 +510,18 @@ function applyCostCalibration() {
   const bill = parseFloat(monthlyBillInput?.value || '0')
   const tasks = parseFloat(includedTasksInput?.value || '0')
   
-  // Ticho fallback na benchmark ak sú polia prázdne alebo nevalidné
+  // ✅ ZERO-DIVISION GUARD: Check for invalid or zero tasks
   if (!bill || !tasks || bill <= 0 || tasks <= 0) {
-    pricePerTask = 0.02
+    pricePerTask = 0.02 // Default benchmark: $0.02/task
     isCustomPrice = false
     monthlyBill = 0
     includedTasks = 0
     updateCalibrationBadge()
+    console.warn('⚠️ Zero-division guard: Invalid pricing inputs, using benchmark $0.02/task')
     return
   }
   
-  // Vypočítaj efektívnu sadzbu
+  // Calculate effective rate (safe division - tasks > 0 guaranteed by guard above)
   monthlyBill = bill
   includedTasks = tasks
   pricePerTask = bill / tasks
@@ -653,9 +685,9 @@ async function handleAnalyzeSelected() {
       usage: includedTasks || 2000
     })
     
-    // ✅ FIXED: Call WASM batch parser with tier-based pricing (plan + usage)
-    const plan = 'professional' // Default to Professional plan
-    const usage = includedTasks || 2000 // Use calibrated tasks or default to 2000
+    // ✅ FIX #2: Use slider state for both plan and usage (synced with UI)
+    const plan = currentPlanType // Use selected plan from slider
+    const usage = includedTasks || 2000 // Use calibrated tasks from slider or default
     
     const resultJson = parse_batch_audit(cachedZipData, selectedIds, plan, usage)
     const batchResult: BatchParseResult = JSON.parse(resultJson)

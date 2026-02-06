@@ -134,9 +134,6 @@ const POLLING_REDUCTION_RATE: f32 = 0.20; // 20%
 /// Estimated filter rejection rate when no execution history available
 const LATE_FILTER_FALLBACK_RATE: f32 = 0.30; // 30%
 
-// Legacy constant for backward compatibility in pattern detection
-// TODO: Remove after full tier-based migration
-const TASK_PRICE: f32 = 0.0245; // Professional 2000-tier benchmark
 
 /// Helper function to calculate task volume correctly
 /// Formula: runs × steps (each run executes all steps)
@@ -722,8 +719,12 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
     // Extract app inventory
     let apps = extract_app_inventory(&zapfile);
 
+    // Use default pricing when no parameters provided (legacy function)
+    let pricing = ZapierPricing::default_fallback();
+    let price_per_task = pricing.cost_per_task;
+    
     // Detect efficiency issues (now includes error loop detection)
-    let efficiency_flags = detect_efficiency_flags(&zapfile, TASK_PRICE);
+    let efficiency_flags = detect_efficiency_flags(&zapfile, price_per_task);
 
     // Calculate efficiency score
     let efficiency_score = calculate_efficiency_score(&efficiency_flags);
@@ -842,7 +843,7 @@ fn detect_late_filter_placement(zap: &Zap, price_per_task: f32) -> Option<Effici
                         // ✅ FIX: Conservative fallback with proper task calculation
                         let estimated_monthly_runs = FALLBACK_MONTHLY_RUNS; // 500 runs (conservative)
                         let wasted_tasks = estimated_monthly_runs * (actions_before_filter as f32) * LATE_FILTER_FALLBACK_RATE;
-                        let fallback_savings = wasted_tasks * TASK_PRICE;
+                        let fallback_savings = wasted_tasks * price_per_task;
                         let explanation = format!(
                             "Estimated: ~{} monthly runs, {} actions before filter, {}% rejection rate (conservative estimate, no execution data)",
                             estimated_monthly_runs as u32,
@@ -995,7 +996,7 @@ fn detect_polling_trigger(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFl
             // Dynamic savings calculation
             estimated_monthly_savings: monthly_savings,
             savings_explanation,
-            is_fallback: !has_execution_data || monthly_savings > 0.0, // Always fallback for polling (no way to measure actual overhead)
+            is_fallback: !has_execution_data, // ✅ FIX #1: Simple and correct - true only when no CSV data
             confidence, // PHASE 1: Confidence system
         })
     } else {
@@ -1122,8 +1123,12 @@ pub fn parse_zapfile_json(json_content: &str) -> String {
     // Extract app inventory
     let apps = extract_app_inventory(&zapfile);
 
+    // Use default pricing when no parameters provided (legacy function)
+    let pricing = ZapierPricing::default_fallback();
+    let price_per_task = pricing.cost_per_task;
+
     // Detect efficiency issues
-    let efficiency_flags = detect_efficiency_flags(&zapfile, TASK_PRICE);
+    let efficiency_flags = detect_efficiency_flags(&zapfile, price_per_task);
 
     // Calculate efficiency score
     let efficiency_score = calculate_efficiency_score(&efficiency_flags);
@@ -1711,14 +1716,15 @@ fn detect_cross_zap_patterns(all_flags: &[EfficiencyFlag]) -> Vec<PatternFinding
                 ),
             };
             
-            // Calculate totals
-            let total_waste_tasks: u32 = group.iter()
-                .map(|f| (f.estimated_monthly_savings / TASK_PRICE) as u32)
-                .sum();
-            
+            // Calculate totals - waste tasks estimated from patterns
+            // Note: With dynamic pricing, we estimate tasks conservatively
             let total_waste_usd: f32 = group.iter()
                 .map(|f| f.estimated_monthly_savings)
                 .sum();
+            
+            // Estimate total waste tasks using conservative $0.025/task benchmark
+            // This is only for reporting, actual savings use dynamic pricing
+            let total_waste_tasks: u32 = (total_waste_usd / 0.025) as u32;
             
             // Calculate median chain length (not applicable for most patterns)
             let median_chain_length = None; // TODO: Implement for formatter_chain if needed

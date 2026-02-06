@@ -155,6 +155,42 @@ function drawSeverityBadge(
 }
 
 /**
+ * Draw confidence badge (small dot or text badge)
+ */
+function drawConfidenceBadge(
+  pdf: jsPDF,
+  confidence: string,
+  x: number,
+  y: number,
+  showLabel: boolean = false
+) {
+  const config: Record<string, { color: { r: number; g: number; b: number }; label: string }> = {
+    high: { color: COLORS.GREEN, label: 'HIGH CONF' },
+    medium: { color: { r: 245, g: 158, b: 11 }, label: 'MED CONF' },
+    low: { color: COLORS.RED, label: 'LOW CONF' }
+  };
+  
+  const confidenceLower = confidence.toLowerCase();
+  const { color, label } = config[confidenceLower] || config.medium;
+  
+  if (showLabel) {
+    // Colored badge with text
+    pdf.setFillColor(color.r, color.g, color.b);
+    pdf.roundedRect(x, y - 2.5, 18, 4, 1, 1, 'F');
+    
+    // White text
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(label.substring(0, 4), x + 9, y, { align: 'center' });
+  } else {
+    // Just colored circle (dot)
+    pdf.setFillColor(color.r, color.g, color.b);
+    pdf.circle(x, y, 1.5, 'F');
+  }
+}
+
+/**
  * Format currency with proper precision for small values
  * Critical for tier-based pricing accuracy
  */
@@ -517,6 +553,10 @@ if (pollingFlag) {
   pdf.setFont('helvetica', 'bold');
   pdf.text(`ESTIMATED SAVINGS: $${annualSavings}/YEAR`, cardX + 9, savingsStartY + 2.5);
   
+  // ✅ Add confidence badge next to savings
+  const confidenceBadgeX = cardX + 66;
+  drawConfidenceBadge(pdf, pollingFlag.confidence, confidenceBadgeX, savingsStartY + 2);
+  
   yPos += cardHeight + 2;
 }
 
@@ -590,10 +630,85 @@ if (filterFlag) {
   pdf.setFont('helvetica', 'bold');
   pdf.text(`ESTIMATED SAVINGS: $${annualSavings}/YEAR`, cardX + 9, savingsStartY + 2.5);
   
+  // ✅ Add confidence badge next to savings
+  const confidenceBadgeX = cardX + 66;
+  drawConfidenceBadge(pdf, filterFlag.confidence, confidenceBadgeX, savingsStartY + 2);
+  
   yPos += cardHeight + 2;
 }
   
   return yPos + 4;
+}
+
+/**
+ * Add Confidence Legend (explains badge colors)
+ * PHASE 2: Building Trust
+ */
+function addConfidenceLegend(
+  pdf: jsPDF,
+  yPos: number,
+  margin: number,
+  contentWidth: number
+): number {
+  const legendHeight = 22;
+  
+  // Legend box (light gray background)
+  pdf.setFillColor(249, 250, 251); // gray-50
+  pdf.setDrawColor(229, 231, 235); // gray-200
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(margin, yPos, contentWidth, legendHeight, 2, 2, 'FD');
+  
+  // Legend title
+  pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('CONFIDENCE INDICATORS', margin + 6, yPos + 6);
+  
+  // Explanation text
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Colored dots indicate data quality for each savings estimate:', margin + 6, yPos + 11);
+  
+  // Legend items (horizontal layout)
+  let legendX = margin + 10;
+  const legendY = yPos + 16;
+  
+  // Green dot - High confidence
+  pdf.setFillColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.circle(legendX, legendY, 1.5, 'F');
+  pdf.setTextColor(COLORS.GREEN.r, COLORS.GREEN.g, COLORS.GREEN.b);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('High', legendX + 3, legendY + 1);
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('(actual execution data)', legendX + 13, legendY + 1);
+  
+  legendX += 55;
+  
+  // Amber dot - Medium confidence
+  pdf.setFillColor(245, 158, 11); // amber-500
+  pdf.circle(legendX, legendY, 1.5, 'F');
+  pdf.setTextColor(245, 158, 11);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Medium', legendX + 3, legendY + 1);
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('(pattern-based estimate)', legendX + 18, legendY + 1);
+  
+  legendX += 60;
+  
+  // Red dot - Low confidence
+  pdf.setFillColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
+  pdf.circle(legendX, legendY, 1.5, 'F');
+  pdf.setTextColor(COLORS.RED.r, COLORS.RED.g, COLORS.RED.b);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Low', legendX + 3, legendY + 1);
+  pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('(minimal data)', legendX + 11, legendY + 1);
+  
+  return yPos + legendHeight + 4;
 }
 
 // TECHNICAL ANALYSIS - page3
@@ -956,8 +1071,10 @@ function addBeforeAfterComparison(
   }
 
   const hasPolling = result.efficiency_flags.some(f => f.flag_type === 'polling_trigger');
-  const currentCost = Math.round((result.estimated_savings || 0) * 12 * 2.5);
-  const optimizedCost = Math.round((result.estimated_savings || 0) * 12 * 0.1);
+  // ✅ FIX #3: Use WASM-calculated values (no 2.5x multiplier)
+  const annualSavings = Math.round((result.estimated_savings || 0) * 12);
+  const currentCost = Math.round(annualSavings * 2); // Current = optimized + savings
+  const optimizedCost = Math.round(annualSavings * 0.1); // Future optimized cost
 
   // Columns
   const col1X = margin + innerMargin + cardOffset;
@@ -1472,7 +1589,8 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
   pdf.setFont('helvetica', 'bold');
   pdf.text('ESTIMATED ANNUAL WASTE', margin + metricCardWidth / 2, yPos + 6, { align: 'center' });
 
-  const annualWaste = Math.round(result.estimated_savings * 12 * 2.5);
+  // ✅ FIX #3: Remove 2.5x multiplier - use WASM values directly
+  const annualWaste = Math.round(result.estimated_savings * 12 * 2); // Current cost = 2x optimized cost
   pdf.setTextColor(239, 68, 68);
   pdf.setFontSize(20);
   pdf.setFont('helvetica', 'bold');
@@ -1592,6 +1710,10 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
 
   ensureSpace(50);
   yPos = addCostWasteAnalysis(pdf, yPos, margin, contentWidth, result);
+
+  // ✅ PHASE 2: Add confidence legend after Cost Waste Analysis
+  ensureSpace(30);
+  yPos = addConfidenceLegend(pdf, yPos, margin, contentWidth);
 
   // Save
   const sanitizedTitle = zapTitle.replace(/[^a-z0-9]/gi, '_');
@@ -2047,9 +2169,9 @@ export async function generateDeveloperEditionPDF(
     const boxGap = 10;
     const startX = margin + cardOffset + (contentWidth - cardOffset - (3 * boxWidth + 2 * boxGap)) / 2;
 
-    // Get app names from result
-    const triggerApp = result.apps.length > 0 ? result.apps[0].name : 'Webhook';
-    const actionApp = result.apps.length > 1 ? result.apps[result.apps.length - 1].name : 'Unknown';
+    // ✅ FIX #4: Safe array access with bounds checking
+    const triggerApp = result.apps && result.apps.length > 0 ? result.apps[0].name : 'Webhook';
+    const actionApp = result.apps && result.apps.length > 1 ? result.apps[result.apps.length - 1].name : 'Unknown';
 
     // TRIGGER box
     pdf.setFillColor(255, 255, 255);
