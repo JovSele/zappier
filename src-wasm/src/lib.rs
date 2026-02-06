@@ -227,6 +227,7 @@ struct ParseResult {
     efficiency_flags: Vec<EfficiencyFlag>,
     efficiency_score: u32,
     estimated_savings: f32,
+    estimated_annual_savings: f32, // NEW: monthly * 12 (moved from PDF layer)
 }
 
 // App information for inventory
@@ -743,6 +744,7 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
         efficiency_flags,
         efficiency_score,
         estimated_savings,
+        estimated_annual_savings: estimated_savings * 12.0,
     };
 
     serde_json::to_string(&result).unwrap_or_else(|_| r#"{"success":true,"zap_count":0,"message":"Unknown"}"#.to_string())
@@ -1142,6 +1144,7 @@ pub fn parse_zapfile_json(json_content: &str) -> String {
         efficiency_flags,
         efficiency_score,
         estimated_savings,
+        estimated_annual_savings: estimated_savings * 12.0,
     };
 
     serde_json::to_string(&result).unwrap_or_else(|_| r#"{"success":true,"zap_count":0,"message":"Unknown"}"#.to_string())
@@ -1275,8 +1278,23 @@ pub fn parse_zap_list(zip_data: &[u8]) -> String {
 /// NEW: Parse Single Zap Audit (Full Analysis for Selected Zap)
 /// Runs complete audit analysis on a single selected Zap
 /// Filters the ZIP to only include the specified zap_id, then runs full heuristics
+/// 
+/// # Arguments
+/// * `zip_data` - ZIP file contents
+/// * `zap_id` - ID of the Zap to audit
+/// * `plan_str` - Zapier plan ("professional" or "team")
+/// * `actual_usage` - User's actual monthly task usage
 #[wasm_bindgen]
-pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64) -> String {
+pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64, plan_str: &str, actual_usage: u32) -> String {
+    // ✅ FIX #1: Resolve tier-based pricing (same as batch audits)
+    let plan = match plan_str.to_lowercase().as_str() {
+        "professional" => ZapierPlan::Professional,
+        "team" => ZapierPlan::Team,
+        _ => ZapierPlan::Professional, // Default fallback
+    };
+    
+    let pricing = ZapierPricing::resolve(plan, actual_usage);
+    let price_per_task = pricing.cost_per_task;
     // Create a seekable reader from byte slice
     let cursor = Cursor::new(zip_data);
     
@@ -1373,7 +1391,7 @@ pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64) -> String {
     let apps = extract_app_inventory(&zapfile);
 
     // Detect efficiency issues (FULL AUDIT - includes all heuristics)
-    let efficiency_flags = detect_efficiency_flags(&zapfile, TASK_PRICE);
+    let efficiency_flags = detect_efficiency_flags(&zapfile, price_per_task);
 
     // Calculate efficiency score
     let efficiency_score = calculate_efficiency_score(&efficiency_flags);
@@ -1393,6 +1411,7 @@ pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64) -> String {
         efficiency_flags,
         efficiency_score,
         estimated_savings,
+        estimated_annual_savings: estimated_savings * 12.0,
     };
 
     serde_json::to_string(&result).unwrap_or_else(|_| r#"{"success":true,"zap_count":0,"message":"Unknown"}"#.to_string())
@@ -1580,6 +1599,7 @@ pub fn parse_batch_audit(zip_data: &[u8], zap_ids_js: JsValue, plan_str: &str, a
             efficiency_flags: flags,
             efficiency_score: score,
             estimated_savings: savings,
+            estimated_annual_savings: savings * 12.0,
         });
     }
     

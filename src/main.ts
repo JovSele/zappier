@@ -1611,7 +1611,7 @@ async function handleZapSelect(zapId: number) {
   
   try {
     // Call WASM parser for single Zap audit
-    const resultJson = parse_single_zap_audit(cachedZipData, BigInt(zapId))
+    const resultJson = parse_single_zap_audit(cachedZipData, BigInt(zapId), currentPlanType, includedTasks || 2000)
     const result = JSON.parse(resultJson)
     
     console.log('Single Zap audit result:', result)
