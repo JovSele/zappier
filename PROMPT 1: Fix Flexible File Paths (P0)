@@ -1,0 +1,56 @@
+Cline, based on test results, we need to support multiple file naming conventions.
+
+**Problem:** `legacy.zip` uses `zaps.json` and `history/` instead of `zapfile.json` and `task_history/`
+
+**Task:** Make ZIP file discovery flexible
+
+**File to modify:** `src/lib.rs` (wherever ZIP parsing happens)
+
+**Changes needed:**
+
+1. Replace hardcoded path lookup with flexible search:
+```rust
+// Find zapfile (try multiple names)
+fn find_zapfile(zip: &mut ZipArchive<File>) -> Result<String, AnalysisError> {
+    const CANDIDATES: &[&str] = &[
+        "zapfile.json",
+        "zaps.json",
+        "config.json",
+    ];
+    
+    for name in CANDIDATES {
+        if zip.by_name(name).is_ok() {
+            return Ok(name.to_string());
+        }
+    }
+    
+    Err(AnalysisError::MissingZapfile)
+}
+
+// Find task history directory
+fn find_task_history_dir(zip: &ZipArchive<File>) -> Option<String> {
+    const DIR_CANDIDATES: &[&str] = &[
+        "task_history/",
+        "history/",
+        "tasks/",
+    ];
+    
+    for dir in DIR_CANDIDATES {
+        // Check if any file starts with this directory
+        if zip.file_names().any(|name| name.starts_with(dir)) {
+            return Some(dir.to_string());
+        }
+    }
+    
+    None
+}
+```
+
+2. Update main parsing logic to use these helpers
+
+**Acceptance:**
+- [ ] `test_standard_zip()` still passes
+- [ ] `test_legacy_zip()` now passes (finds zaps.json and history/)
+- [ ] Error messages are clear if no zapfile found
+
+Run tests after implementation.

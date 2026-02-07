@@ -1,0 +1,114 @@
+Cline, when task history is missing, don't crash - gracefully degrade.
+
+**Problem:** `partial.zip` and `urlonly.zip` have no task execution data
+
+**Task:** Implement "Partial Analysis Mode" that works without task history
+
+**Changes needed:**
+
+**1. Define analysis mode enum** (in `src/types.rs`):
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum AnalysisMode {
+    Full,     // Has task history data
+    Partial,  // Config only, no usage metrics
+}
+
+pub struct Analysis {
+    pub mode: AnalysisMode,
+    pub zaps: Vec<Zap>,
+    pub task_history: Option<TaskHistoryData>,
+    // ... rest
+}
+```
+
+**2. Update main parsing** (in `src/lib.rs`):
+```rust
+pub fn parse_zapier_export(zip_path: &str) -> Result<Analysis, AnalysisError> {
+    let mut zip = open_zip(zip_path)?;
+    
+    // Parse zapfile
+    let zapfile_name = find_zapfile(&mut zip)?;
+    let zaps = parse_zapfile(&mut zip, &zapfile_name)?;
+    
+    // Try to find task history (non-fatal if missing)
+    let task_history_dir = find_task_history_dir(&zip);
+    
+    let (mode, task_history) = match task_history_dir {
+        Some(dir) => {
+            match parse_task_history(&mut zip, &dir) {
+                Ok(data) => (AnalysisMode::Full, Some(data)),
+                Err(e) => {
+                    log::warn!("Task history found but failed to parse: {}", e);
+                    (AnalysisMode::Partial, None)
+                }
+            }
+        }
+        None => {
+            log::info!("No task history found - entering partial analysis mode");
+            (AnalysisMode::Partial, None)
+        }
+    };
+    
+    Ok(Analysis {
+        mode,
+        zaps,
+        task_history,
+        // ...
+    })
+}
+```
+
+**3. Update PDF generator** (in `src/pdfGenerator.ts`):
+```typescript
+function generatePDF(analysis: Analysis) {
+    if (analysis.mode === 'Partial') {
+        addWarningBanner(pdf);
+    }
+    
+    // Page 1: Executive Summary
+    generateExecutiveSummary(pdf, analysis);
+    
+    // Only add usage-based sections if Full mode
+    if (analysis.mode === 'Full') {
+        generateCostBreakdown(pdf, analysis);
+        generateErrorAnalysis(pdf, analysis);
+        generateZombieDetection(pdf, analysis);
+    }
+    
+    // These work without task history
+    generateComplexityAnalysis(pdf, analysis);
+    generatePatternDetection(pdf, analysis);
+    generateActionPlan(pdf, analysis);
+}
+
+function addWarningBanner(pdf: jsPDF) {
+    const margin = 20;
+    const yPos = 35;
+    
+    // Orange warning box
+    pdf.setFillColor(255, 243, 205); // Light orange
+    pdf.roundedRect(margin, yPos, 170, 15, 2, 2, 'F');
+    
+    pdf.setTextColor(180, 83, 9); // Dark orange
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('⚠️ LIMITED ANALYSIS', margin + 3, yPos + 6);
+    
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('This report is based on configuration only. For full cost/usage analysis,', margin + 3, yPos + 11);
+    pdf.text('re-export your Zapier account with task history included.', margin + 3, yPos + 14.5);
+    
+    pdf.setTextColor(0, 0, 0); // Reset to black
+}
+```
+
+**Acceptance:**
+- [ ] `test_partial_zip()` passes without crash
+- [ ] `test_urlonly_zip()` passes without crash
+- [ ] Both generate PDF with warning banner
+- [ ] PDFs don't have blank pages where sections skipped
+- [ ] `test_standard_zip()` still generates full report
+
+Run tests and generate sample PDFs.
