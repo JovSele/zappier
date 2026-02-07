@@ -1,0 +1,11 @@
+zap_id,task_id,status,started_at,ended_at,error_message
+66666,task_001,error,2026-01-20T10:00:00Z,2026-01-20T10:00:01Z,Authentication failed: Token expired
+66666,task_002,error,2026-01-20T11:00:00Z,2026-01-20T11:00:01Z,Authentication failed: Token expired
+66666,task_003,error,2026-01-20T12:00:00Z,2026-01-20T12:00:01Z,Authentication failed: Token expired
+66666,task_004,error,2026-01-21T09:00:00Z,2026-01-21T09:00:01Z,Authentication failed: Token expired
+66666,task_005,error,2026-01-21T10:00:00Z,2026-01-21T10:00:01Z,Authentication failed: Token expired
+66666,task_006,error,2026-01-21T14:00:00Z,2026-01-21T14:00:01Z,Authentication failed: Token expired
+66666,task_007,error,2026-01-22T08:00:00Z,2026-01-22T08:00:01Z,Authentication failed: Token expired
+66666,task_008,error,2026-01-22T12:00:00Z,2026-01-22T12:00:01Z,Authentication failed: Token expired
+66666,task_009,error,2026-01-23T09:30:00Z,2026-01-23T09:30:01Z,Authentication failed: Token expired
+66666,task_010,error,2026-01-23T15:00:00Z,2026-01-23T15:00:01Z,Authentication failed: Token expired
