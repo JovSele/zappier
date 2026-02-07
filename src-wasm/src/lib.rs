@@ -348,10 +348,19 @@ struct ZapFile {
     zaps: Vec<Zap>,
 }
 
+/// Analysis mode indicates data completeness
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AnalysisMode {
+    Full,    // Has task history CSV data
+    Partial, // Config only, no usage metrics
+}
+
 // Result struct to return to TypeScript
 #[derive(Serialize)]
 struct ParseResult {
     success: bool,
+    mode: AnalysisMode, // NEW: Indicates data completeness
     zap_count: usize,
     total_nodes: usize,
     message: String,
@@ -856,6 +865,14 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
     // Parse CSV files for task history data
     let task_history_map = parse_csv_files(&csv_contents);
     
+    // Detect analysis mode based on CSV data presence
+    let has_task_history = !task_history_map.is_empty();
+    let mode = if has_task_history {
+        AnalysisMode::Full
+    } else {
+        AnalysisMode::Partial
+    };
+    
     // Attach usage statistics to Zaps
     attach_usage_stats(&mut zapfile, &task_history_map);
 
@@ -880,15 +897,26 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
     // Calculate estimated savings
     let estimated_savings = calculate_estimated_savings(&efficiency_flags);
 
+    // Build success message with mode indicator
+    let message = if mode == AnalysisMode::Partial {
+        format!("Successfully parsed {} Zaps with {} total steps (Partial mode: no task history data)", 
+            zapfile.zaps.len(), 
+            total_nodes
+        )
+    } else {
+        format!("Successfully parsed {} Zaps with {} total steps", 
+            zapfile.zaps.len(), 
+            total_nodes
+        )
+    };
+
     // Return success result
     let result = ParseResult {
         success: true,
+        mode,
         zap_count: zapfile.zaps.len(),
         total_nodes,
-        message: format!("Successfully parsed {} Zaps with {} total steps", 
-            zapfile.zaps.len(), 
-            total_nodes
-        ),
+        message,
         apps,
         efficiency_flags,
         efficiency_score,
@@ -1284,12 +1312,13 @@ pub fn parse_zapfile_json(json_content: &str) -> String {
     // Calculate estimated savings
     let estimated_savings = calculate_estimated_savings(&efficiency_flags);
 
-    // Return success result
+    // Return success result (always Partial mode - no CSV data available)
     let result = ParseResult {
         success: true,
+        mode: AnalysisMode::Partial, // JSON-only parsing has no task history
         zap_count: zapfile.zaps.len(),
         total_nodes,
-        message: format!("Successfully parsed {} Zaps with {} total steps", 
+        message: format!("Successfully parsed {} Zaps with {} total steps (Partial mode: no task history data)", 
             zapfile.zaps.len(), 
             total_nodes
         ),
@@ -1552,9 +1581,21 @@ pub fn parse_single_zap_audit(zip_data: &[u8], zap_id: u64, plan_str: &str, actu
     // Calculate estimated savings
     let estimated_savings = calculate_estimated_savings(&efficiency_flags);
 
+    // Detect mode based on CSV data availability for this Zap
+    let has_task_history = zapfile.zaps.first()
+        .and_then(|z| z.usage_stats.as_ref())
+        .map(|s| s.has_task_history)
+        .unwrap_or(false);
+    let mode = if has_task_history {
+        AnalysisMode::Full
+    } else {
+        AnalysisMode::Partial
+    };
+    
     // Return success result (same format as parse_zapier_export)
     let result = ParseResult {
         success: true,
+        mode,
         zap_count: zapfile.zaps.len(), // Should be 1
         total_nodes,
         message: format!("Successfully audited Zap: {}", 
@@ -1740,9 +1781,21 @@ pub fn parse_batch_audit(zip_data: &[u8], zap_ids_js: JsValue, plan_str: &str, a
         let savings = calculate_estimated_savings(&flags);
         total_savings += savings;
         
+        // Detect mode for this Zap
+        let has_task_history = single_zap_file.zaps.first()
+            .and_then(|z| z.usage_stats.as_ref())
+            .map(|s| s.has_task_history)
+            .unwrap_or(false);
+        let mode = if has_task_history {
+            AnalysisMode::Full
+        } else {
+            AnalysisMode::Partial
+        };
+        
         // Build individual result
         individual_results.push(ParseResult {
             success: true,
+            mode,
             zap_count: 1,
             total_nodes: zap_nodes,
             message: format!("Audited: {}", 

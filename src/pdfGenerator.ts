@@ -17,6 +17,7 @@ export interface PDFConfig {
 }
 
 export interface ParseResult {
+  mode?: string; // NEW: "full" | "partial" - indicates data completeness
   zap_count: number;
   total_nodes: number;
   message: string;
@@ -227,6 +228,33 @@ function calculatePriority(efficiencyScore: number, wasteUsd: number): string {
   } else {
     return 'LOW';
   }
+}
+
+/**
+ * Add Partial Mode Warning Box
+ * Displays when analysis is based on configuration only (no task history)
+ */
+function addPartialModeWarning(pdf: jsPDF, yPos: number, margin: number, contentWidth: number): number {
+  // Orange warning box
+  pdf.setFillColor(255, 243, 205); // #FFF3CD - Light orange
+  pdf.roundedRect(margin, yPos, contentWidth, 18, 2, 2, 'F');
+  
+  // Warning icon + title
+  pdf.setTextColor(180, 83, 9); // #B45309 - Dark orange
+  pdf.setFontSize(11);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('⚠️ LIMITED ANALYSIS', margin + 3, yPos + 6);
+  
+  // Warning text
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('This report is based on configuration only. For full cost and usage analysis,', margin + 3, yPos + 11);
+  pdf.text('re-export your Zapier account with task history included.', margin + 3, yPos + 15);
+  
+  // Reset color
+  pdf.setTextColor(0, 0, 0);
+  
+  return yPos + 22; // Return new yPos after warning box
 }
 
 //FOOTER
@@ -1352,7 +1380,13 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
 
   yPos += 20;
 
-  
+  // ============================================================================
+  // PARTIAL MODE WARNING (if applicable)
+  // ============================================================================
+  if (result.mode === 'partial') {
+    ensureSpace(25);
+    yPos = addPartialModeWarning(pdf, yPos, margin, contentWidth);
+  }
 
   yPos += 18; // ✅ SPACING PO BADGE
 
