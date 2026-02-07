@@ -142,25 +142,30 @@ fn calculate_task_volume(runs: u32, steps: usize) -> u32 {
 }
 
 // Triple stores metadata
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 struct TripleStores {
+    #[serde(default)]
     copied_from: Option<u64>,
+    #[serde(default)]
     created_by: Option<u64>,
+    #[serde(default)]
     polling_interval_override: u64,
+    #[serde(default)]
     block_and_release_limit_override: u64,
+    #[serde(default)]
     spread_tasks: u64,
 }
 
 // Node (Step) in a Zap workflow
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 struct Node {
     id: u64,
     account_id: u64,
     customuser_id: u64,
     paused: bool,
     type_of: String, // "read" or "write"
-    params: serde_json::Value, // Dynamic params object
-    meta: serde_json::Value, // Dynamic metadata
+    params: serde_json::Value,
+    meta: serde_json::Value,
     triple_stores: TripleStores,
     folders: Option<serde_json::Value>,
     parent_id: Option<u64>,
@@ -171,6 +176,70 @@ struct Node {
     authentication_id: Option<u64>,
     created_at: String,
     last_changed: String,
+}
+
+// Custom deserializer for Node to handle both modern (minimal fields) and legacy (full fields) formats
+impl<'de> Deserialize<'de> for Node {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        
+        let value = serde_json::Value::deserialize(deserializer)?;
+        
+        // Handle id - can be string or number
+        let id = if let Some(id_val) = value.get("id") {
+            if let Some(num) = id_val.as_u64() {
+                num
+            } else if let Some(s) = id_val.as_str() {
+                // Try to parse string as number, otherwise use hash
+                s.parse::<u64>().unwrap_or_else(|_| {
+                    // For string IDs like "step_001", use a simple hash
+                    s.bytes().map(|b| b as u64).sum()
+                })
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+        
+        // Handle type_of (or just "type")
+        let type_of = value.get("type_of")
+            .or_else(|| value.get("type"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("write")
+            .to_string();
+        
+        // Handle selected_api (or "app")
+        let selected_api = value.get("selected_api")
+            .or_else(|| value.get("app"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        
+        Ok(Node {
+            id,
+            account_id: value.get("account_id").and_then(|v| v.as_u64()).unwrap_or(0),
+            customuser_id: value.get("customuser_id").and_then(|v| v.as_u64()).unwrap_or(0),
+            paused: value.get("paused").and_then(|v| v.as_bool()).unwrap_or(false),
+            type_of,
+            params: value.get("params").cloned().unwrap_or(serde_json::Value::Null),
+            meta: value.get("meta").cloned().unwrap_or(serde_json::Value::Null),
+            triple_stores: serde_json::from_value(value.get("triple_stores").cloned().unwrap_or(serde_json::Value::Null))
+                .unwrap_or_default(),
+            folders: value.get("folders").cloned(),
+            parent_id: value.get("parent_id").and_then(|v| v.as_u64()),
+            root_id: value.get("root_id").and_then(|v| v.as_u64()),
+            action: value.get("action").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            selected_api,
+            title: value.get("title").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            authentication_id: value.get("authentication_id").and_then(|v| v.as_u64()),
+            created_at: value.get("created_at").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            last_changed: value.get("last_changed").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        })
+    }
 }
 
 // Usage statistics for a Zap (from task history data)
@@ -190,25 +259,91 @@ struct UsageStats {
 }
 
 // Zap (automation workflow)
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 struct Zap {
     id: u64,
     title: String,
-    status: String, // "on", "off", etc.
-    nodes: HashMap<String, Node>, // Numeric string keys -> Node
-    #[serde(skip_deserializing)]
+    status: String,
+    nodes: HashMap<String, Node>,
     usage_stats: Option<UsageStats>,
 }
 
+// Custom deserializer for Zap to handle both modern (steps array) and legacy (nodes map) formats
+impl<'de> Deserialize<'de> for Zap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        
+        // Deserialize as a generic JSON value first
+        let value = serde_json::Value::deserialize(deserializer)?;
+        
+        let id = value.get("id")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| Error::custom("missing field 'id'"))?;
+        
+        // Handle title (or name)
+        let title = value.get("title")
+            .or_else(|| value.get("name"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Error::custom("missing field 'title' or 'name'"))?
+            .to_string();
+        
+        // Handle status (or state)
+        let status = value.get("status")
+            .or_else(|| value.get("state"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Error::custom("missing field 'status' or 'state'"))?
+            .to_string();
+        
+        // Handle nodes/steps/actions - this is the tricky part
+        let mut nodes = HashMap::new();
+        
+        // Try to get steps first (modern format - array)
+        if let Some(steps_value) = value.get("steps").or_else(|| value.get("actions")) {
+            if let Some(steps_array) = steps_value.as_array() {
+                // Modern format: steps is an array
+                for (index, step_value) in steps_array.iter().enumerate() {
+                    let node: Node = serde_json::from_value(step_value.clone())
+                        .map_err(|e| Error::custom(format!("failed to parse step: {}", e)))?;
+                    nodes.insert(index.to_string(), node);
+                }
+            }
+        }
+        // Try legacy nodes format (HashMap)
+        else if let Some(nodes_value) = value.get("nodes") {
+            if let Some(nodes_obj) = nodes_value.as_object() {
+                // Legacy format: nodes is a map
+                for (key, node_value) in nodes_obj {
+                    let node: Node = serde_json::from_value(node_value.clone())
+                        .map_err(|e| Error::custom(format!("failed to parse node: {}", e)))?;
+                    nodes.insert(key.clone(), node);
+                }
+            }
+        }
+        
+        Ok(Zap {
+            id,
+            title,
+            status,
+            nodes,
+            usage_stats: None,
+        })
+    }
+}
+
 // Metadata at root level
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 struct Metadata {
+    #[serde(default)]
     version: String,
 }
 
 // Root structure of zapfile.json
 #[derive(Debug, Deserialize, Serialize)]
 struct ZapFile {
+    #[serde(default)]
     metadata: Metadata,
     zaps: Vec<Zap>,
 }
@@ -648,10 +783,13 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
         }
     };
 
-    // Look for zapfile.json and CSV files
+    // Look for zapfile.json (or legacy alternatives) and CSV files
     let mut zapfile_content = String::new();
     let mut csv_contents: Vec<String> = Vec::new();
     let mut found_zapfile = false;
+    
+    // Flexible file search - try multiple candidate filenames
+    const ZAPFILE_CANDIDATES: &[&str] = &["zapfile.json", "zaps.json", "config.json"];
 
     for i in 0..archive.len() {
         let mut file = match archive.by_index(i) {
@@ -660,20 +798,27 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
         };
 
         let file_name = file.name().to_string();
+        let file_name_lower = file_name.to_lowercase();
         
-        // Find zapfile.json (case-insensitive)
-        if file_name.to_lowercase().ends_with("zapfile.json") {
-            if let Err(e) = file.read_to_string(&mut zapfile_content) {
-                let error = ErrorResult {
-                    success: false,
-                    message: format!("Failed to read zapfile.json: {}", e),
-                };
-                return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Read error"}"#.to_string());
+        // Find zapfile using flexible search (modern or legacy names)
+        if !found_zapfile {
+            for candidate in ZAPFILE_CANDIDATES {
+                if file_name_lower.ends_with(candidate) {
+                    if let Err(e) = file.read_to_string(&mut zapfile_content) {
+                        let error = ErrorResult {
+                            success: false,
+                            message: format!("Failed to read {}: {}", candidate, e),
+                        };
+                        return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"Read error"}"#.to_string());
+                    }
+                    found_zapfile = true;
+                    break;
+                }
             }
-            found_zapfile = true;
         }
+        
         // Find CSV files (task history or other)
-        else if file_name.to_lowercase().ends_with(".csv") {
+        if file_name_lower.ends_with(".csv") {
             let mut csv_content = String::new();
             if file.read_to_string(&mut csv_content).is_ok() {
                 csv_contents.push(csv_content);
@@ -684,7 +829,10 @@ pub fn parse_zapier_export(zip_data: &[u8]) -> String {
     if !found_zapfile {
         let error = ErrorResult {
             success: false,
-            message: "zapfile.json not found in archive".to_string(),
+            message: format!(
+                "No zapfile found in archive. Tried: {}",
+                ZAPFILE_CANDIDATES.join(", ")
+            ),
         };
         return serde_json::to_string(&error).unwrap_or_else(|_| r#"{"success":false,"message":"File not found"}"#.to_string());
     }
