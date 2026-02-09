@@ -27,6 +27,9 @@ interface EfficiencyFlag {
   error_trend?: string
   max_streak?: number
   estimated_monthly_savings: number
+  estimated_annual_savings: number  // NEW: Centralized from WASM (monthly * 12)
+  formatted_monthly_savings: string  // Pre-formatted for PDF display (e.g., "$2.3k")
+  formatted_annual_savings: string  // Pre-formatted for PDF display (e.g., "$27.6k")
   savings_explanation: string
   is_fallback: boolean
   confidence: string  // "high" | "medium" | "low" - PHASE 2: Trust indicator

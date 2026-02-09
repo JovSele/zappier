@@ -34,6 +34,9 @@ export interface ParseResult {
     error_trend?: string;
     max_streak?: number;
     estimated_monthly_savings: number;
+    estimated_annual_savings: number; // NEW: Centralized from WASM (monthly * 12)
+    formatted_monthly_savings: string; // Pre-formatted for PDF display (e.g., "$2.3k")
+    formatted_annual_savings: string; // Pre-formatted for PDF display (e.g., "$27.6k")
     savings_explanation: string;
     is_fallback: boolean;
     confidence: string; // "high" | "medium" | "low"
@@ -513,7 +516,7 @@ function addCostWasteAnalysis(
   
   // ✅ POLLING TRIGGER CARD - kompletne prepracovaný
 if (pollingFlag) {
-  const annualSavings = ((pollingFlag.estimated_monthly_savings || 0) * 12).toFixed(0);
+  const annualSavings = (pollingFlag.estimated_annual_savings || 0).toFixed(0);
   
   const cardX = margin + cardOffset + 6;
   const cardStartY = yPos;
@@ -590,7 +593,7 @@ if (pollingFlag) {
 
 // ✅ LATE FILTER PLACEMENT CARD - rovnaký pattern
 if (filterFlag) {
-  const annualSavings = ((filterFlag.estimated_monthly_savings || 0) * 12).toFixed(0);
+  const annualSavings = (filterFlag.estimated_annual_savings || 0).toFixed(0);
   
   const cardX = margin + cardOffset + 6;
   const cardStartY = yPos;

@@ -134,6 +134,15 @@ const POLLING_REDUCTION_RATE: f32 = 0.20; // 20%
 /// Estimated filter rejection rate when no execution history available
 const LATE_FILTER_FALLBACK_RATE: f32 = 0.30; // 30%
 
+/// Format large numbers with 'k' suffix for display
+/// Used to provide pre-formatted strings to the PDF layer
+fn format_large_number(amount: f32) -> String {
+    if amount >= 1000.0 {
+        format!("{:.1}k", amount / 1000.0)
+    } else {
+        format!("{:.0}", amount)
+    }
+}
 
 /// Helper function to calculate task volume correctly
 /// Formula: runs × steps (each run executes all steps)
@@ -394,6 +403,9 @@ struct EfficiencyFlag {
     max_streak: Option<u32>,
     // Dynamic savings calculation
     estimated_monthly_savings: f32, // in USD
+    estimated_annual_savings: f32, // in USD (monthly * 12) - CENTRALIZED
+    formatted_monthly_savings: String, // Pre-formatted for PDF display (e.g., "$2.3k")
+    formatted_annual_savings: String, // Pre-formatted for PDF display (e.g., "$27.6k")
     savings_explanation: String, // How savings were calculated
     is_fallback: bool, // true = using estimated fallback data, false = using actual execution data
     // PHASE 1: Confidence system
@@ -758,6 +770,9 @@ fn detect_error_loop(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFlag> {
                 max_streak: Some(stats.max_streak),
                 // Dynamic savings calculation
                 estimated_monthly_savings: monthly_savings,
+                estimated_annual_savings: monthly_savings * 12.0,
+                formatted_monthly_savings: format!("${}", format_large_number(monthly_savings)),
+                formatted_annual_savings: format!("${}", format_large_number(monthly_savings * 12.0)),
                 savings_explanation,
                 is_fallback: false, // Error loop detection always uses actual execution data
                 confidence: "high".to_string(), // Real CSV data = high confidence
@@ -1058,6 +1073,9 @@ fn detect_late_filter_placement(zap: &Zap, price_per_task: f32) -> Option<Effici
                         max_streak: None,
                         // Dynamic savings calculation
                         estimated_monthly_savings: monthly_savings,
+                        estimated_annual_savings: monthly_savings * 12.0,
+                        formatted_monthly_savings: format!("${}", format_large_number(monthly_savings)),
+                        formatted_annual_savings: format!("${}", format_large_number(monthly_savings * 12.0)),
                         savings_explanation,
                         is_fallback, // Track whether we used actual data or fallback estimate
                         confidence, // PHASE 1: Confidence system
@@ -1171,6 +1189,9 @@ fn detect_polling_trigger(zap: &Zap, price_per_task: f32) -> Option<EfficiencyFl
             max_streak: None,
             // Dynamic savings calculation
             estimated_monthly_savings: monthly_savings,
+            estimated_annual_savings: monthly_savings * 12.0,
+            formatted_monthly_savings: format!("${}", format_large_number(monthly_savings)),
+            formatted_annual_savings: format!("${}", format_large_number(monthly_savings * 12.0)),
             savings_explanation,
             is_fallback: !has_execution_data, // ✅ FIX #1: Simple and correct - true only when no CSV data
             confidence, // PHASE 1: Confidence system
