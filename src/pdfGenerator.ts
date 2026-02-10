@@ -2,10 +2,14 @@
 // Manual rendering with precise layout control
 
 import jsPDF from 'jspdf';
-import { sanitizeForPDF } from './pdfHelpers';
+// Import future schema types for reference (v1.0.0)
+// Note: AuditResult will be used when WASM output migrates to v1.0.0 schema
+// import type { AuditResult } from './types/audit-schema';
 
 // ========================================
-// TYPE DEFINITIONS
+// TYPE DEFINITIONS (Current WASM Output Format)
+// NOTE: These represent the current output format from WASM.
+// Future versions will migrate to AuditResult schema (v1.0.0)
 // ========================================
 
 export interface PDFConfig {
@@ -207,7 +211,9 @@ function formatCurrency(amount: number): string {
 
 /**
  * Format waste amount (fixes "$0" display)
+ * @future-use: Helper for detailed waste breakdowns
  */
+// @ts-ignore - TS6133: Function prepared for future detailed waste display
 function formatWasteAmount(tasks: number, usd: number): string {
   if (usd === 0) {
     return `${tasks} tasks/month (negligible cost)`;
@@ -751,7 +757,7 @@ function addTechnicalAnalysis(
   yPos: number,
   margin: number,
   contentWidth: number,
-  result: ParseResult,
+  _result: ParseResult, // Prefix with _ to indicate intentionally unused
   zapInfo: { trigger_app: string; step_count: number }
 ): number {
   // Section title (no icon needed)
