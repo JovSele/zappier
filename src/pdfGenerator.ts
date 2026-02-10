@@ -2,9 +2,8 @@
 // Manual rendering with precise layout control
 
 import jsPDF from 'jspdf';
-// Import future schema types for reference (v1.0.0)
-// Note: AuditResult will be used when WASM output migrates to v1.0.0 schema
-// import type { AuditResult } from './types/audit-schema';
+// Import v1.0.0 schema types
+import type { AuditResult } from './types/audit-schema';
 
 // ========================================
 // TYPE DEFINITIONS (Current WASM Output Format)
@@ -1771,9 +1770,12 @@ export async function generatePDFReport(result: ParseResult, config: PDFConfig) 
 /**
  * Generate Developer Edition PDF for batch analysis
  * Multi-Zap technical report with patterns, scope, and per-Zap breakdown
+ * 
+ * @param auditResult - v1.0.0 AuditResult from WASM
+ * @param config - PDF report configuration
  */
 export async function generateDeveloperEditionPDF(
-  batchResult: BatchParseResult,
+  auditResult: AuditResult,
   config: PDFConfig
 ) {
   const pdf = new jsPDF('p', 'mm', 'a4');
@@ -1800,13 +1802,29 @@ export async function generateDeveloperEditionPDF(
     return false;
   };
 
-  // Calculate severity breakdown
+  // Calculate average efficiency score from per-zap findings
+  const avgScore = auditResult.per_zap_findings.length > 0
+    ? auditResult.per_zap_findings.reduce((sum, zap) => {
+        // Calculate score from flags (fewer flags = higher score)
+        const zapScore = 100 - (zap.flags.length * 10);
+        return sum + Math.max(0, zapScore);
+      }, 0) / auditResult.per_zap_findings.length
+    : 100;
+
+  // Calculate average steps per zap
+  const avgSteps = auditResult.per_zap_findings.length > 0
+    ? auditResult.per_zap_findings.reduce((sum, zap) => 
+        sum + zap.metrics.steps, 0) / auditResult.per_zap_findings.length
+    : 0;
+
+  // Calculate severity breakdown from all flags
   const severityBreakdown = { high: 0, medium: 0, low: 0 };
-  batchResult.individual_results.forEach(result => {
-    result.efficiency_flags.forEach(flag => {
-      if (flag.severity === 'high') severityBreakdown.high++;
-      else if (flag.severity === 'medium') severityBreakdown.medium++;
-      else if (flag.severity === 'low') severityBreakdown.low++;
+  auditResult.per_zap_findings.forEach(zap => {
+    zap.flags.forEach(flag => {
+      const severity = flag.severity.toLowerCase();
+      if (severity === 'high') severityBreakdown.high++;
+      else if (severity === 'medium') severityBreakdown.medium++;
+      else if (severity === 'low') severityBreakdown.low++;
     });
   });
 
@@ -1869,12 +1887,12 @@ export async function generateDeveloperEditionPDF(
   pdf.text('PROJECT SNAPSHOT', margin + 8, yPos + 8);
   pdf.setCharSpace(0);
 
-  // Metrics in 2x2 grid
+  // Metrics in 2x2 grid (mapped from v1.0.0 schema)
   const snapMetrics = [
-    { label: 'Zaps Analyzed', value: batchResult.zap_count.toString() },
-    { label: 'Total Anti-Patterns', value: batchResult.total_flags.toString() },
-    { label: 'Monthly Waste', value: `$${Math.round(batchResult.total_estimated_savings)}` },
-    { label: 'Avg Efficiency', value: `${Math.round(batchResult.average_efficiency_score)}/100` }
+    { label: 'Zaps Analyzed', value: auditResult.global_metrics.total_zaps.toString() },
+    { label: 'Total Anti-Patterns', value: auditResult.global_metrics.high_severity_flag_count.toString() },
+    { label: 'Monthly Waste', value: `$${Math.round(auditResult.global_metrics.estimated_monthly_waste_usd)}` },
+    { label: 'Avg Efficiency', value: `${Math.round(avgScore)}/100` }
   ];
 
   const gridCols = 2;
@@ -1970,12 +1988,17 @@ export async function generateDeveloperEditionPDF(
   pdf.setCharSpace(0);
 
   let healthY = yPos + 18;
-  const metrics = batchResult.system_metrics;
+  // Calculate trigger counts from findings
+  const pollingCount = auditResult.per_zap_findings.filter(zap => 
+    zap.flags.some(flag => flag.code === 'TASK_STEP_COST_INFLATION')
+  ).length;
+  const instantCount = auditResult.global_metrics.total_zaps - pollingCount;
+  
   const healthItems = [
-    `• Avg Steps/Zap: ${metrics.avg_steps_per_zap.toFixed(1)}`,
-    `• Polling Triggers: ${metrics.polling_trigger_count}/${batchResult.zap_count} (${Math.round(metrics.polling_trigger_count / batchResult.zap_count * 100)}%)`,
-    `• Instant Triggers: ${metrics.instant_trigger_count}/${batchResult.zap_count} (${Math.round(metrics.instant_trigger_count / batchResult.zap_count * 100)}%)`,
-    `• Formatter Density: ${metrics.formatter_usage_density}`
+    `• Avg Steps/Zap: ${avgSteps.toFixed(1)}`,
+    `• Polling Triggers: ${pollingCount}/${auditResult.global_metrics.total_zaps} (${Math.round(pollingCount / auditResult.global_metrics.total_zaps * 100)}%)`,
+    `• Instant Triggers: ${instantCount}/${auditResult.global_metrics.total_zaps} (${Math.round(instantCount / auditResult.global_metrics.total_zaps * 100)}%)`,
+    `• Total Monthly Tasks: ${auditResult.global_metrics.total_monthly_tasks}`
   ];
 
   pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
@@ -1993,7 +2016,9 @@ export async function generateDeveloperEditionPDF(
   
   const colWidth = (contentWidth - 4) / 2;
   
-  // LEFT: Analyzed Zaps
+  // LEFT: Analyzed Zaps (from v1.0.0 per_zap_findings)
+  const activeZaps = auditResult.per_zap_findings.filter(zap => !zap.is_zombie);
+  
   pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
   pdf.roundedRect(margin, yPos, colWidth, 80, 3, 3, 'FD');
   pdf.setFillColor(239, 246, 255);
@@ -2003,11 +2028,11 @@ export async function generateDeveloperEditionPDF(
   pdf.setFontSize(9);
   pdf.setFont('helvetica', 'bold');
   pdf.setCharSpace(1);
-  pdf.text(`ANALYZED (${batchResult.scope_metadata.analyzed_count})`, margin + 6, yPos + 7);
+  pdf.text(`ANALYZED (${activeZaps.length})`, margin + 6, yPos + 7);
   pdf.setCharSpace(0);
 
   let listY = yPos + 15;
-  const analyzed = batchResult.scope_metadata.analyzed_zap_summaries.slice(0, 10);
+  const analyzed = activeZaps.slice(0, 10);
   pdf.setFontSize(7);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
@@ -2017,17 +2042,19 @@ export async function generateDeveloperEditionPDF(
       pdf.text('...', margin + 6, listY);
       break;
     }
-    const title = zap.title.substring(0, 20) + (zap.title.length > 20 ? '...' : '');
+    const title = zap.zap_name.substring(0, 20) + (zap.zap_name.length > 20 ? '...' : '');
     pdf.text(`• ${title}`, margin + 6, listY);
     pdf.setFont('helvetica', 'italic');
     pdf.setFontSize(6);
-    pdf.text(`${zap.step_count} steps`, margin + 10, listY + 3);
+    pdf.text(`${zap.metrics.steps} steps`, margin + 10, listY + 3);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
     listY += 7;
   }
 
-  // RIGHT: Excluded Zaps
+  // RIGHT: Zombie/Excluded Zaps
+  const zombieZaps = auditResult.per_zap_findings.filter(zap => zap.is_zombie);
+  
   const rightX = margin + colWidth + 4;
   pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.roundedRect(rightX, yPos, colWidth, 80, 3, 3, 'FD');
@@ -2038,11 +2065,11 @@ export async function generateDeveloperEditionPDF(
   pdf.setFontSize(9);
   pdf.setFont('helvetica', 'bold');
   pdf.setCharSpace(1);
-  pdf.text(`EXCLUDED (${batchResult.scope_metadata.excluded_count})`, rightX + 6, yPos + 7);
+  pdf.text(`ZOMBIES (${zombieZaps.length})`, rightX + 6, yPos + 7);
   pdf.setCharSpace(0);
 
   listY = yPos + 15;
-  const excluded = batchResult.scope_metadata.excluded_zap_summaries.slice(0, 10);
+  const excluded = zombieZaps.slice(0, 10);
   pdf.setFontSize(7);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
@@ -2052,7 +2079,7 @@ export async function generateDeveloperEditionPDF(
       pdf.text('...', rightX + 6, listY);
       break;
     }
-    const title = zap.title.substring(0, 20) + (zap.title.length > 20 ? '...' : '');
+    const title = zap.zap_name.substring(0, 20) + (zap.zap_name.length > 20 ? '...' : '');
     pdf.text(`• ${title}`, rightX + 6, listY);
     pdf.setFont('helvetica', 'italic');
     pdf.setFontSize(6);
@@ -2078,15 +2105,29 @@ export async function generateDeveloperEditionPDF(
   pdf.text('Pattern-Level Findings', margin, yPos);
   yPos += 12; // ✅ Spacing after title
 
-  // Draw pattern cards
-  const patterns = batchResult.patterns.slice(0, 5); // Top 5 patterns
+  // Draw pattern cards (from opportunities_ranked in v1.0.0)
+  // Group opportunities by flag_code to create pattern-like view
+  const opportunitiesByCode = new Map<string, typeof auditResult.opportunities_ranked>();
+  auditResult.opportunities_ranked.forEach(opp => {
+    if (!opportunitiesByCode.has(opp.flag_code)) {
+      opportunitiesByCode.set(opp.flag_code, []);
+    }
+    opportunitiesByCode.get(opp.flag_code)!.push(opp);
+  });
   
-  for (const pattern of patterns) {
+  const topPatterns = Array.from(opportunitiesByCode.entries()).slice(0, 5);
+  
+  for (const [flagCode, opportunities] of topPatterns) {
+    const pattern = {
+      pattern_name: flagCode.replace(/_/g, ' '),
+      affected_count: opportunities.length,
+      total_waste_usd: opportunities.reduce((sum, o) => sum + o.estimated_monthly_savings_usd, 0),
+      severity: opportunities[0].confidence === 'High' ? 'high' : 'medium'
+    };
     ensureSpace(35);
     
     const cardHeight = 28;
-    const severityColor = pattern.severity === 'high' ? COLORS.RED :
-      pattern.severity === 'medium' ? { r: 245, g: 158, b: 11 } : COLORS.GREEN;
+    const severityColor = pattern.severity === 'high' ? COLORS.RED : { r: 245, g: 158, b: 11 };
     
     pdf.setFillColor(severityColor.r, severityColor.g, severityColor.b);
     pdf.roundedRect(margin, yPos, contentWidth - 1, cardHeight, 3, 3, 'FD');
@@ -2113,18 +2154,12 @@ export async function generateDeveloperEditionPDF(
     pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`• Waste: ${pattern.total_waste_tasks} tasks/month ($${Math.round(pattern.total_waste_usd)})`, margin + 8, detailY);
+    pdf.text(`• Waste: $${Math.round(pattern.total_waste_usd)}/month`, margin + 8, detailY);
     
     detailY += 5;
-    if (pattern.median_chain_length) {
-      pdf.text(`• Avg Chain Length: ${pattern.median_chain_length.toFixed(1)} steps`, margin + 8, detailY);
-      detailY += 5;
-    }
-    
     pdf.setFont('helvetica', 'italic');
     pdf.setFontSize(7);
-    const guidance = pattern.refactor_guidance.substring(0, 80) + (pattern.refactor_guidance.length > 80 ? '...' : '');
-    pdf.text(`Fix: ${guidance}`, margin + 8, detailY, { maxWidth: contentWidth - 16 });
+    pdf.text(`Affected Zaps: ${pattern.affected_count}`, margin + 8, detailY, { maxWidth: contentWidth - 16 });
 
     yPos += cardHeight + 4;
   }
@@ -2132,10 +2167,10 @@ export async function generateDeveloperEditionPDF(
   // ============================================================================
   // PAGES 4+: PER-ZAP BREAKDOWN (with ASCII diagrams)
   // ============================================================================
-  const topZaps = batchResult.individual_results.slice(0, 5); // Top 5 zaps with most flags
+  const topZaps = auditResult.per_zap_findings.slice(0, 5); // Top 5 zaps with most flags
   
   for (let zapIndex = 0; zapIndex < topZaps.length; zapIndex++) {
-    const result = topZaps[zapIndex];
+    const zapFinding = topZaps[zapIndex];
     
     pdf.addPage();
     currentPage++;
@@ -2143,9 +2178,8 @@ export async function generateDeveloperEditionPDF(
     yPos = 20; // ✅ RESET
 
     // Zap header
-    const zapTitle = result.efficiency_flags.length > 0 
-      ? result.efficiency_flags[0].zap_title 
-      : `Zap ${zapIndex + 1}`;
+    const zapTitle = zapFinding.zap_name;
+    const zapScore = 100 - (zapFinding.flags.length * 10);
     
     pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
     pdf.setFontSize(14);
@@ -2155,7 +2189,7 @@ export async function generateDeveloperEditionPDF(
     pdf.setTextColor(COLORS.SLATE_600.r, COLORS.SLATE_600.g, COLORS.SLATE_600.b);
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`${result.total_nodes} steps • ${result.efficiency_flags.length} issues • Score: ${result.efficiency_score}/100`, margin, yPos + 6);
+    pdf.text(`${zapFinding.metrics.steps} steps • ${zapFinding.flags.length} issues • Score: ${Math.max(0, zapScore)}/100`, margin, yPos + 6);
     
     yPos += 18; // ✅ Spacing after header
 
@@ -2185,15 +2219,15 @@ export async function generateDeveloperEditionPDF(
     pdf.setCharSpace(0);
 
     // Complexity badge (right side)
-    const complexity = result.total_nodes > 8 ? 'HIGH' : result.total_nodes > 4 ? 'MEDIUM' : 'LOW';
-    const complexityColor = result.total_nodes > 8 ? COLORS.RED : 
-                            result.total_nodes > 4 ? { r: 245, g: 158, b: 11 } : 
+    const complexity = zapFinding.metrics.steps > 8 ? 'HIGH' : zapFinding.metrics.steps > 4 ? 'MEDIUM' : 'LOW';
+    const complexityColor = zapFinding.metrics.steps > 8 ? COLORS.RED : 
+                            zapFinding.metrics.steps > 4 ? { r: 245, g: 158, b: 11 } : 
                             COLORS.GREEN;
 
     pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
     pdf.setFontSize(7);
     pdf.setFont('helvetica', 'normal');
-    const stepsText = `${result.total_nodes} STEPS • `;
+    const stepsText = `${zapFinding.metrics.steps} STEPS • `;
     const complexityText = `${complexity} COMPLEXITY`;
     const totalWidth = pdf.getTextWidth(stepsText + complexityText);
     const rightX = margin + contentWidth - cardOffset - 6 - totalWidth;
@@ -2212,9 +2246,9 @@ export async function generateDeveloperEditionPDF(
     const boxGap = 10;
     const startX = margin + cardOffset + (contentWidth - cardOffset - (3 * boxWidth + 2 * boxGap)) / 2;
 
-    // ✅ FIX #4: Safe array access with bounds checking
-    const triggerApp = result.apps && result.apps.length > 0 ? result.apps[0].name : 'Webhook';
-    const actionApp = result.apps && result.apps.length > 1 ? result.apps[result.apps.length - 1].name : 'Unknown';
+    // Use generic placeholders for trigger/action apps
+    const triggerApp = 'Webhook';
+    const actionApp = 'App';
 
     // TRIGGER box
     pdf.setFillColor(255, 255, 255);
@@ -2256,7 +2290,7 @@ export async function generateDeveloperEditionPDF(
     pdf.roundedRect(logic2X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
 
     // Logic badge
-    const logicSteps = Math.max(result.total_nodes - 2, 0);
+    const logicSteps = Math.max(zapFinding.metrics.steps - 2, 0);
     pdf.setFillColor(COLORS.BLUE.r, COLORS.BLUE.g, COLORS.BLUE.b);
     pdf.roundedRect(logic2X + boxWidth / 2 - 8, yPos + 3, 16, 6, 3, 3, 'F');
     pdf.setTextColor(255, 255, 255);
@@ -2312,31 +2346,32 @@ export async function generateDeveloperEditionPDF(
     pdf.text('Identified Issues', margin, yPos + 6);
     yPos += 12;
 
-    const zapFlags = result.efficiency_flags.slice(0, 3);
+    const zapFlags = zapFinding.flags.slice(0, 3);
     for (const flag of zapFlags) {
       ensureSpace(20);
       
       const issueHeight = 16;
-      const sevColor = flag.severity === 'high' ? COLORS.RED :
-        flag.severity === 'medium' ? { r: 245, g: 158, b: 11 } : COLORS.GREEN;
+      const sevLower = flag.severity.toLowerCase();
+      const sevColor = sevLower === 'high' ? COLORS.RED :
+        sevLower === 'medium' ? { r: 245, g: 158, b: 11 } : COLORS.GREEN;
       
       pdf.setFillColor(sevColor.r, sevColor.g, sevColor.b);
       pdf.roundedRect(margin, yPos, contentWidth - 1, issueHeight, 2, 2, 'FD');
       
-      const issueBg = flag.severity === 'high' ? { r: 254, g: 242, b: 242 } :
-        flag.severity === 'medium' ? { r: 254, g: 243, b: 199 } : { r: 236, g: 253, b: 245 };
+      const issueBg = sevLower === 'high' ? { r: 254, g: 242, b: 242 } :
+        sevLower === 'medium' ? { r: 254, g: 243, b: 199 } : { r: 236, g: 253, b: 245 };
       pdf.setFillColor(issueBg.r, issueBg.g, issueBg.b);
       pdf.roundedRect(margin + 1, yPos, contentWidth - 1, issueHeight, 2, 2, 'FD');
 
       pdf.setTextColor(sevColor.r, sevColor.g, sevColor.b);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(flag.flag_type.toUpperCase().replace(/_/g, ' '), margin + 6, yPos + 6);
+      pdf.text(flag.code.toUpperCase().replace(/_/g, ' '), margin + 6, yPos + 6);
 
       pdf.setTextColor(COLORS.SLATE_700.r, COLORS.SLATE_700.g, COLORS.SLATE_700.b);
       pdf.setFontSize(7);
       pdf.setFont('helvetica', 'normal');
-      const msg = flag.message.substring(0, 70) + (flag.message.length > 70 ? '...' : '');
+      const msg = `$${flag.impact.estimated_monthly_savings_usd.toFixed(0)}/month savings potential`;
       pdf.text(msg, margin + 6, yPos + 11);
 
       yPos += issueHeight + 3;
@@ -2373,10 +2408,10 @@ export async function generateDeveloperEditionPDF(
   yPos += 10;
 
   // Table rows
-  const scoreboardZaps = batchResult.individual_results.slice(0, 10);
+  const scoreboardZaps = auditResult.per_zap_findings.slice(0, 10);
   
   for (let i = 0; i < scoreboardZaps.length; i++) {
-    const res = scoreboardZaps[i];
+    const zapFinding = scoreboardZaps[i];
     ensureSpace(8);
     
     // Alternating row colors
@@ -2385,17 +2420,16 @@ export async function generateDeveloperEditionPDF(
       pdf.rect(margin, yPos, contentWidth, 6, 'F');
     }
 
-    const zapName = res.efficiency_flags.length > 0 
-      ? res.efficiency_flags[0].zap_title.substring(0, 25) 
-      : `Zap ${i + 1}`;
+    const zapName = zapFinding.zap_name.substring(0, 25);
     
-    const complexity = res.total_nodes > 8 ? 'High' : res.total_nodes > 4 ? 'Med' : 'Low';
-    const risk = res.efficiency_flags.length > 2 ? 'High' : res.efficiency_flags.length > 0 ? 'Med' : 'Low';
-    const wasteUsd = res.estimated_savings * 12;
+    const complexity = zapFinding.metrics.steps > 8 ? 'High' : zapFinding.metrics.steps > 4 ? 'Med' : 'Low';
+    const risk = zapFinding.flags.length > 2 ? 'High' : zapFinding.flags.length > 0 ? 'Med' : 'Low';
+    const wasteUsd = zapFinding.flags.reduce((sum, f) => sum + f.impact.estimated_monthly_savings_usd, 0) * 12;
     const waste = `$${Math.round(wasteUsd)}`;
     
+    const zapScore = 100 - (zapFinding.flags.length * 10);
     // ✅ Use calculatePriority instead of emoji
-    const priority = calculatePriority(res.efficiency_score, wasteUsd);
+    const priority = calculatePriority(Math.max(0, zapScore), wasteUsd);
     const priorityColor = priority === 'CRIT' ? COLORS.RED :
                           priority === 'HIGH' ? { r: 245, g: 158, b: 11 } :
                           priority === 'MED' ? { r: 245, g: 158, b: 11 } :
@@ -2429,19 +2463,18 @@ export async function generateDeveloperEditionPDF(
   pdf.text('Optimization Checklist', margin, yPos + 6);
   yPos += 18;
 
-  // Dynamic checklist based on patterns
+  // Dynamic checklist based on top opportunities
   const checklistItems: string[] = [];
   
-  batchResult.patterns.forEach(pattern => {
-    if (pattern.pattern_type === 'polling_trigger') {
-      checklistItems.push(`Replace ${pattern.affected_count} polling triggers with webhooks`);
-    } else if (pattern.pattern_type === 'formatter_chain') {
-      checklistItems.push(`Consolidate ${pattern.affected_count} formatter chains into single steps`);
-    } else if (pattern.pattern_type === 'late_filter') {
-      checklistItems.push(`Reposition filters earlier in ${pattern.affected_count} workflows`);
-    } else {
-      checklistItems.push(`Address ${pattern.pattern_name} in ${pattern.affected_count} Zaps`);
-    }
+  // Group by flag code to create checklist items
+  const flagCounts = new Map<string, number>();
+  auditResult.opportunities_ranked.slice(0, 5).forEach(opp => {
+    flagCounts.set(opp.flag_code, (flagCounts.get(opp.flag_code) || 0) + 1);
+  });
+  
+  flagCounts.forEach((count, code) => {
+    const readableName = code.replace(/_/g, ' ').toLowerCase();
+    checklistItems.push(`Address ${readableName} in ${count} Zap${count === 1 ? '' : 's'}`);
   });
 
   // Add generic items

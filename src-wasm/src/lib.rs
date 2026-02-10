@@ -2346,8 +2346,31 @@ fn build_zap_summary(zap: &Zap, task_history_map: &HashMap<u64, UsageStats>) -> 
 /// Main v1.0.0 audit function - Complete end-to-end analysis
 /// Returns AuditResultV1 (canonical schema) as JSON
 #[wasm_bindgen]
-pub fn analyze_zaps(zip_data: &[u8], plan_str: &str, actual_usage: u32) -> Result<JsValue, JsValue> {
+pub fn analyze_zaps(
+    zip_data: &[u8],
+    selected_zap_ids: Vec<JsValue>,  // NEW: Array of zap IDs to analyze
+    plan_str: &str,
+    actual_usage: u32
+) -> Result<JsValue, JsValue> {
     // 1. PARSE INPUTS
+    
+    // Convert JsValue array to Vec<String>
+    let selected_ids: Vec<String> = selected_zap_ids
+        .iter()
+        .filter_map(|id| {
+            if let Some(s) = id.as_string() {
+                Some(s)
+            } else if let Some(n) = id.as_f64() {
+                Some(n.to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+    
+    // If empty array passed, analyze all Zaps (backward compatibility)
+    let analyze_all = selected_ids.is_empty();
+    
     let plan = match plan_str.to_lowercase().as_str() {
         "professional" => ZapierPlan::Professional,
         "team" => ZapierPlan::Team,
@@ -2395,10 +2418,16 @@ pub fn analyze_zaps(zip_data: &[u8], plan_str: &str, actual_usage: u32) -> Resul
     let has_csv = !task_history_map.is_empty();
     attach_usage_stats(&mut zapfile, &task_history_map);
     
+    // 2.5. FILTER ZAPS (if specific IDs selected)
+    if !analyze_all {
+        zapfile.zaps.retain(|zap| selected_ids.contains(&zap.id.to_string()));
+    }
+    
     // 3. RUN CALCULATIONS (reuse existing functions)
     let old_flags = detect_efficiency_flags(&zapfile, price_per_task);
     
     // 4. BUILD v1.0.0 FINDINGS
+
     let mut findings: Vec<ZapFinding> = Vec::new();
     let mut global_active_count = 0;
     let mut global_zombie_count = 0;

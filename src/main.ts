@@ -7,7 +7,7 @@ import init, {
   analyze_zaps  // ✅ v1.0.0 API (replaces parse_batch_audit)
 } from '../src-wasm/pkg/zapier_lighthouse_wasm'
 
-import { generatePDFReport, generateDeveloperEditionPDF, type ParseResult, type BatchParseResult } from './pdfGenerator'
+import { generatePDFReport, generateDeveloperEditionPDF, type ParseResult } from './pdfGenerator'
 import type { AuditResult } from './types/audit-schema'
 
 // Type definitions
@@ -718,17 +718,19 @@ async function handleAnalyzeSelected() {
     console.log('🔍 WASM Call Parameters:', {
       zipDataSize: cachedZipData.byteLength,
       selectedIds: selectedIds,
-      plan: 'professional',
+      plan: currentPlanType,
       usage: includedTasks || 2000
     })
     
-    // ✅ FIX #2: Use slider state for both plan and usage (synced with UI)
+    // ✅ Use slider state for both plan and usage (synced with UI)
     const plan = currentPlanType // Use selected plan from slider
     const usage = includedTasks || 2000 // Use calibrated tasks from slider or default
 
-    // 🔥 NEW: Call v1.0.0 analyze_zaps instead of parse_batch_audit
-    const resultJson = analyze_zaps(cachedZipData, plan, usage)
-    const auditResult = JSON.parse(resultJson)
+    // 🔥 Call v1.0.0 analyze_zaps with selected IDs
+    const selectedIdsArray = Array.from(selectedZapIds).map(id => id.toString())
+    const resultJson = analyze_zaps(cachedZipData, selectedIdsArray, plan, usage)
+
+    const auditResult: AuditResult = JSON.parse(resultJson)
 
     // ✅ Validate v1.0.0 schema
     console.log('📊 v1.0.0 Audit Result:', auditResult)
@@ -736,57 +738,31 @@ async function handleAnalyzeSelected() {
       throw new Error(`Invalid schema version: ${auditResult.schema_version}`)
     }
 
-    // 🔄 TEMPORARY: Map v1.0.0 to old BatchParseResult for existing UI
-    // TODO: Refactor UI to consume v1.0.0 directly
-    const batchResult: BatchParseResult = {
-      success: true,
-      message: `Analyzed ${auditResult.global_metrics.total_zaps} Zaps`,
-      zap_count: auditResult.global_metrics.total_zaps,
-      individual_results: [], // TODO: Map from v1.0.0 findings
-      total_nodes: 0, // TODO: Calculate from findings
-      total_flags: auditResult.global_metrics.high_severity_flag_count,
-      total_estimated_savings: auditResult.global_metrics.estimated_monthly_waste_usd,
-      average_efficiency_score: 75, // Placeholder
-      combined_apps: [], // TODO: Extract from findings
-      patterns: [],
-      scope_metadata: {
-        total_zaps_in_account: auditResult.global_metrics.total_zaps,
-        analyzed_count: auditResult.global_metrics.total_zaps,
-        excluded_count: 0,
-        analyzed_zap_summaries: [],
-        excluded_zap_summaries: []
-      },
-      system_metrics: {
-        avg_steps_per_zap: 0,
-        avg_tasks_per_run: 0,
-        polling_trigger_count: 0,
-        instant_trigger_count: 0,
-        total_monthly_tasks: auditResult.global_metrics.total_monthly_tasks,
-        formatter_usage_density: 'low',
-        fan_out_flows: 0
-      }
+    // WASM already filtered - validate result
+    if (auditResult.global_metrics.total_zaps !== selectedIds.length) {
+      console.warn(`Expected ${selectedIds.length} Zaps, got ${auditResult.global_metrics.total_zaps}`)
     }
 
-    console.log('📦 Batch audit result (Developer Edition):', batchResult)
+    // Display results (WASM already filtered by selected IDs)
+    displayDeveloperEditionResults(auditResult)
     
-    if (batchResult.success) {
-      updateStatus('success', `✅ Successfully analyzed ${batchResult.zap_count} Zap${batchResult.zap_count === 1 ? '' : 's'}`)
-      
-      // Display Developer Edition results UI
-      displayDeveloperEditionResults(batchResult)
-    } else {
-      updateStatus('error', batchResult.message)
-    }
   } catch (error) {
-    console.error('Error in batch analysis:', error)
+    console.error('Error analyzing Zaps:', error)
     updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
-/**
- * Display Developer Edition batch analysis results with PDF download button
- */
-function displayDeveloperEditionResults(batchResult: BatchParseResult) {
+// Display Developer Edition results
+function displayDeveloperEditionResults(auditResult: AuditResult) {
+  const avgScore = auditResult.per_zap_findings.length > 0
+    ? auditResult.per_zap_findings.reduce((sum, zap) => {
+        const zapScore = 100 - (zap.flags.length * 10);
+        return sum + Math.max(0, zapScore);
+      }, 0) / auditResult.per_zap_findings.length
+    : 100;
+  
+  updateStatus('success', `✅ Analysis complete for ${auditResult.global_metrics.total_zaps} Zap${auditResult.global_metrics.total_zaps === 1 ? '' : 's'}`)
+  
   const resultsEl = document.getElementById('results')
   if (!resultsEl) return
   
@@ -815,40 +791,42 @@ function displayDeveloperEditionResults(batchResult: BatchParseResult) {
         <h4 class="text-white text-xl font-black mb-4">📊 PROJECT SUMMARY</h4>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div class="bg-white/10 rounded-lg p-4 text-center">
-            <p class="text-3xl font-black text-white">${batchResult.zap_count}</p>
+            <p class="text-3xl font-black text-white">${auditResult.global_metrics.total_zaps}</p>
             <p class="text-sm text-blue-100 mt-1">Zaps Analyzed</p>
           </div>
           <div class="bg-white/10 rounded-lg p-4 text-center">
-            <p class="text-3xl font-black text-white">${batchResult.total_flags}</p>
-            <p class="text-sm text-blue-100 mt-1">Issues Found</p>
+            <p class="text-3xl font-black text-white">${auditResult.global_metrics.high_severity_flag_count}</p>
+            <p class="text-sm text-blue-100 mt-1">High Priority Issues</p>
           </div>
           <div class="bg-white/10 rounded-lg p-4 text-center">
-            <p class="text-3xl font-black text-white">$${Math.round(batchResult.total_estimated_savings)}</p>
-            <p class="text-sm text-blue-100 mt-1">Monthly Savings</p>
+            <p class="text-3xl font-black text-white">$${Math.round(auditResult.global_metrics.estimated_monthly_waste_usd)}</p>
+            <p class="text-sm text-blue-100 mt-1">Monthly Waste</p>
           </div>
           <div class="bg-white/10 rounded-lg p-4 text-center">
-            <p class="text-3xl font-black text-white">${Math.round(batchResult.average_efficiency_score)}/100</p>
+            <p class="text-3xl font-black text-white">${Math.round(avgScore)}/100</p>
             <p class="text-sm text-blue-100 mt-1">Avg Score</p>
           </div>
         </div>
       </div>
       
-      <!-- Patterns Card -->
-      ${batchResult.patterns && batchResult.patterns.length > 0 ? `
+      <!-- Top Opportunities Card -->
+      ${auditResult.opportunities_ranked && auditResult.opportunities_ranked.length > 0 ? `
         <div class="stat-card mb-8">
-          <h4 class="text-lg font-bold text-slate-900 mb-4">🔍 Pattern Detection</h4>
+          <h4 class="text-lg font-bold text-slate-900 mb-4">🎯 Top Opportunities</h4>
           <div class="space-y-3">
-            ${batchResult.patterns.map(p => `
+            ${auditResult.opportunities_ranked.slice(0, 5).map(opp => {
+              const zapFinding = auditResult.per_zap_findings.find(z => z.zap_id === opp.zap_id);
+              return `
               <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <div class="flex-1">
-                  <p class="font-bold text-slate-900">${p.pattern_name}</p>
-                  <p class="text-sm text-slate-600">${p.affected_count} Zaps affected • $${Math.round(p.total_waste_usd)}/month waste</p>
+                  <p class="font-bold text-slate-900">${zapFinding?.zap_name || 'Unknown Zap'}</p>
+                  <p class="text-sm text-slate-600">${opp.flag_code.replace(/_/g, ' ')} • $${Math.round(opp.estimated_monthly_savings_usd)}/month</p>
                 </div>
-                <span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
-                  ${p.severity.toUpperCase()}
+                <span class="px-3 py-1 ${opp.confidence === 'High' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} rounded-full text-xs font-bold">
+                  ${opp.confidence.toUpperCase()}
                 </span>
               </div>
-            `).join('')}
+            `}).join('')}
           </div>
         </div>
       ` : ''}
@@ -858,16 +836,16 @@ function displayDeveloperEditionResults(batchResult: BatchParseResult) {
         <h4 class="text-lg font-bold text-slate-900 mb-4">⚙️ System Metrics</h4>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div class="p-4 bg-slate-50 rounded-lg">
-            <p class="text-2xl font-bold text-slate-900">${batchResult.system_metrics.avg_steps_per_zap.toFixed(1)}</p>
-            <p class="text-sm text-slate-600">Avg Steps/Zap</p>
+            <p class="text-2xl font-bold text-slate-900">${auditResult.global_metrics.total_monthly_tasks.toLocaleString()}</p>
+            <p class="text-sm text-slate-600">Monthly Tasks</p>
           </div>
           <div class="p-4 bg-slate-50 rounded-lg">
-            <p class="text-2xl font-bold text-slate-900">${batchResult.system_metrics.polling_trigger_count}</p>
-            <p class="text-sm text-slate-600">Polling Triggers</p>
+            <p class="text-2xl font-bold text-slate-900">${auditResult.global_metrics.active_zaps}</p>
+            <p class="text-sm text-slate-600">Active Zaps</p>
           </div>
           <div class="p-4 bg-slate-50 rounded-lg">
-            <p class="text-2xl font-bold text-slate-900">${batchResult.system_metrics.instant_trigger_count}</p>
-            <p class="text-sm text-slate-600">Instant Triggers</p>
+            <p class="text-2xl font-bold text-slate-900">${auditResult.global_metrics.zombie_zap_count}</p>
+            <p class="text-sm text-slate-600">Zombie Zaps</p>
           </div>
         </div>
       </div>
@@ -902,7 +880,7 @@ function displayDeveloperEditionResults(batchResult: BatchParseResult) {
           const reportCode = generateReportCode(reportId)
           const today = new Date().toISOString().split('T')[0]
 
-          await generateDeveloperEditionPDF(batchResult, {
+          await generateDeveloperEditionPDF(auditResult, {
             agencyName: 'Zapier Lighthouse',
             clientName: 'Batch Analysis',
             reportDate: today,
@@ -1945,9 +1923,10 @@ async function testV1API() {
   updateStatus('processing', 'Testing v1.0.0 API (analyze_zaps)...')
   
   try {
-    // 🔥 FIX: Call WASM (no await, parse JSON)
+    // 🔥 Call WASM with empty array (analyze all Zaps)
     const resultJson = analyze_zaps(
-      cachedZipData, 
+      cachedZipData,
+      [], // Empty array = analyze all Zaps
       currentPlanType, 
       includedTasks || 2000
     )
