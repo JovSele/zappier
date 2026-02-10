@@ -4,8 +4,7 @@ import init, {
   parse_zapfile_json, 
   parse_zap_list, 
   parse_single_zap_audit, 
-  parse_batch_audit, 
-  analyze_zaps  // ✅ Already here, don't duplicate
+  analyze_zaps  // ✅ v1.0.0 API (replaces parse_batch_audit)
 } from '../src-wasm/pkg/zapier_lighthouse_wasm'
 
 import { generatePDFReport, generateDeveloperEditionPDF, type ParseResult, type BatchParseResult } from './pdfGenerator'
@@ -743,14 +742,28 @@ async function handleAnalyzeSelected() {
       success: true,
       message: `Analyzed ${auditResult.global_metrics.total_zaps} Zaps`,
       zap_count: auditResult.global_metrics.total_zaps,
+      individual_results: [], // TODO: Map from v1.0.0 findings
+      total_nodes: 0, // TODO: Calculate from findings
       total_flags: auditResult.global_metrics.high_severity_flag_count,
       total_estimated_savings: auditResult.global_metrics.estimated_monthly_waste_usd,
       average_efficiency_score: 75, // Placeholder
+      combined_apps: [], // TODO: Extract from findings
       patterns: [],
+      scope_metadata: {
+        total_zaps_in_account: auditResult.global_metrics.total_zaps,
+        analyzed_count: auditResult.global_metrics.total_zaps,
+        excluded_count: 0,
+        analyzed_zap_summaries: [],
+        excluded_zap_summaries: []
+      },
       system_metrics: {
         avg_steps_per_zap: 0,
+        avg_tasks_per_run: 0,
         polling_trigger_count: 0,
-        instant_trigger_count: 0
+        instant_trigger_count: 0,
+        total_monthly_tasks: auditResult.global_metrics.total_monthly_tasks,
+        formatter_usage_density: 'low',
+        fan_out_flows: 0
       }
     }
 
