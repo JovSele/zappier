@@ -1,39 +1,4 @@
 
-reset
-**********************
-"Cline, vitaj v novom Codespace. Predtým, než začneš písať akýkoľvek kód, musíš vykonať hĺbkovú analýzu projektu, aby si pochopil jeho aktuálny stav a pravidlá. Nateraz nepíš žiaden kód, len študuj.
-Tvoje úlohy:
--Pravidlá a roly: Naštuduj si súbory v adresári .cline/ (najmä rules.md, ai-agent.md, report-tone.md). Tieto definujú tvoju identitu ako seniorného audítora a technické pravidlá projektu (napr. jazykovú politiku: komunikácia v slovenčine, artefakty v angličtine).
--Aktuálny stav projektu: Prečítaj si dokumenty v doc/: Pruduct_status_report 14.1.2026.md a Pruduct_status_technical_debt.md. Potrebujem, aby si presne vedel, čo je hotové a kde nás tlačí technický dlh.
--Technický audit: Pozri sa na štruktúru súborov, najmä na prepojenie medzi Rust engine-om (src-wasm/src/lib.rs) a TypeScript frontendom (src/main.ts, src/pdfGenerator.ts).
--Heuristiky: Preštuduj si zapier-heuristics.md, aby si rozumel, ako analyzujeme zlyhania a efektivitu Zapov.
--Po analýze mi odpovedz v slovenčine a uveď:
--Zhrnutie tvojho pochopenia projektu (čo je cieľom aplikácie).
--Potvrdenie, že rozumieš technickým obmedzeniam (WASM buildy, jazyková politika).
--Tvoj pohľad na aktuálny technický dlh, ktorý si našiel v dokumentácii.
-
-Nezapisuj žiadne zmeny, kým ti nepotvrdím tvoj plán."
-
-********************
-
-
-POWER PROMPTS
-    Audit feature
-        Scan the project.
-        Find where Make heuristics are implemented.
-        Design an equivalent Zapier analyzer.
-        Explain cost implications.
-        Then implement step by step.
-    Refactor
-        Refactor this module.
-        Preserve output.
-        Add comments explaining each heuristic.
-    Report engine
-        Generate a consultant-ready explanation
-        based on this JSON output.
-        No technical jargon.
-
-
 
 Comitnut:
 do codespace: git pull origin main

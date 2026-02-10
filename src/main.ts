@@ -1,6 +1,15 @@
 import './style.css'
-import init, { hello_world, parse_zapfile_json, parse_zap_list, parse_single_zap_audit, parse_batch_audit } from '../src-wasm/pkg/zapier_lighthouse_wasm'
+import init, { 
+  hello_world, 
+  parse_zapfile_json, 
+  parse_zap_list, 
+  parse_single_zap_audit, 
+  parse_batch_audit, 
+  analyze_zaps  // ✅ Already here, don't duplicate
+} from '../src-wasm/pkg/zapier_lighthouse_wasm'
+
 import { generatePDFReport, generateDeveloperEditionPDF, type ParseResult, type BatchParseResult } from './pdfGenerator'
+import type { AuditResult } from './types/audit-schema'
 
 // Type definitions
 interface ZapSummary {
@@ -717,10 +726,34 @@ async function handleAnalyzeSelected() {
     // ✅ FIX #2: Use slider state for both plan and usage (synced with UI)
     const plan = currentPlanType // Use selected plan from slider
     const usage = includedTasks || 2000 // Use calibrated tasks from slider or default
-    
-    const resultJson = parse_batch_audit(cachedZipData, selectedIds, plan, usage)
-    const batchResult: BatchParseResult = JSON.parse(resultJson)
-    
+
+    // 🔥 NEW: Call v1.0.0 analyze_zaps instead of parse_batch_audit
+    const resultJson = analyze_zaps(cachedZipData, plan, usage)
+    const auditResult = JSON.parse(resultJson)
+
+    // ✅ Validate v1.0.0 schema
+    console.log('📊 v1.0.0 Audit Result:', auditResult)
+    if (auditResult.schema_version !== "1.0.0") {
+      throw new Error(`Invalid schema version: ${auditResult.schema_version}`)
+    }
+
+    // 🔄 TEMPORARY: Map v1.0.0 to old BatchParseResult for existing UI
+    // TODO: Refactor UI to consume v1.0.0 directly
+    const batchResult: BatchParseResult = {
+      success: true,
+      message: `Analyzed ${auditResult.global_metrics.total_zaps} Zaps`,
+      zap_count: auditResult.global_metrics.total_zaps,
+      total_flags: auditResult.global_metrics.high_severity_flag_count,
+      total_estimated_savings: auditResult.global_metrics.estimated_monthly_waste_usd,
+      average_efficiency_score: 75, // Placeholder
+      patterns: [],
+      system_metrics: {
+        avg_steps_per_zap: 0,
+        polling_trigger_count: 0,
+        instant_trigger_count: 0
+      }
+    }
+
     console.log('📦 Batch audit result (Developer Edition):', batchResult)
     
     if (batchResult.success) {
@@ -1883,6 +1916,50 @@ function displayHtmlPreview(htmlContent: string, result: ParseResult, zapInfo: Z
   }, 100)
 }
 
+
+// NEW: Test v1.0.0 API with analyze_zaps()
+async function testV1API() {
+  if (!wasmReady) {
+    updateStatus('error', 'WASM engine not ready. Please refresh the page.')
+    return
+  }
+  
+  if (!cachedZipData) {
+    updateStatus('error', 'No ZIP data cached. Please upload a file first.')
+    return
+  }
+  
+  updateStatus('processing', 'Testing v1.0.0 API (analyze_zaps)...')
+  
+  try {
+    // 🔥 FIX: Call WASM (no await, parse JSON)
+    const resultJson = analyze_zaps(
+      cachedZipData, 
+      currentPlanType, 
+      includedTasks || 2000
+    )
+    const auditResult: AuditResult = JSON.parse(resultJson)
+    
+    console.log('✅ v1.0.0 Audit Result:', auditResult)
+    
+    // Validate schema version
+    if (auditResult.schema_version !== '1.0.0') {
+      throw new Error(`Invalid schema version: ${auditResult.schema_version}`)
+    }
+    
+    updateStatus('success', `✅ v1.0.0 API works! Found ${auditResult.per_zap_findings.length} Zaps with ${auditResult.global_metrics.total_monthly_tasks} monthly tasks`)
+    
+    // Log key metrics
+    console.log('📊 Global Metrics:', auditResult.global_metrics)
+    console.log('🔍 Findings:', auditResult.per_zap_findings.length)
+    console.log('💰 Opportunities:', auditResult.opportunities_ranked.length)
+    
+  } catch (error) {
+    console.error('❌ v1.0.0 API test failed:', error)
+    updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
 // Load test data from JSON file
 async function loadTestData() {
   if (!wasmReady) {
@@ -1920,6 +1997,9 @@ async function loadTestData() {
     updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
+
+// Make test function globally available
+;(window as any).testV1API = testV1API
 
 // NEW: Back to Zap Selector (without re-upload)
 function backToSelector() {

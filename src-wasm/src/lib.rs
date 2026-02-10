@@ -6,6 +6,188 @@ use serde::{Deserialize, Serialize};
 use csv::ReaderBuilder;
 
 // ============================================================================
+// v1.0.0 SCHEMA MODULE
+// ============================================================================
+mod audit_schema_v1;
+use audit_schema_v1::*;
+
+// ============================================================================
+// v1.0.0 MAPPING HELPERS
+// ============================================================================
+
+/// Map old flag type string to v1.0.0 FlagCode enum
+fn map_flag_code(flag_type: &str) -> FlagCode {
+    match flag_type {
+        "late_filter_placement" => FlagCode::LateFilter,
+        "polling_trigger" => FlagCode::FormatterChain, // NOTE: Reusing closest match
+        "error_loop" => FlagCode::TaskStepCostInflation, // NOTE: Reusing closest match
+        _ => FlagCode::TaskStepCostInflation, // Default fallback
+    }
+}
+
+/// Map old confidence string to v1.0.0 ConfidenceLevel enum
+fn map_confidence(confidence_str: &str) -> ConfidenceLevel {
+    match confidence_str.to_lowercase().as_str() {
+        "high" => ConfidenceLevel::High,
+        "medium" => ConfidenceLevel::Medium,
+        "low" => ConfidenceLevel::Low,
+        _ => ConfidenceLevel::Medium, // Default fallback
+    }
+}
+
+/// Map old severity string to v1.0.0 Severity enum
+fn map_severity(severity_str: &str) -> Severity {
+    match severity_str.to_lowercase().as_str() {
+        "high" => Severity::High,
+        "medium" => Severity::Medium,
+        "low" => Severity::Low,
+        _ => Severity::Medium, // Default fallback
+    }
+}
+
+/// Calculate confidence overview from all findings
+fn calculate_confidence_overview(findings: &[ZapFinding]) -> ConfidenceOverview {
+    let mut high = 0;
+    let mut medium = 0;
+    let mut low = 0;
+    
+    for finding in findings {
+        match finding.confidence {
+            ConfidenceLevel::High => high += 1,
+            ConfidenceLevel::Medium => medium += 1,
+            ConfidenceLevel::Low => low += 1,
+        }
+        
+        // Also count confidence from individual flags
+        for flag in &finding.flags {
+            match flag.confidence {
+                ConfidenceLevel::High => high += 1,
+                ConfidenceLevel::Medium => medium += 1,
+                ConfidenceLevel::Low => low += 1,
+            }
+        }
+    }
+    
+    ConfidenceOverview { high, medium, low }
+}
+
+/// Detect if Zap is a zombie (on but not running)
+fn detect_zombie_status(status: &str, monthly_tasks: u32) -> bool {
+    status.to_lowercase() == "on" && monthly_tasks == 0
+}
+
+/// Rank opportunities by financial impact (top 10)
+fn rank_opportunities(findings: &[ZapFinding]) -> Vec<RankedOpportunity> {
+    let mut opportunities = Vec::new();
+    
+    // Extract all flags from all findings
+    for finding in findings {
+        for flag in &finding.flags {
+            opportunities.push(RankedOpportunity {
+                zap_id: finding.zap_id.clone(),
+                flag_code: flag.code,
+                estimated_monthly_savings_usd: flag.impact.estimated_monthly_savings_usd,
+                confidence: flag.confidence,
+                rank: 0, // Will be set after sorting
+            });
+        }
+    }
+    
+    // Sort by savings DESC
+    opportunities.sort_by(|a, b| {
+        b.estimated_monthly_savings_usd
+            .partial_cmp(&a.estimated_monthly_savings_usd)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    
+    // Take top 10 and assign ranks
+    opportunities.truncate(10);
+    for (index, opp) in opportunities.iter_mut().enumerate() {
+        opp.rank = (index + 1) as u32;
+    }
+    
+    opportunities
+}
+
+/// Detect premium Zapier features in use
+fn detect_premium_features(zapfile: &ZapFile) -> PremiumFeatures {
+    let mut features = PremiumFeatures {
+        paths: false,
+        filters: false,
+        webhooks: false,
+        custom_logic: false,
+    };
+    
+    for zap in &zapfile.zaps {
+        for (_id, node) in &zap.nodes {
+            let action_lower = node.action.to_lowercase();
+            let api_lower = node.selected_api.to_lowercase();
+            
+            // Detect Paths (branching logic)
+            if action_lower.contains("path") || api_lower.contains("path") {
+                features.paths = true;
+            }
+            
+            // Detect Filters
+            if action_lower.contains("filter") {
+                features.filters = true;
+            }
+            
+            // Detect Webhooks
+            if api_lower.contains("webhook") || action_lower.contains("webhook") {
+                features.webhooks = true;
+            }
+            
+            // Detect Code steps (Python/JavaScript)
+            if api_lower.contains("code") || api_lower.contains("python") || api_lower.contains("javascript") {
+                features.custom_logic = true;
+            }
+        }
+    }
+    
+    features
+}
+
+/// Convert old EfficiencyFlag to v1.0.0 schema
+fn convert_efficiency_flag(old_flag: &EfficiencyFlag, _zap_id_str: &str) -> audit_schema_v1::EfficiencyFlag {
+    // Build metadata JSON from old flag's extra fields
+    let mut meta = serde_json::Map::new();
+    
+    if let Some(ref error) = old_flag.most_common_error {
+        meta.insert("most_common_error".to_string(), serde_json::Value::String(error.clone()));
+    }
+    if let Some(ref trend) = old_flag.error_trend {
+        meta.insert("error_trend".to_string(), serde_json::Value::String(trend.clone()));
+    }
+    if let Some(streak) = old_flag.max_streak {
+        meta.insert("max_streak".to_string(), serde_json::Value::Number(streak.into()));
+    }
+    meta.insert("message".to_string(), serde_json::Value::String(old_flag.message.clone()));
+    meta.insert("details".to_string(), serde_json::Value::String(old_flag.details.clone()));
+    meta.insert("savings_explanation".to_string(), serde_json::Value::String(old_flag.savings_explanation.clone()));
+    meta.insert("is_fallback".to_string(), serde_json::Value::Bool(old_flag.is_fallback));
+    
+    audit_schema_v1::EfficiencyFlag {
+        code: map_flag_code(&old_flag.flag_type),
+        severity: map_severity(&old_flag.severity),
+        confidence: map_confidence(&old_flag.confidence),
+        impact: FlagImpact {
+            estimated_monthly_savings_usd: old_flag.estimated_monthly_savings,
+            estimated_annual_savings_usd: old_flag.estimated_annual_savings,
+        },
+        implementation: FlagImplementation {
+            estimated_effort_hours: match old_flag.flag_type.as_str() {
+                "error_loop" => 0.5,          // Quick fix - authentication
+                "late_filter_placement" => 1.0,  // Moderate - restructuring
+                "polling_trigger" => 2.0,     // More complex - trigger change
+                _ => 1.0,                     // Default
+            },
+        },
+        meta: serde_json::Value::Object(meta),
+    }
+}
+
+// ============================================================================
 // ZAPIER TIER-BASED BILLING ENGINE (PRODUCTION-GRADE PRICING)
 // ============================================================================
 
@@ -2155,6 +2337,218 @@ fn build_zap_summary(zap: &Zap, task_history_map: &HashMap<u64, UsageStats>) -> 
         error_rate,
         total_runs,
     }
+}
+
+// ============================================================================
+// v1.0.0 MAIN EXPORT - analyze_zaps()
+// ============================================================================
+
+/// Main v1.0.0 audit function - Complete end-to-end analysis
+/// Returns AuditResultV1 (canonical schema) as JSON
+#[wasm_bindgen]
+pub fn analyze_zaps(zip_data: &[u8], plan_str: &str, actual_usage: u32) -> Result<JsValue, JsValue> {
+    // 1. PARSE INPUTS
+    let plan = match plan_str.to_lowercase().as_str() {
+        "professional" => ZapierPlan::Professional,
+        "team" => ZapierPlan::Team,
+        _ => ZapierPlan::Professional,
+    };
+    
+    let pricing = ZapierPricing::resolve(plan, actual_usage);
+    let price_per_task = pricing.cost_per_task;
+    
+    // Parse ZIP archive
+    let cursor = Cursor::new(zip_data);
+    let mut archive = ZipArchive::new(cursor)
+        .map_err(|e| JsValue::from_str(&format!("Failed to open ZIP: {}", e)))?;
+    
+    let mut zapfile_content = String::new();
+    let mut csv_contents: Vec<String> = Vec::new();
+    let mut found_zapfile = false;
+    
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| JsValue::from_str(&format!("Archive error: {}", e)))?;
+        let file_name = file.name().to_string();
+        let file_name_lower = file_name.to_lowercase();
+        
+        if !found_zapfile && file_name_lower.ends_with("zapfile.json") {
+            file.read_to_string(&mut zapfile_content)
+                .map_err(|e| JsValue::from_str(&format!("Failed to read zapfile: {}", e)))?;
+            found_zapfile = true;
+        } else if file_name_lower.ends_with(".csv") {
+            let mut csv_content = String::new();
+            if file.read_to_string(&mut csv_content).is_ok() {
+                csv_contents.push(csv_content);
+            }
+        }
+    }
+    
+    if !found_zapfile {
+        return Err(JsValue::from_str("zapfile.json not found in archive"));
+    }
+    
+    let mut zapfile: ZapFile = serde_json::from_str(&zapfile_content)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse zapfile: {}", e)))?;
+    
+    // 2. ATTACH USAGE STATS
+    let task_history_map = parse_csv_files(&csv_contents);
+    let has_csv = !task_history_map.is_empty();
+    attach_usage_stats(&mut zapfile, &task_history_map);
+    
+    // 3. RUN CALCULATIONS (reuse existing functions)
+    let old_flags = detect_efficiency_flags(&zapfile, price_per_task);
+    
+    // 4. BUILD v1.0.0 FINDINGS
+    let mut findings: Vec<ZapFinding> = Vec::new();
+    let mut global_active_count = 0;
+    let mut global_zombie_count = 0;
+    let mut global_high_severity_count = 0;
+    let mut global_total_tasks = 0;
+    let mut global_waste_tasks = 0;
+    let mut global_waste_usd = 0.0;
+    
+    for zap in &zapfile.zaps {
+        let zap_id_str = zap.id.to_string();
+        let status = zap.status.clone();
+        let steps = zap.nodes.len() as u32;
+        
+        // Calculate monthly tasks for this Zap
+        let monthly_tasks = if let Some(stats) = &zap.usage_stats {
+            calculate_task_volume(stats.total_runs, zap.nodes.len())
+        } else {
+            0
+        };
+        
+        // Detect zombie status
+        let is_zombie = detect_zombie_status(&status, monthly_tasks);
+        if status.to_lowercase() == "on" {
+            global_active_count += 1;
+        }
+        if is_zombie {
+            global_zombie_count += 1;
+        }
+        
+        global_total_tasks += monthly_tasks;
+        
+        // Determine Zap-level confidence
+        let zap_confidence = if has_csv {
+            ConfidenceLevel::High
+        } else {
+            ConfidenceLevel::Medium
+        };
+        
+        // Convert old flags to v1.0.0 schema
+        let zap_flags: Vec<audit_schema_v1::EfficiencyFlag> = old_flags.iter()
+            .filter(|f| f.zap_id == zap.id)
+            .map(|f| {
+                let v1_flag = convert_efficiency_flag(f, &zap_id_str);
+                
+                // Count severity
+                if v1_flag.severity == Severity::High {
+                    global_high_severity_count += 1;
+                }
+                
+                // Accumulate waste
+                global_waste_usd += v1_flag.impact.estimated_monthly_savings_usd;
+                
+                v1_flag
+            })
+            .collect();
+        
+        // Calculate task/step ratio
+        let task_step_ratio = if steps > 0 {
+            guard_nan(monthly_tasks as f32 / steps as f32)
+        } else {
+            0.0
+        };
+        
+        findings.push(ZapFinding {
+            zap_id: zap_id_str,
+            zap_name: zap.title.clone(),
+            status,
+            is_zombie,
+            metrics: ZapMetrics {
+                steps,
+                monthly_tasks,
+                task_step_ratio,
+            },
+            confidence: zap_confidence,
+            flags: zap_flags,
+            warnings: vec![], // Can add warnings if needed
+        });
+    }
+    
+    // Estimate waste tasks from waste USD
+    global_waste_tasks = (global_waste_usd / price_per_task) as u32;
+    
+    // 5. BUILD METADATA
+    let confidence_overview = calculate_confidence_overview(&findings);
+    let pricing_assumptions = PricingAssumptions {
+        plan_tier: format!("{:?}", plan),
+        task_price_usd: price_per_task,
+    };
+    let input_sources = InputSources {
+        zap_json: true,
+        task_csv: has_csv,
+    };
+    let metadata = AuditMetadata::new(input_sources, pricing_assumptions, confidence_overview);
+    
+    // 6. BUILD GLOBAL METRICS
+    let global_metrics = GlobalMetrics {
+        total_zaps: zapfile.zaps.len() as u32,
+        active_zaps: global_active_count,
+        total_monthly_tasks: global_total_tasks,
+        estimated_monthly_waste_tasks: global_waste_tasks,
+        estimated_monthly_waste_usd: global_waste_usd,
+        estimated_annual_waste_usd: global_waste_usd * 12.0,
+        zombie_zap_count: global_zombie_count,
+        high_severity_flag_count: global_high_severity_count,
+    };
+    
+    // 7. RANK OPPORTUNITIES
+    let opportunities = rank_opportunities(&findings);
+    
+    // 8. PLAN ANALYSIS
+    let premium_features = detect_premium_features(&zapfile);
+    let usage_percentile = if pricing.tier_tasks > 0 {
+        guard_nan(global_total_tasks as f32 / pricing.tier_tasks as f32)
+    } else {
+        0.0
+    };
+    
+    let downgrade_safe = usage_percentile < 0.7 && !premium_features.paths;
+    
+    let plan_analysis = PlanAnalysis {
+        current_plan: format!("{:?}", plan),
+        monthly_task_usage: global_total_tasks,
+        plan_task_capacity: PlanCapacity {
+            min: pricing.tier_tasks,
+            max: pricing.tier_tasks,
+        },
+        usage_percentile,
+        premium_features_detected: premium_features,
+        downgrade_safe,
+    };
+    
+    // 9. BUILD FINAL RESULT
+    let result = AuditResultV1::new(
+        metadata,
+        global_metrics,
+        findings,
+        opportunities,
+        plan_analysis,
+    );
+    
+    // 10. VALIDATE
+    result.validate()
+        .map_err(|e| JsValue::from_str(&format!("Validation failed: {}", e)))?;
+    
+    // 11. SERIALIZE TO JSON STRING (not JsValue object)
+    let json_string = serde_json::to_string(&result)
+        .map_err(|e| JsValue::from_str(&format!("JSON serialization error: {}", e)))?;
+    
+    // Return as string
+    Ok(JsValue::from_str(&json_string))
 }
 
 /// Hello world test function to verify WASM compilation
