@@ -9,6 +9,7 @@ import init, {
 
 import { generatePDFReport, generateDeveloperEditionPDF, type ParseResult } from './pdfGenerator'
 import type { AuditResult } from './types/audit-schema'
+import { validateAuditResult } from './validation'
 
 // Type definitions
 interface ZapSummary {
@@ -729,14 +730,23 @@ async function handleAnalyzeSelected() {
     // 🔥 Call v1.0.0 analyze_zaps with selected IDs
     const selectedIdsArray = Array.from(selectedZapIds).map(id => id.toString())
     const resultJson = analyze_zaps(cachedZipData, selectedIdsArray, plan, usage)
+    const rawResult = JSON.parse(resultJson)
 
-    const auditResult: AuditResult = JSON.parse(resultJson)
-
-    // ✅ Validate v1.0.0 schema
-    console.log('📊 v1.0.0 Audit Result:', auditResult)
-    if (auditResult.schema_version !== "1.0.0") {
-      throw new Error(`Invalid schema version: ${auditResult.schema_version}`)
+    // 🔥 VALIDATE before using (throws on invalid data)
+    try {
+      validateAuditResult(rawResult)
+    } catch (validationError) {
+      console.error('❌ Validation Error:', validationError)
+      const errorMsg = validationError instanceof Error 
+        ? validationError.message 
+        : 'Unknown validation error'
+      updateStatus('error', `Data validation failed: ${errorMsg}`)
+      return  // Stop processing
     }
+
+    // TypeScript now KNOWS it's valid AuditResult
+    const auditResult: AuditResult = rawResult
+    console.log('✅ Validated v1.0.0 Audit Result:', auditResult)
 
     // WASM already filtered - validate result
     if (auditResult.global_metrics.total_zaps !== selectedIds.length) {
@@ -2504,3 +2514,11 @@ function renderUI() {
 // Initialize application
 renderUI()
 initWasm()
+
+// Development tools (accessible via browser console)
+if (import.meta.env.DEV) {
+  import('./validation').then(({ testBrokenData }) => {
+    (window as any).testBrokenData = testBrokenData
+    console.log('💡 Dev tool available: testBrokenData()')
+  })
+}
