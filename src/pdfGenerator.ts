@@ -4,7 +4,22 @@ import type { AuditResult } from './types/audit-schema';
 
 // ========================================
 // EXECUTIVE AUDIT PDF GENERATOR v1.0.0
-// Minimalist, professional, managerial design
+// ========================================
+// Generates minimalist, professional 5-page Executive Automation Audit
+// Design philosophy: "Informed Control" - clarity over drama
+//
+// Structure:
+// - Page 1: Executive Summary (financial overview)
+// - Page 2: Priority Actions (actionable improvements)
+// - Page 3: Infrastructure Health (risk summary)
+// - Page 4: Plan Analysis (cost optimization)
+// - Page 5: Verified Stable Automations (psychological relief)
+//
+// Design system:
+// - Typography: Helvetica (body), Helvetica Bold (emphasis)
+// - Colors: Minimal palette (red accent for financials only)
+// - Layout: 25% whitespace target, fixed positioning
+// - Footer: Confidential statement + privacy notice on every page
 // ========================================
 
 // ========================================
@@ -340,6 +355,302 @@ function renderPage2_PriorityActions(
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
 }
 
+/**
+ * Render Page 3: Infrastructure Health
+ * Shows risk summary and pattern analysis
+ */
+function renderPage3_InfrastructureHealth(
+  pdf: jsPDF,
+  viewModel: PdfViewModel
+): void {
+  const { PAGE_MARGIN, TOP_MARGIN, CONTENT_WIDTH } = LAYOUT;
+  let yPos = TOP_MARGIN;
+
+  // ===== HEADER =====
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Infrastructure Health', PAGE_MARGIN, yPos);
+  
+  yPos += 12;
+
+  // ===== DIVIDER =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+  pdf.setLineWidth(0.3);
+  pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+  
+  yPos += 15;
+
+  // Check if we have any risks
+  const { riskSummary } = viewModel;
+  const hasRisks = 
+    riskSummary.highSeverityCount > 0 ||
+    riskSummary.mediumSeverityCount > 0 ||
+    riskSummary.inefficientLogicPatterns > 0 ||
+    riskSummary.redundancyPatterns > 0 ||
+    riskSummary.nonExecutingAutomations > 0;
+
+  if (!hasRisks) {
+    // ===== EMPTY STATE =====
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    
+    pdf.text('No structural inefficiencies detected.', PAGE_MARGIN, yPos);
+    yPos += 7;
+    
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+    pdf.text('Infrastructure is operating within normal parameters.', PAGE_MARGIN, yPos);
+    
+    yPos += 15;
+  } else {
+    // ===== RISK SUMMARY SECTION =====
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Risk Summary', PAGE_MARGIN, yPos);
+    
+    yPos += 3;
+    
+    // Underline for section
+    pdf.setLineWidth(0.5);
+    const sectionUnderlineWidth = pdf.getTextWidth('Risk Summary');
+    pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + sectionUnderlineWidth, yPos);
+    
+    yPos += 12;
+
+    // High Severity
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('High Severity:', PAGE_MARGIN + 5, yPos);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(riskSummary.highSeverityCount.toString(), PAGE_MARGIN + 60, yPos);
+    
+    yPos += 7;
+
+    // Medium Severity
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Medium Severity:', PAGE_MARGIN + 5, yPos);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(riskSummary.mediumSeverityCount.toString(), PAGE_MARGIN + 60, yPos);
+    
+    yPos += 15;
+
+    // ===== PATTERN ANALYSIS SECTION =====
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Pattern Analysis', PAGE_MARGIN, yPos);
+    
+    yPos += 3;
+    
+    // Underline
+    const patternUnderlineWidth = pdf.getTextWidth('Pattern Analysis');
+    pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + patternUnderlineWidth, yPos);
+    
+    yPos += 12;
+
+    // Pattern items
+    const patterns = [
+      { label: 'Inefficient Logic:', count: riskSummary.inefficientLogicPatterns },
+      { label: 'Redundant Steps:', count: riskSummary.redundancyPatterns },
+      { label: 'Non-Executing:', count: riskSummary.nonExecutingAutomations }
+    ];
+
+    patterns.forEach(pattern => {
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(pattern.label, PAGE_MARGIN + 5, yPos);
+      
+      // Instance/instances
+      const instanceText = pattern.count === 1 ? 'instance' : 'instances';
+      pdf.text(`${pattern.count} ${instanceText}`, PAGE_MARGIN + 60, yPos);
+      
+      yPos += 7;
+    });
+    
+    yPos += 8;
+  }
+
+  // ===== FINAL DIVIDER =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+  pdf.setLineWidth(0.3);
+  pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+}
+
+/**
+ * Render Page 4: Plan Analysis
+ * Shows current plan utilization and recommendations
+ */
+function renderPage4_PlanAnalysis(
+  pdf: jsPDF,
+  viewModel: PdfViewModel
+): void {
+  const { PAGE_MARGIN, TOP_MARGIN, CONTENT_WIDTH } = LAYOUT;
+  let yPos = TOP_MARGIN;
+
+  // ===== HEADER =====
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Plan Analysis', PAGE_MARGIN, yPos);
+  
+  yPos += 12;
+
+  // ===== DIVIDER =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+  pdf.setLineWidth(0.3);
+  pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+  
+  yPos += 15;
+
+  // ===== CURRENT PLAN =====
+  pdf.setFontSize(12);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Current Plan:', PAGE_MARGIN, yPos);
+  
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(viewModel.planSummary.currentPlan, PAGE_MARGIN + 40, yPos);
+  
+  yPos += 7;
+
+  // ===== TASK USAGE =====
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Task Usage:', PAGE_MARGIN, yPos);
+  
+  pdf.setFont('helvetica', 'bold');
+  const usageText = `${viewModel.planSummary.usagePercent}%`;
+  pdf.text(usageText, PAGE_MARGIN + 40, yPos);
+  
+  yPos += 12;
+
+  // ===== CAPACITY STATEMENT =====
+  pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+  pdf.setFontSize(12);
+  pdf.setFont('helvetica', 'normal');
+  
+  const excessPercent = (100 - viewModel.planSummary.usagePercent).toFixed(1);
+  const capacityText = `Your current capacity exceeds requirements by ${excessPercent}%.`;
+  pdf.text(capacityText, PAGE_MARGIN, yPos);
+  
+  yPos += 15;
+
+  // ===== PREMIUM FEATURES (if any) =====
+  if (viewModel.planSummary.premiumFeaturesDetected.length > 0) {
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Premium Features Detected:', PAGE_MARGIN, yPos);
+    
+    yPos += 7;
+    
+    // List features
+    viewModel.planSummary.premiumFeaturesDetected.forEach(feature => {
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`• ${feature}`, PAGE_MARGIN + 5, yPos);
+      yPos += 6;
+    });
+    
+    yPos += 9;
+  }
+
+  // ===== RECOMMENDED ACTION =====
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+  pdf.setFontSize(12);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Recommended Action:', PAGE_MARGIN, yPos);
+  
+  yPos += 7;
+  
+  pdf.setFont('helvetica', 'normal');
+  
+  if (viewModel.planSummary.downgradeRecommended) {
+    // Downgrade recommended
+    pdf.text('Adjust to lower tier to reduce costs.', PAGE_MARGIN, yPos);
+    yPos += 7;
+  } else {
+    // Current plan is fine
+    pdf.text('Current plan is appropriate.', PAGE_MARGIN, yPos);
+    yPos += 7;
+    pdf.text('No downgrade recommended.', PAGE_MARGIN, yPos);
+    yPos += 7;
+  }
+  
+  yPos += 8;
+
+  // ===== FINAL DIVIDER =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+  pdf.setLineWidth(0.3);
+  pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+}
+
+/**
+ * Render Page 5: Verified Stable Automations (Safe Zone)
+ * Shows automations that require no action - psychological relief
+ */
+function renderPage5_SafeZone(
+  pdf: jsPDF,
+  viewModel: PdfViewModel
+): void {
+  const { PAGE_MARGIN, TOP_MARGIN, CONTENT_WIDTH } = LAYOUT;
+  let yPos = TOP_MARGIN;
+
+  // ===== HEADER =====
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Verified Stable Automations', PAGE_MARGIN, yPos);
+  
+  yPos += 12;
+
+  // ===== DIVIDER =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+  pdf.setLineWidth(0.3);
+  pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+  
+  yPos += 15;
+
+  if (viewModel.safeZone.optimizedZaps.length === 0) {
+    // ===== EMPTY STATE =====
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    
+    pdf.text('No fully optimized automations identified.', PAGE_MARGIN, yPos);
+    
+    yPos += 15;
+  } else {
+    // ===== INTRO TEXT =====
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    
+    pdf.text('The following automations require no action:', PAGE_MARGIN, yPos);
+    
+    yPos += 12;
+
+    // ===== LIST OF SAFE ZAPS =====
+    viewModel.safeZone.optimizedZaps.forEach(zap => {
+      pdf.text(`• ${zap.zapName}`, PAGE_MARGIN + 5, yPos);
+      yPos += 6;
+    });
+    
+    yPos += 9;
+
+    // ===== CLOSING STATEMENT =====
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+    pdf.text('These processes meet all efficiency benchmarks.', PAGE_MARGIN, yPos);
+    
+    yPos += 15;
+  }
+
+  // ===== FINAL DIVIDER =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+  pdf.setLineWidth(0.3);
+  pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+}
+
 // ========================================
 // MAIN ENTRY POINT
 // ========================================
@@ -364,118 +675,23 @@ export async function generateExecutiveAuditPDF(
   renderPage2_PriorityActions(pdf, viewModel);
   drawPageFooter(pdf, 2, config.clientName || 'Client');
   
-  // TODO: Pages 3-5
-  // - Page 3: Infrastructure Health
-  // - Page 4: Plan Analysis
-  // - Page 5: Safe Zone
+  // Page 3: Infrastructure Health
+  pdf.addPage();
+  renderPage3_InfrastructureHealth(pdf, viewModel);
+  drawPageFooter(pdf, 3, config.clientName || 'Client');
+  
+  // Page 4: Plan Analysis
+  pdf.addPage();
+  renderPage4_PlanAnalysis(pdf, viewModel);
+  drawPageFooter(pdf, 4, config.clientName || 'Client');
+  
+  // Page 5: Verified Stable Automations (Safe Zone)
+  pdf.addPage();
+  renderPage5_SafeZone(pdf, viewModel);
+  drawPageFooter(pdf, 5, config.clientName || 'Client');
   
   // Save
   const timestamp = new Date().toISOString().split('T')[0];
   pdf.save(`Executive_Audit_${config.reportCode}_${timestamp}.pdf`);
 }
-
-// ========================================
-// TEMPORARY TEST MOCK - Remove before production
-// ========================================
-
-if (typeof window !== 'undefined') {
-  (window as any).__testExecutiveAudit = () => {
-    const mockViewModel: PdfViewModel = {
       report: {
-        reportId: 'ZAP-2026-047',
-        generatedAt: new Date().toISOString()
-      },
-      financialOverview: {
-        recapturableAnnualSpend: 671.16,
-        multiplier: 8.5,
-        activeZaps: 5,
-        highSeverityCount: 2,
-        estimatedRemediationMinutes: 45
-      },
-      priorityActions: [
-        {
-          zapName: 'CRM → Slack',
-          actionLabel: 'Merge formatters',
-          estimatedAnnualImpact: 456,
-          effortMinutes: 10
-        },
-        {
-          zapName: 'Lead Filter',
-          actionLabel: 'Move filter earlier',
-          estimatedAnnualImpact: 214,
-          effortMinutes: 5
-        },
-        {
-          zapName: 'Email → Spreadsheet',
-          actionLabel: 'Switch to instant trigger',
-          estimatedAnnualImpact: 180,
-          effortMinutes: 15
-        }
-      ],
-      riskSummary: {
-        highSeverityCount: 2,
-        mediumSeverityCount: 3,
-        inefficientLogicPatterns: 2,
-        redundancyPatterns: 1,
-        nonExecutingAutomations: 0
-      },
-      planSummary: {
-        currentPlan: 'Team',
-        usagePercent: 12.4,
-        premiumFeaturesDetected: ['Custom Logic', 'Filters'],
-        downgradeRecommended: false
-      },
-      safeZone: {
-        optimizedZaps: []
-      }
-    };
-
-    const config: PDFConfig = {
-      reportCode: 'TEST-001',
-      clientName: 'Test Client'
-    };
-
-    generateExecutiveAuditPDF(mockViewModel, config);
-  };
-
-  // Test function for empty state
-  (window as any).__testExecutiveAuditEmpty = () => {
-    const mockViewModel: PdfViewModel = {
-      report: {
-        reportId: 'ZAP-2026-048',
-        generatedAt: new Date().toISOString()
-      },
-      financialOverview: {
-        recapturableAnnualSpend: 0,
-        multiplier: 0,
-        activeZaps: 5,
-        highSeverityCount: 0,
-        estimatedRemediationMinutes: 0
-      },
-      priorityActions: [], // ← EMPTY
-      riskSummary: {
-        highSeverityCount: 0,
-        mediumSeverityCount: 0,
-        inefficientLogicPatterns: 0,
-        redundancyPatterns: 0,
-        nonExecutingAutomations: 0
-      },
-      planSummary: {
-        currentPlan: 'Team',
-        usagePercent: 12.4,
-        premiumFeaturesDetected: [],
-        downgradeRecommended: false
-      },
-      safeZone: {
-        optimizedZaps: []
-      }
-    };
-
-    const config: PDFConfig = {
-      reportCode: 'TEST-002',
-      clientName: 'Perfect Client'
-    };
-
-    generateExecutiveAuditPDF(mockViewModel, config);
-  };
-}
