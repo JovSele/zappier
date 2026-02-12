@@ -244,6 +244,102 @@ function renderPage1_ExecutiveSummary(
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
 }
 
+/**
+ * Render Page 2: Priority Actions
+ * Shows actionable improvements with effort estimates
+ */
+function renderPage2_PriorityActions(
+  pdf: jsPDF,
+  viewModel: PdfViewModel
+): void {
+  const { PAGE_MARGIN, TOP_MARGIN, CONTENT_WIDTH } = LAYOUT;
+  let yPos = TOP_MARGIN;
+
+  // ===== HEADER =====
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  
+  // Add time estimate to header if we have actions
+  const headerText = viewModel.priorityActions.length > 0 
+    ? 'Priority Actions (<15 min)' 
+    : 'Priority Actions';
+  
+  pdf.text(headerText, PAGE_MARGIN, yPos);
+  
+  yPos += 12;
+
+  // ===== DIVIDER =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+  pdf.setLineWidth(0.3);
+  pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+  
+  yPos += 15;
+
+  // ===== CONTENT =====
+  if (viewModel.priorityActions.length === 0) {
+    // Empty state
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    
+    pdf.text('No priority actions identified.', PAGE_MARGIN, yPos);
+    yPos += 7;
+    
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+    pdf.text('Current automation setup meets efficiency benchmarks.', PAGE_MARGIN, yPos);
+    
+    yPos += 15;
+  } else {
+    // Render each action
+    viewModel.priorityActions.forEach((action, index) => {
+      // Checkbox
+      pdf.setDrawColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+      pdf.setLineWidth(0.3);
+      pdf.rect(PAGE_MARGIN, yPos - 3, 4, 4); // Empty checkbox
+      
+      // Zap name (bold, primary color)
+      pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(action.zapName, PAGE_MARGIN + 8, yPos);
+      
+      yPos += 7;
+      
+      // Action label (normal, indented)
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(action.actionLabel, PAGE_MARGIN + 12, yPos);
+      
+      yPos += 7;
+      
+      // Impact (secondary color, indented)
+      pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+      pdf.setFontSize(10);
+      const impactText = `Impact: ${formatCurrency(action.estimatedAnnualImpact)}/year`;
+      pdf.text(impactText, PAGE_MARGIN + 12, yPos);
+      
+      yPos += 5;
+      
+      // Effort (secondary color, indented)
+      pdf.text(`Effort: ${action.effortMinutes} min`, PAGE_MARGIN + 12, yPos);
+      
+      yPos += 12;
+      
+      // Divider between items (except after last item)
+      if (index < viewModel.priorityActions.length - 1) {
+        pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+        pdf.setLineWidth(0.3);
+        pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+        yPos += 12;
+      }
+    });
+  }
+
+  // ===== FINAL DIVIDER =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
+  pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+}
+
 // ========================================
 // MAIN ENTRY POINT
 // ========================================
@@ -263,8 +359,12 @@ export async function generateExecutiveAuditPDF(
   renderPage1_ExecutiveSummary(pdf, viewModel, config);
   drawPageFooter(pdf, 1, config.clientName || 'Client');
   
-  // TODO: Pages 2-5
-  // - Page 2: Priority Actions
+  // Page 2: Priority Actions
+  pdf.addPage();
+  renderPage2_PriorityActions(pdf, viewModel);
+  drawPageFooter(pdf, 2, config.clientName || 'Client');
+  
+  // TODO: Pages 3-5
   // - Page 3: Infrastructure Health
   // - Page 4: Plan Analysis
   // - Page 5: Safe Zone
@@ -292,7 +392,26 @@ if (typeof window !== 'undefined') {
         highSeverityCount: 2,
         estimatedRemediationMinutes: 45
       },
-      priorityActions: [],
+      priorityActions: [
+        {
+          zapName: 'CRM → Slack',
+          actionLabel: 'Merge formatters',
+          estimatedAnnualImpact: 456,
+          effortMinutes: 10
+        },
+        {
+          zapName: 'Lead Filter',
+          actionLabel: 'Move filter earlier',
+          estimatedAnnualImpact: 214,
+          effortMinutes: 5
+        },
+        {
+          zapName: 'Email → Spreadsheet',
+          actionLabel: 'Switch to instant trigger',
+          estimatedAnnualImpact: 180,
+          effortMinutes: 15
+        }
+      ],
       riskSummary: {
         highSeverityCount: 2,
         mediumSeverityCount: 3,
@@ -314,6 +433,47 @@ if (typeof window !== 'undefined') {
     const config: PDFConfig = {
       reportCode: 'TEST-001',
       clientName: 'Test Client'
+    };
+
+    generateExecutiveAuditPDF(mockViewModel, config);
+  };
+
+  // Test function for empty state
+  (window as any).__testExecutiveAuditEmpty = () => {
+    const mockViewModel: PdfViewModel = {
+      report: {
+        reportId: 'ZAP-2026-048',
+        generatedAt: new Date().toISOString()
+      },
+      financialOverview: {
+        recapturableAnnualSpend: 0,
+        multiplier: 0,
+        activeZaps: 5,
+        highSeverityCount: 0,
+        estimatedRemediationMinutes: 0
+      },
+      priorityActions: [], // ← EMPTY
+      riskSummary: {
+        highSeverityCount: 0,
+        mediumSeverityCount: 0,
+        inefficientLogicPatterns: 0,
+        redundancyPatterns: 0,
+        nonExecutingAutomations: 0
+      },
+      planSummary: {
+        currentPlan: 'Team',
+        usagePercent: 12.4,
+        premiumFeaturesDetected: [],
+        downgradeRecommended: false
+      },
+      safeZone: {
+        optimizedZaps: []
+      }
+    };
+
+    const config: PDFConfig = {
+      reportCode: 'TEST-002',
+      clientName: 'Perfect Client'
     };
 
     generateExecutiveAuditPDF(mockViewModel, config);
