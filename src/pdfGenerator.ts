@@ -108,6 +108,7 @@ function formatCurrency(amount: number): string {
 /**
  * Draw page footer with confidential statement
  */
+
 function drawPageFooter(
   pdf: jsPDF,
   pageNum: number,
@@ -122,10 +123,12 @@ function drawPageFooter(
   pdf.setLineWidth(0.3);
   pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
 
-  // Page number (left)
-  pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+  // Set footer text color (gray #777 = rgb(119, 119, 119))
+  pdf.setTextColor(119, 119, 119);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'normal');
+
+  // Page number (left)
   pdf.text(`Page ${pageNum}`, margin, pageHeight - 10);
 
   // Confidential statement (center)

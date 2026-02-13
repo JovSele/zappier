@@ -856,10 +856,18 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
           <div class="space-y-3">
             ${auditResult.opportunities_ranked.slice(0, 5).map(opp => {
               const zapFinding = auditResult.per_zap_findings.find(z => z.zap_id === opp.zap_id);
+              
+              // Use same logic as PDF mapper - show last 4 digits for "Untitled Zap"
+              let displayName = zapFinding?.zap_name || 'Unknown Zap';
+              if (displayName === 'Untitled Zap') {
+                const shortId = opp.zap_id.slice(-4);
+                displayName = `Zap #${shortId}`;
+              }
+              
               return `
               <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <div class="flex-1">
-                  <p class="font-bold text-slate-900">${zapFinding?.zap_name || 'Unknown Zap'}</p>
+                  <p class="font-bold text-slate-900">${displayName}</p>
                   <p class="text-sm text-slate-600">${opp.flag_code.replace(/_/g, ' ')} • $${Math.round(opp.estimated_monthly_savings_usd)}/month</p>
                 </div>
                 <span class="px-3 py-1 ${opp.confidence === 'High' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} rounded-full text-xs font-bold">
