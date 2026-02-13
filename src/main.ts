@@ -755,6 +755,23 @@ async function handleAnalyzeSelected() {
     const auditResult: AuditResult = rawResult
     console.log('✅ Validated v1.0.0 Audit Result:', auditResult)
 
+    // 🔍 DEBUG: Log global metrics
+    console.log('📊 GLOBAL METRICS DEBUG:', {
+      total_zaps: auditResult.global_metrics.total_zaps,
+      active_zaps: auditResult.global_metrics.active_zaps,
+      zombie_zaps: auditResult.global_metrics.zombie_zap_count,
+      total_monthly_tasks: auditResult.global_metrics.total_monthly_tasks,
+      high_severity: auditResult.global_metrics.high_severity_flag_count,
+    })
+
+    // 🔍 DEBUG: PER-ZAP STATUS
+    console.log('🚨 PER-ZAP STATUS:', auditResult.per_zap_findings.map(z => ({
+      id: z.zap_id,
+      name: z.zap_name,
+      status: z.status,
+      is_zombie: z.is_zombie,
+    })))
+
     // WASM already filtered - validate result
     if (auditResult.global_metrics.total_zaps !== selectedIds.length) {
       console.warn(`Expected ${selectedIds.length} Zaps, got ${auditResult.global_metrics.total_zaps}`)

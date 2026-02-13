@@ -103,72 +103,85 @@ export function mapAuditToPdfViewModel(
     });
 
   // ===== RISK SUMMARY =====
-  // Count all flags by pattern type across all zaps
-  const allFlags = auditResult.per_zap_findings.flatMap(zap => zap.flags);
-  
-  const inefficientLogicPatterns = allFlags.filter(f =>
-    ['FORMATTER_CHAIN', 'LATE_FILTER', 'INTERLEAVED_TRANSFORMATIONS'].includes(f.code)
-  ).length;
+// Count all flags by pattern type across all zaps
+const allFlags = auditResult.per_zap_findings.flatMap(zap => zap.flags);
 
-  const redundancyPatterns = allFlags.filter(f =>
-    f.code === 'TASK_STEP_COST_INFLATION'
-  ).length;
+// Count flags by severity (not confidence!)
+const highSeverityCount = allFlags.filter(f => 
+  f.severity === 'High'
+).length;
 
-  const nonExecutingAutomations = auditResult.global_metrics.zombie_zap_count;
+const mediumSeverityCount = allFlags.filter(f => 
+  f.severity === 'Medium'
+).length;
 
-  // ===== PLAN SUMMARY =====
-  const premiumFeaturesDetected = Object.entries(
-    auditResult.plan_analysis.premium_features_detected
-  )
-    .filter(([_, detected]) => detected)
-    .map(([feature]) => FEATURE_LABELS[feature] || feature);
+const lowSeverityCount = allFlags.filter(f => 
+  f.severity === 'Low'
+).length;
 
-  // Usage percent rounded to 1 decimal
-  const usagePercent = Number(
-    (auditResult.plan_analysis.usage_percentile * 100).toFixed(1)
-  );
+const inefficientLogicPatterns = allFlags.filter(f =>
+  ['FORMATTER_CHAIN', 'LATE_FILTER', 'INTERLEAVED_TRANSFORMATIONS'].includes(f.code)
+).length;
 
-  // ===== SAFE ZONE =====
-  const optimizedZaps = auditResult.per_zap_findings
-    .filter(zap => zap.flags.length === 0 && !zap.is_zombie)
-    .map(zap => ({ zapName: zap.zap_name }));
+const redundancyPatterns = allFlags.filter(f =>
+  f.code === 'TASK_STEP_COST_INFLATION'
+).length;
 
-  // ===== BUILD VIEW MODEL =====
-  return {
-    report: {
-      reportId,
-      generatedAt: auditResult.audit_metadata.generated_at,
-    },
+const nonExecutingAutomations = auditResult.global_metrics.zombie_zap_count;
 
-    financialOverview: {
-      recapturableAnnualSpend: annualWaste,
-      multiplier,
-      activeZaps: auditResult.global_metrics.active_zaps,
-      highSeverityCount: auditResult.global_metrics.high_severity_flag_count,
-      estimatedRemediationMinutes: roundedRemediationMinutes,
-    },
+// ===== PLAN SUMMARY =====
+const premiumFeaturesDetected = Object.entries(
+  auditResult.plan_analysis.premium_features_detected
+)
+  .filter(([_, detected]) => detected)
+  .map(([feature]) => FEATURE_LABELS[feature] || feature);
 
-    priorityActions,
+// Usage percent rounded to 1 decimal
+const usagePercent = Number(
+  (auditResult.plan_analysis.usage_percentile * 100).toFixed(1)
+);
 
-    riskSummary: {
-      highSeverityCount: auditResult.global_metrics.high_severity_flag_count,
-      mediumSeverityCount: auditResult.audit_metadata.confidence_overview.medium,
-      inefficientLogicPatterns,
-      redundancyPatterns,
-      nonExecutingAutomations,
-    },
+// ===== SAFE ZONE =====
+const optimizedZaps = auditResult.per_zap_findings
+  .filter(zap => zap.flags.length === 0 && !zap.is_zombie)
+  .map(zap => ({ zapName: zap.zap_name }));
 
-    planSummary: {
-      currentPlan: auditResult.plan_analysis.current_plan,
-      usagePercent,
-      premiumFeaturesDetected,
-      downgradeRecommended: auditResult.plan_analysis.downgrade_safe,
-    },
+// ===== BUILD VIEW MODEL =====
+return {
+  report: {
+    reportId,
+    generatedAt: auditResult.audit_metadata.generated_at,
+  },
 
-    safeZone: {
-      optimizedZaps,
-    },
-  };
+  financialOverview: {
+    recapturableAnnualSpend: annualWaste,
+    multiplier,
+    activeZaps: auditResult.global_metrics.active_zaps,
+    highSeverityCount: auditResult.global_metrics.high_severity_flag_count,
+    estimatedRemediationMinutes: roundedRemediationMinutes,
+  },
+
+  priorityActions,
+
+  riskSummary: {
+    highSeverityCount: highSeverityCount,  // ← OPRAVENÉ
+    mediumSeverityCount: mediumSeverityCount,  // ← OPRAVENÉ
+    inefficientLogicPatterns,
+    redundancyPatterns,
+    nonExecutingAutomations,
+  },
+
+  planSummary: {
+    currentPlan: auditResult.plan_analysis.current_plan,
+    usagePercent,
+    premiumFeaturesDetected,
+    downgradeRecommended: auditResult.plan_analysis.downgrade_safe,
+  },
+
+  safeZone: {
+    optimizedZaps,
+  },
+};
 }
 
 // ========================================
