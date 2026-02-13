@@ -823,7 +823,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
       <!-- Project Summary Card -->
       <div class="stat-card mb-8 bg-gradient-to-br from-blue-600 to-blue-700 border-2 border-blue-500">
         <h4 class="text-white text-xl font-black mb-4">📊 PROJECT SUMMARY</h4>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div class="bg-white/10 rounded-lg p-4 text-center">
             <p class="text-3xl font-black text-white">${auditResult.global_metrics.total_zaps}</p>
             <p class="text-sm text-blue-100 mt-1">Zaps Analyzed</p>
@@ -837,12 +837,18 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
             <p class="text-sm text-blue-100 mt-1">Monthly Waste</p>
           </div>
           <div class="bg-white/10 rounded-lg p-4 text-center">
+            <p class="text-3xl font-black text-white">$${Math.round(auditResult.global_metrics.estimated_annual_waste_usd)}</p>
+            <p class="text-sm text-blue-100 mt-1">Annual Waste</p>
+          </div>
+          <div class="bg-white/10 rounded-lg p-4 text-center">
             <p class="text-3xl font-black text-white">${Math.round(avgScore)}/100</p>
             <p class="text-sm text-blue-100 mt-1">Avg Score</p>
           </div>
         </div>
       </div>
-      
+
+
+
       <!-- Top Opportunities Card -->
       ${auditResult.opportunities_ranked && auditResult.opportunities_ranked.length > 0 ? `
         <div class="stat-card mb-8">

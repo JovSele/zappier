@@ -156,6 +156,7 @@ return {
   financialOverview: {
     recapturableAnnualSpend: annualWaste,
     multiplier,
+    totalZaps: auditResult.global_metrics.total_zaps,       
     activeZaps: auditResult.global_metrics.active_zaps,
     highSeverityCount: auditResult.global_metrics.high_severity_flag_count,
     estimatedRemediationMinutes: roundedRemediationMinutes,

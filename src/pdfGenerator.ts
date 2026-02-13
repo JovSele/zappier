@@ -38,10 +38,11 @@ export interface PdfViewModel {
   financialOverview: {
     recapturableAnnualSpend: number;
     multiplier: number;
+    totalZaps: number;         // ← PRIDANÉ
     activeZaps: number;
     highSeverityCount: number;
     estimatedRemediationMinutes: number;
-  };
+  }
   
   priorityActions: Array<{
     zapName: string;
@@ -240,11 +241,22 @@ function renderPage1_ExecutiveSummary(
   pdf.setFontSize(12);
   pdf.setFont('helvetica', 'normal');
 
-  const stats = [
-    `Active Zaps: ${viewModel.financialOverview.activeZaps}`,
-    `High Priority Issues: ${viewModel.financialOverview.highSeverityCount}`,
-    `Estimated Remediation Time: ${viewModel.financialOverview.estimatedRemediationMinutes} minutes`
-  ];
+  // Build stats array with dynamic Zaps label
+  const stats = [];
+
+  const totalZaps = viewModel.financialOverview.totalZaps;
+  const activeZaps = viewModel.financialOverview.activeZaps;
+
+  if (activeZaps === 0) {
+    stats.push(`Total Zaps Analyzed: ${totalZaps} (all inactive)`);
+  } else if (activeZaps === totalZaps) {
+    stats.push(`Total Zaps Analyzed: ${totalZaps} (all active)`);
+  } else {
+    stats.push(`Active Zaps: ${activeZaps} of ${totalZaps}`);
+  }
+
+  stats.push(`High Priority Issues: ${viewModel.financialOverview.highSeverityCount}`);
+  stats.push(`Estimated Remediation Time: ${viewModel.financialOverview.estimatedRemediationMinutes} minutes`);
 
   stats.forEach(stat => {
     pdf.text(stat, PAGE_MARGIN, yPos);
