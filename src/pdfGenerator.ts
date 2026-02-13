@@ -1,6 +1,4 @@
 import jsPDF from 'jspdf';
-// @ts-ignore - AuditResult will be used in future phases
-import type { AuditResult } from './types/audit-schema';
 
 // ========================================
 // EXECUTIVE AUDIT PDF GENERATOR v1.0.0
@@ -694,4 +692,10 @@ export async function generateExecutiveAuditPDF(
   const timestamp = new Date().toISOString().split('T')[0];
   pdf.save(`Executive_Audit_${config.reportCode}_${timestamp}.pdf`);
 }
-      report: {
+
+// ========================================
+// RE-EXPORTS
+// ========================================
+
+// Re-export mapper for convenience
+export { mapAuditToPdfViewModel } from './pdfViewModelMapper';

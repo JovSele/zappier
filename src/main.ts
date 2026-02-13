@@ -7,9 +7,16 @@ import init, {
   analyze_zaps  // ✅ v1.0.0 API (replaces parse_batch_audit)
 } from '../src-wasm/pkg/zapier_lighthouse_wasm'
 
-import { generatePDFReport, generateDeveloperEditionPDF, type ParseResult } from './pdfGenerator'
+import { 
+  generateExecutiveAuditPDF,
+  mapAuditToPdfViewModel,
+  type PDFConfig
+} from './pdfGenerator'
 import type { AuditResult } from './types/audit-schema'
 import { validateAuditResult } from './validation'
+
+// Keep ParseResult for legacy single-zap workflow (will be migrated later)
+type ParseResult = any
 
 // Type definitions
 interface ZapSummary {
@@ -888,13 +895,14 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
         try {
           const reportId = getNextReportId()
           const reportCode = generateReportCode(reportId)
-          const today = new Date().toISOString().split('T')[0]
 
-          await generateDeveloperEditionPDF(auditResult, {
-            agencyName: 'Zapier Lighthouse',
-            clientName: 'Batch Analysis',
-            reportDate: today,
-            reportCode: reportCode 
+          // Transform WASM result → PDF view model
+          const viewModel = mapAuditToPdfViewModel(auditResult)
+
+          // Generate Executive Audit PDF
+          await generateExecutiveAuditPDF(viewModel, {
+            reportCode: reportCode,
+            clientName: 'Batch Analysis'
           })
           
           pdfBtn.innerHTML = `
@@ -1309,9 +1317,17 @@ function displayZapSelector(zaps: ZapSummary[]) {
   }, 100)
 }
 
-/**
- * Generate Quick Wins HTML from top flags
- */
+// ============================================================================
+// DEPRECATED - LEGACY SINGLE-ZAP WORKFLOW (Replaced by batch workflow)
+// ============================================================================
+// These functions are part of the old single-zap workflow using ParseResult
+// and generatePDFReport(). They have been replaced by the v1.0.0 batch workflow
+// using AuditResult → mapAuditToPdfViewModel() → generateExecutiveAuditPDF()
+// ============================================================================
+
+/*
+// Generate Quick Wins HTML from top flags
+
 function generateQuickWinsHTML(flags: EfficiencyFlag[]): string {
   // Sort by severity (high → medium → low) and take top 3
   const sortedFlags = [...flags]
@@ -1368,9 +1384,9 @@ function generateQuickWinsHTML(flags: EfficiencyFlag[]): string {
 // HTML REPORT GENERATION (NEW)
 // ============================================================================
 
-/**
- * Generate HTML report from template with real data injection
- */
+
+// Generate HTML report from template with real data injection
+
 async function generateHtmlReport(result: ParseResult, zapInfo: ZapSummary): Promise<string> {
   try {
     // Load template
@@ -1493,9 +1509,8 @@ saveAuditLog(reportId, reportCode, zapInfo.id, zapInfo.title)
   }
 }
 
-/**
- * Get score label based on efficiency score
- */
+// Get score label based on efficiency score
+
 function getScoreLabel(score: number): string {
   if (score >= 90) return 'Excellent'
   if (score >= 75) return 'Good'
@@ -1503,9 +1518,8 @@ function getScoreLabel(score: number): string {
   return 'Below Optimal'
 }
 
-/**
- * Replace Action Plan section with dynamic flags
- */
+// Replace Action Plan section with dynamic flags
+
 function replaceActionPlan(html: string, flags: any[]): string {
   // Sort flags by severity (high → medium → low)
   const sortedFlags = [...flags].sort((a, b) => {
@@ -1565,9 +1579,8 @@ function replaceActionPlan(html: string, flags: any[]): string {
   return html.replace(actionPlanRegex, replacement)
 }
 
-/**
- * Replace Error Analysis section with real data
- */
+// Replace Error Analysis section with real data
+
 function replaceErrorAnalysis(html: string, flags: any[]): string {
   const errorFlag = flags.find(f => f.flag_type === 'error_loop')
   
@@ -1595,12 +1608,8 @@ function replaceErrorAnalysis(html: string, flags: any[]): string {
   return html
 }
 
-/**
- * Replace Cost Waste Analysis section with real optimization opportunities
- */
-/**
- * Replace Cost Waste Analysis section with real optimization opportunities
- */
+// Replace Cost Waste Analysis section with real optimization opportunities
+
 function replaceCostWasteAnalysis(html: string, flags: any[]): string {
   const pollingFlag = flags.find(f => f.flag_type === 'polling_trigger')
   const filterFlag = flags.find(f => f.flag_type === 'late_filter_placement')
@@ -1689,8 +1698,11 @@ ${cardsHTML}
   return html.replace(regex, fullSectionHTML)
 }
 
+
+
 // NEW: Handle Zap Selection (run full audit on selected Zap)
 // @ts-ignore - TS6133: Function prepared for single-zap selection workflow
+
 async function handleZapSelect(zapId: number) {
   if (!cachedZipData) {
     updateStatus('error', 'ZIP data not cached. Please upload again.')
@@ -1728,9 +1740,8 @@ async function handleZapSelect(zapId: number) {
   }
 }
 
-/**
- * Display HTML report in iframe preview
- */
+// Display HTML report in iframe preview
+
 function displayHtmlPreview(htmlContent: string, result: ParseResult, zapInfo: ZapSummary) {
   const resultsEl = document.getElementById('results')
   if (!resultsEl) return
@@ -1918,6 +1929,8 @@ function displayHtmlPreview(htmlContent: string, result: ParseResult, zapInfo: Z
 }
 
 
+*/
+
 // NEW: Test v1.0.0 API with analyze_zaps()
 async function testV1API() {
   if (!wasmReady) {
@@ -1962,6 +1975,7 @@ async function testV1API() {
   }
 }
 
+
 // Load test data from JSON file
 async function loadTestData() {
   if (!wasmReady) {
@@ -1981,24 +1995,20 @@ async function loadTestData() {
     const jsonContent = await response.text()
     console.log('Loaded test data:', jsonContent.substring(0, 200))
     
-    // Call WASM parser with JSON directly
-    const resultJson = parse_zapfile_json(jsonContent)
-    const result = JSON.parse(resultJson)
+    // ⚠️ TEST DATA BUTTON IS DEPRECATED
+    // The old single-zap workflow has been replaced by batch analysis
+    updateStatus('error', '⚠️ Test data button is deprecated. Please upload a real Zapier export ZIP file instead.')
     
-    console.log('Parse result:', result)
-    
-    if (result.success) {
-      updateStatus('success', '✨ Test data loaded - Contains 2 Zaps with known issues for testing')
-      displayResults(result)
-    } else {
-      updateStatus('error', result.message)
-    }
+    console.warn('💡 To test: Upload a real Zapier export ZIP → Select Zaps → Analyze')
     
   } catch (error) {
     console.error('Error loading test data:', error)
     updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
+
+
+
 
 // Make test function globally available
 ;(window as any).testV1API = testV1API
@@ -2014,7 +2024,10 @@ function backToSelector() {
   displayZapSelector(zapList)
 }
 
-// Display parsing results
+// ============================================================================
+// DEPRECATED - displayResults() function (replaced by batch workflow)
+// ============================================================================
+/*
 function displayResults(result: ParseResult) {
   const resultsEl = document.getElementById('results')
   if (!resultsEl) return
@@ -2390,6 +2403,8 @@ function displayResults(result: ParseResult) {
     }
   }, 100)
 }
+
+*/
 
 // Setup drag and drop zone
 function setupDropzone() {
