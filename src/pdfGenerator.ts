@@ -121,29 +121,31 @@ function drawPageFooter(
   // Divider line
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
   pdf.setLineWidth(0.3);
-  pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+  pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
 
   // Set footer text color (gray #777 = rgb(119, 119, 119))
   pdf.setTextColor(119, 119, 119);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'normal');
 
-  // Page number (left)
-  pdf.text(`Page ${pageNum}`, margin, pageHeight - 10);
-
-  // Confidential statement (center)
+  // LINE 1: Confidential statement (left only)
   pdf.text(
     `CONFIDENTIAL AUDIT — Prepared for ${clientName}`,
-    pageWidth / 2,
-    pageHeight - 10,
-    { align: 'center' }
+    margin,
+    pageHeight - 13
   );
 
-  // Privacy notice (right)
+  // LINE 2: Privacy notice (left) + Page number (right)
   pdf.text(
     'Data processed locally. No cloud storage.',
+    margin,
+    pageHeight - 8
+  );
+  
+  pdf.text(
+    `Page ${pageNum}`,
     pageWidth - margin,
-    pageHeight - 10,
+    pageHeight - 8,
     { align: 'right' }
   );
 }
@@ -538,15 +540,22 @@ function renderPage4_PlanAnalysis(
   
   yPos += 12;
 
-  // ===== CAPACITY STATEMENT =====
+  /// ===== CAPACITY STATEMENT =====
   pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
   pdf.setFontSize(12);
   pdf.setFont('helvetica', 'normal');
-  
-  const excessPercent = (100 - viewModel.planSummary.usagePercent).toFixed(1);
-  const capacityText = `Your current capacity exceeds requirements by ${excessPercent}%.`;
+
+  // Conditional wording based on usage level
+  let capacityText: string;
+  if (viewModel.planSummary.usagePercent < 5) {
+    capacityText = 'Current plan utilization is minimal.';
+  } else {
+    const excessPercent = (100 - viewModel.planSummary.usagePercent).toFixed(1);
+    capacityText = `Your current capacity exceeds requirements by ${excessPercent}%.`;
+  }
+
   pdf.text(capacityText, PAGE_MARGIN, yPos);
-  
+
   yPos += 15;
 
   // ===== PREMIUM FEATURES (if any) =====
@@ -568,29 +577,32 @@ function renderPage4_PlanAnalysis(
     yPos += 9;
   }
 
-  // ===== RECOMMENDED ACTION =====
+ // ===== RECOMMENDED ACTION =====
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(12);
   pdf.setFont('helvetica', 'bold');
   pdf.text('Recommended Action:', PAGE_MARGIN, yPos);
-  
+
   yPos += 7;
-  
+
   pdf.setFont('helvetica', 'normal');
-  
-  if (viewModel.planSummary.downgradeRecommended) {
-    // Downgrade recommended
+
+  // Conditional recommendation based on usage and downgrade safety
+  if (viewModel.planSummary.usagePercent < 5) {
+    // Very low usage - softer wording
+    pdf.text('Plan review recommended.', PAGE_MARGIN, yPos);
+    yPos += 7;
+  } else if (viewModel.planSummary.downgradeRecommended) {
+    // Moderate usage - direct recommendation
     pdf.text('Adjust to lower tier to reduce costs.', PAGE_MARGIN, yPos);
     yPos += 7;
   } else {
-    // Current plan is fine
+    // Current plan is appropriate
     pdf.text('Current plan is appropriate.', PAGE_MARGIN, yPos);
     yPos += 7;
     pdf.text('No downgrade recommended.', PAGE_MARGIN, yPos);
     yPos += 7;
   }
-  
-  yPos += 8;
 
   // ===== FINAL DIVIDER =====
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
