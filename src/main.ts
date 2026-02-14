@@ -1030,69 +1030,70 @@ function renderZapTable(filteredZaps: ZapSummary[]) {
     
     <!-- Table Rows -->
     ${filteredZaps.length > 0 ? filteredZaps.map((zap, index) => {
-      const statusBadge = getStatusBadge(zap.status)
-      const errorBadge = getErrorRateBadge(zap.error_rate)
-      const lastRun = formatRelativeTime(zap.last_run)
-      const isSelected = selectedZapIds.has(zap.id)
-      
-      return `
-        <div 
-          class="zap-row group p-6 border-b border-slate-100 last:border-0 transition-all duration-200 ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-slate-50'}" 
-          data-zap-id="${zap.id}"
-          style="animation: fade-in-up 0.3s ease-out ${index * 0.05}s both;"
-        >
-          <div class="grid grid-cols-12 gap-4 items-center">
-            <!-- Checkbox + Index -->
-            <div class="col-span-1 flex items-center gap-2">
-              <input 
-                type="checkbox" 
-                class="zap-checkbox w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                data-zap-id="${zap.id}"
-                ${isSelected ? 'checked' : ''}
-                onclick="event.stopPropagation(); toggleZapSelection(${zap.id})"
-              />
-              <span class="text-slate-400 font-mono text-sm">#${index + 1}</span>
-            </div>
-            
-            <!-- Title & Trigger -->
-            <div class="col-span-4">
-              <h3 class="font-bold text-slate-900 group-hover:text-blue-600 transition-colors mb-1">
-                ${zap.title}
-              </h3>
-              <p class="text-xs text-slate-500">
-                <span class="font-mono bg-slate-100 px-2 py-0.5 rounded">${zap.trigger_app}</span>
-                <span class="mx-2">•</span>
-                <span>${zap.step_count} step${zap.step_count === 1 ? '' : 's'}</span>
-              </p>
-            </div>
-            
-            <!-- Status -->
-            <div class="col-span-2">
-              <span class="inline-flex items-center gap-1 px-3 py-1 ${statusBadge.bg} ${statusBadge.text} rounded-full text-xs font-semibold border ${statusBadge.border}">
-                ${statusBadge.icon} ${zap.status.toUpperCase()}
-              </span>
-            </div>
-            
-            <!-- Last Run -->
-            <div class="col-span-2 text-center">
-              <span class="text-sm text-slate-600">${lastRun}</span>
-            </div>
-            
-            <!-- Error Rate -->
-            <div class="col-span-2 text-center">
-              <span class="inline-flex items-center px-3 py-1 ${errorBadge.bg} ${errorBadge.text} rounded-full text-xs font-bold border border-current">
-                ${errorBadge.label}
-              </span>
-            </div>
-            
-            <!-- Total Runs -->
-            <div class="col-span-1 text-center">
-              <span class="text-sm font-mono text-slate-700">${zap.total_runs}</span>
-            </div>
+    const statusBadge = getStatusBadge(zap.status)
+    const errorBadge = getErrorRateBadge(zap.error_rate)
+    const lastRun = formatRelativeTime(zap.last_run)
+    const isSelected = selectedZapIds.has(zap.id)
+    
+    return `
+      <div 
+        class="zap-row group p-6 border-b border-slate-100 last:border-0 transition-all duration-200 ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-slate-50'}" 
+        data-zap-id="${zap.id}"
+        style="animation: fade-in-up 0.3s ease-out ${index * 0.05}s both;"
+      >
+        <div class="grid grid-cols-12 gap-4 items-center">
+          <!-- Checkbox + Index -->
+          <div class="col-span-1 flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              class="zap-checkbox w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              data-zap-id="${zap.id}"
+              ${isSelected ? 'checked' : ''}
+              onclick="event.stopPropagation(); toggleZapSelection(${zap.id})"
+            />
+            <span class="text-slate-400 font-mono text-sm">#${index + 1}</span>
+          </div>
+          
+          <!-- Title & Trigger -->
+          <div class="col-span-4">
+            <h3 class="font-bold text-slate-900 group-hover:text-blue-600 transition-colors mb-1">
+              ${zap.title === 'Untitled Zap' ? `Zap #${zap.id.toString().slice(-4)}` : zap.title}
+            </h3>
+            <p class="text-xs text-slate-500">
+              <span class="font-mono bg-slate-100 px-2 py-0.5 rounded">${zap.trigger_app}</span>
+              <span class="mx-2">•</span>
+              <span>${zap.step_count} step${zap.step_count === 1 ? '' : 's'}</span>
+            </p>
+          </div>
+          
+          <!-- Status -->
+          <div class="col-span-2">
+            <span class="inline-flex items-center gap-1 px-3 py-1 ${statusBadge.bg} ${statusBadge.text} rounded-full text-xs font-semibold border ${statusBadge.border}">
+              ${statusBadge.icon} ${zap.status.toUpperCase()}
+            </span>
+          </div>
+          
+          <!-- Last Run -->
+          <div class="col-span-2 text-center">
+            <span class="text-sm text-slate-600">${lastRun}</span>
+          </div>
+          
+          <!-- Error Rate -->
+          <div class="col-span-2 text-center">
+            <span class="inline-flex items-center px-3 py-1 ${errorBadge.bg} ${errorBadge.text} rounded-full text-xs font-bold border border-current">
+              ${errorBadge.label}
+            </span>
+          </div>
+          
+          <!-- Total Runs -->
+          <div class="col-span-1 text-center">
+            <span class="text-sm font-mono text-slate-700">${zap.total_runs}</span>
           </div>
         </div>
-      `
-    }).join('') : `
+      </div>
+    `
+  }).join('') : `
+    <!-- Empty State -->
       <!-- Empty State with Reset -->
       <div class="p-12 text-center">
         <svg class="w-20 h-20 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
