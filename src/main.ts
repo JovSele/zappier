@@ -110,20 +110,6 @@ function generateReportCode(reportId: number): string {
   return `LHA-${year}-${dayOfYear}-${paddedId}`
 }
 
-/**
- * Get audit statistics (for debugging/display)
- * @future-use: Currently prepared for stats dashboard
- */
-// @ts-ignore - TS6133: Function prepared for future statistics display
-function getAuditStats() {
-  const firstInstall = localStorage.getItem('first_install_timestamp')
-  const counter = parseInt(localStorage.getItem('audit_counter') || '0')
-  return {
-    first_install: firstInstall,
-    total_audits: counter,
-    next_id: counter + 1
-  }
-}
 
 /**
  * Save audit entry to localStorage
@@ -154,7 +140,6 @@ let selectedZapIds: Set<number> = new Set()
 // NEW: Cost Calibration State
 let pricePerTask: number = 0.02 // Default: $0.02/task (industry benchmark)
 let isCustomPrice: boolean = false // Track if user provided custom pricing
-// @ts-ignore - TS6133: State variable for cost calibration tracking
 let monthlyBill: number = 0
 let includedTasks: number = 0
 
@@ -344,10 +329,6 @@ async function handleFileUpload(file: File) {
 let currentSearchTerm = ''
 let currentStatusFilter: 'all' | 'on' | 'error' = 'all'
 
-// Part 4 infrastructure - ready for UI toggle implementation
-// @ts-ignore - TS6133: Variable prepared for future use
-let showOnlyHighConfidence = false // UI toggle for filtering efficiency flags
-
 // NEW: Filter zaps based on search and status
 function getFilteredZaps(): ZapSummary[] {
   let filtered = [...zapList]
@@ -514,36 +495,6 @@ function getConfidenceBadgeColor(confidence: string): { dot: string; hex: string
   } else {
     return { dot: 'bg-rose-500', hex: '#ef4444' } // Red - matches PDF COLORS.RED
   }
-}
-
-/**
- * Generate confidence badge HTML for UI display
- * @future-use: Prepared for Phase 4 UI confidence indicators
- */
-// @ts-ignore - TS6133: Function prepared for future confidence display
-function renderConfidenceBadge(confidence: string): string {
-  const colors = getConfidenceBadgeColor(confidence)
-  return `<div class="inline-flex items-center gap-1">
-    <div class="${colors.dot} w-2 h-2 rounded-full"></div>
-  </div>`
-}
-
-/**
- * Filter efficiency flags by confidence level (Part 4)
- * Part 4 infrastructure - ready for UI toggle implementation
- * @param flags - All efficiency flags from analysis
- * @param highConfidenceOnly - If true, show only "high" confidence flags
- * @returns Filtered array of flags
- */
-// @ts-ignore - TS6133: Function prepared for future use
-function filterFlagsByConfidence(
-  flags: EfficiencyFlag[], 
-  highConfidenceOnly: boolean
-): EfficiencyFlag[] {
-  if (!highConfidenceOnly) {
-    return flags; // Show all flags
-  }
-  return flags.filter(flag => flag.confidence === "high");
 }
 
 // NEW: Apply Cost Calibration (LIVE - no button needed)
