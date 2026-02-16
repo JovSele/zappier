@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
-    "jspdf": "^4.0.0"
+    "jspdf": "^4.0.0",
+    "pdf-lib": "^1.17.1"
   }
 }

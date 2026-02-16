@@ -7,6 +7,7 @@ import init, {
   analyze_zaps  // ✅ v1.0.0 API (replaces parse_batch_audit)
 } from '../src-wasm/pkg/zapier_lighthouse_wasm'
 
+import { PDFDocument } from 'pdf-lib'
 import { 
   generateExecutiveAuditPDF,
   mapAuditToPdfViewModel,
@@ -14,6 +15,11 @@ import {
 } from './pdfGenerator'
 import type { AuditResult } from './types/audit-schema'
 import { validateAuditResult } from './validation'
+import type { ReAuditMetadata } from './types/reaudit'
+import { 
+  generateFileHash, 
+  deserializeMetadata 
+} from './types/reaudit'
 
 // Keep ParseResult for legacy single-zap workflow (will be migrated later)
 type ParseResult = any
@@ -283,6 +289,130 @@ function formatRelativeTime(isoTimestamp: string | null): string {
   } catch {
     return 'Invalid date'
   }
+}
+
+/**
+ * Extract re-audit metadata from PDF file
+ */
+async function extractReAuditMetadata(pdfFile: File): Promise<ReAuditMetadata | null> {
+  try {
+    const pdfBytes = await pdfFile.arrayBuffer()
+    const pdfDoc = await PDFDocument.load(pdfBytes)
+    
+    // Get keywords field
+    const keywords = pdfDoc.getKeywords()
+    
+    if (!keywords) {
+      console.warn('No keywords found in PDF')
+      return null
+    }
+    
+    // Look for re-audit metadata prefix
+    const match = keywords.match(/REAUDIT_V1:([A-Za-z0-9+/=]+)/)
+    
+    if (!match) {
+      console.warn('No re-audit metadata found in PDF keywords')
+      return null
+    }
+    
+    // Decode base64 and parse JSON
+    const metadataBase64 = match[1]
+    const metadataJson = atob(metadataBase64)
+    const metadata = deserializeMetadata(metadataJson)
+    
+    console.log('✅ Re-audit metadata extracted:', metadata)
+    return metadata
+    
+  } catch (error) {
+    console.error('❌ Failed to extract re-audit metadata:', error)
+    return null
+  }
+}
+
+/**
+ * Handle PDF upload for re-audit
+ */
+  async function handlePDFUpload(file: File) {
+    updateStatus('processing', 'Extracting re-audit metadata from PDF...')
+    
+    try {
+      // Extract metadata
+      const metadata = await extractReAuditMetadata(file)
+      
+      if (!metadata) {
+        updateStatus('error', 'This PDF does not contain re-audit metadata. Please upload a Lighthouse PDF generated after Feb 2026.')
+        return
+      }
+      
+      // Show re-audit banner
+      showReAuditBanner(metadata)  // ← TOTO SA VOLÁ, ALE POTOM...
+      
+    // Restore pricing settings
+    const planType = metadata.pricing_snapshot.plan_type.toLowerCase()
+    currentPlanType = (planType === 'team' ? 'team' : 'professional') as 'professional' | 'team'
+    includedTasks = metadata.pricing_snapshot.tier_tasks
+    monthlyBill = metadata.pricing_snapshot.tier_price
+    pricePerTask = metadata.pricing_snapshot.price_per_task
+    isCustomPrice = true
+      
+      // Pre-select Zaps from metadata
+      selectedZapIds = new Set(metadata.zap_ids_analyzed.map(id => parseInt(id)))
+      
+      updateStatus('success', 'Re-audit mode activated! Now upload your ZIP file to continue.')  // ← TOTO PREPÍŠE BANNER!
+      
+    } catch (error) {
+      console.error('Error processing PDF:', error)
+      updateStatus('error', `Failed to process PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+/**
+ * Show re-audit banner with metadata info
+ */
+function showReAuditBanner(metadata: ReAuditMetadata) {
+  // Find or create banner container
+  let bannerContainer = document.getElementById('reaudit-banner-container')
+  
+  if (!bannerContainer) {
+    // Create container above status element
+    const statusEl = document.getElementById('status')
+    if (!statusEl) return
+    
+    bannerContainer = document.createElement('div')
+    bannerContainer.id = 'reaudit-banner-container'
+    statusEl.parentNode?.insertBefore(bannerContainer, statusEl)
+  }
+  
+  const generationDate = new Date(metadata.generation_timestamp).toLocaleDateString()
+  const zapCount = metadata.zap_ids_analyzed.length
+  
+  bannerContainer.className = 'mb-4 p-6 rounded-xl border-2 border-purple-300 bg-purple-50 shadow-lg'
+  bannerContainer.innerHTML = `
+    <div class="flex items-start gap-4">
+      <div class="w-12 h-12 rounded-lg bg-purple-600 flex items-center justify-center flex-shrink-0">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <div class="flex-1">
+        <h3 class="text-lg font-black text-purple-900 mb-2">🔄 Re-Audit Mode Activated</h3>
+        <div class="space-y-1 text-sm text-purple-800">
+          <p><strong>Original Report:</strong> ${metadata.report_code}</p>
+          <p><strong>Generated:</strong> ${generationDate}</p>
+          <p><strong>Zaps Analyzed:</strong> ${zapCount}</p>
+          <p><strong>Plan:</strong> ${metadata.pricing_snapshot.plan_type} (${metadata.pricing_snapshot.tier_tasks.toLocaleString()} tasks @ $${metadata.pricing_snapshot.price_per_task.toFixed(4)}/task)</p>
+        </div>
+        <div class="mt-3 p-3 bg-purple-100 rounded-lg border border-purple-200">
+          <p class="text-sm text-purple-900">
+            ✅ Settings restored! Upload your <strong>current ZIP export</strong> above to run the same analysis with fresh data.
+          </p>
+        </div>
+      </div>
+    </div>
+  `
+  
+  // Also update status below banner
+  updateStatus('success', 'Re-audit mode activated! Now upload your ZIP file to continue.')
 }
 
 // NEW: Handle file upload (updated workflow with Zap Selector)
@@ -859,16 +989,37 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
         pdfBtn.classList.add('opacity-75', 'cursor-wait')
         
         try {
+          // Generate report ID and code
           const reportId = getNextReportId()
           const reportCode = generateReportCode(reportId)
 
-          // Transform WASM result → PDF view model
-          const viewModel = mapAuditToPdfViewModel(auditResult)
+          // Generate file hash for verification (re-audit capability)
+          const fileHash = await generateFileHash(cachedZipData! as BufferSource)
 
-          // Generate Executive Audit PDF
+          // Build re-audit metadata (allows users to restore settings from PDF)
+          const reauditMetadata: ReAuditMetadata = {
+            report_id: reportId,
+            report_code: reportCode,
+            generation_timestamp: new Date().toISOString(),
+            pricing_snapshot: {
+              plan_type: currentPlanType,
+              tier_tasks: includedTasks,
+              tier_price: monthlyBill,
+              price_per_task: pricePerTask
+            },
+            zap_ids_analyzed: Array.from(selectedZapIds).map(id => id.toString()),
+            file_hash: fileHash,
+            metadata_version: '1.0.0'
+          }
+
+          // Transform WASM result → PDF view model
+          const viewModel = mapAuditToPdfViewModel(auditResult, reportCode)
+
+          // Generate PDF with embedded re-audit metadata
           await generateExecutiveAuditPDF(viewModel, {
             reportCode: reportCode,
-            clientName: 'Batch Analysis'
+            clientName: 'Batch Analysis',
+            reauditMetadata: reauditMetadata
           })
           
           pdfBtn.innerHTML = `
@@ -1429,6 +1580,17 @@ function setupDropzone() {
       handleFileUpload(files[0])
     }
   })
+  
+  // PDF upload handler for re-audit
+  const pdfInput = document.getElementById('pdf-upload') as HTMLInputElement
+  if (pdfInput) {
+    pdfInput.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement
+      if (target.files && target.files[0]) {
+        handlePDFUpload(target.files[0])
+      }
+    })
+  }
 }
 
 // Render UI
@@ -1467,6 +1629,34 @@ function renderUI() {
             🔒 All processing happens locally in your browser
           </p>
           <input type="file" id="file-input" accept=".zip" class="hidden" />
+        </div>
+        
+        <!-- OR Divider -->
+        <div class="relative my-8">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-slate-300"></div>
+          </div>
+          <div class="relative flex justify-center text-sm">
+            <span class="px-4 bg-[#fafafa] text-slate-500 font-bold">OR</span>
+          </div>
+        </div>
+
+        <!-- PDF Re-Audit Upload -->
+        <div class="text-center">
+          <h3 class="text-xl font-bold text-slate-900 mb-3">Re-Audit from Previous Report</h3>
+          <p class="text-slate-600 mb-4">Upload a Lighthouse PDF to re-run the same analysis</p>
+          
+          <label for="pdf-upload" class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg cursor-pointer transition-all hover:scale-105 shadow-md">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            Upload Previous PDF
+          </label>
+          <input type="file" id="pdf-upload" accept=".pdf,application/pdf" class="hidden" />
+          
+          <p class="text-xs text-slate-500 mt-2">
+            💡 This will restore your previous settings and Zap selection
+          </p>
         </div>
         
         <!-- Status -->

@@ -61,13 +61,14 @@ const FEATURE_LABELS: Record<string, string> = {
  * Transform AuditResult from WASM into PdfViewModel for PDF generator
  */
 export function mapAuditToPdfViewModel(
-  auditResult: AuditResult
+  auditResult: AuditResult,
+  reportCode: string
 ): PdfViewModel {
   const AUDIT_COST = 79;
   const annualWaste = auditResult.global_metrics.estimated_annual_waste_usd;
 
   // ===== REPORT METADATA =====
-  const reportId = generateReportId(auditResult.audit_metadata.generated_at);
+  // Use provided report code from main.ts report ID system
   
   // ===== CREATE GLOBAL ZAP NAME MAPPING =====
   // Use last 4 digits of Zapier ID for unnamed automations
@@ -152,7 +153,7 @@ export function mapAuditToPdfViewModel(
   // ===== BUILD VIEW MODEL =====
   return {
     report: {
-      reportId,
+      reportId: reportCode,
       generatedAt: auditResult.audit_metadata.generated_at,
     },
 
@@ -188,26 +189,3 @@ export function mapAuditToPdfViewModel(
   };
 }
 
-// ========================================
-// HELPER FUNCTIONS
-// ========================================
-
-/**
- * Generate stable report ID from timestamp
- * Format: ZAP-YYYY-NNN where NNN is day of year
- */
-function generateReportId(isoTimestamp: string): string {
-  const date = new Date(isoTimestamp);
-  const year = date.getFullYear();
-  
-  // Calculate day of year (1-366)
-  const start = new Date(year, 0, 0);
-  const diff = date.getTime() - start.getTime();
-  const oneDay = 1000 * 60 * 60 * 24;
-  const dayOfYear = Math.floor(diff / oneDay);
-  
-  // Pad to 3 digits
-  const dayPadded = dayOfYear.toString().padStart(3, '0');
-  
-  return `ZAP-${year}-${dayPadded}`;
-}

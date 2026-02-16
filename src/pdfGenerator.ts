@@ -1,4 +1,6 @@
 import jsPDF from 'jspdf';
+import type { ReAuditMetadata } from './types/reaudit';
+import { serializeMetadata } from './types/reaudit';
 
 // ========================================
 // EXECUTIVE AUDIT PDF GENERATOR v1.0.0
@@ -27,6 +29,7 @@ import jsPDF from 'jspdf';
 export interface PDFConfig {
   reportCode: string;
   clientName?: string;
+  reauditMetadata?: ReAuditMetadata;
 }
 
 export interface PdfViewModel {
@@ -677,6 +680,31 @@ function renderPage5_SafeZone(
 }
 
 // ========================================
+// RE-AUDIT METADATA EMBEDDING
+// ========================================
+
+/**
+ * Embed re-audit metadata into PDF as custom property
+ * Stored in PDF Keywords field with special prefix for later extraction
+ */
+function embedReAuditMetadata(pdfDoc: jsPDF, metadata: ReAuditMetadata) {
+  const metadataJson = serializeMetadata(metadata);
+  
+  // Encode as base64 to avoid JSON parsing issues in PDF metadata
+  const metadataBase64 = btoa(metadataJson);
+  
+  // Embed in Keywords field with special prefix
+  const keywords = `REAUDIT_V1:${metadataBase64}`;
+  
+  pdfDoc.setProperties({
+    keywords: keywords,
+    subject: 'Zapier Lighthouse Audit Report - Re-Audit Enabled'
+  });
+  
+  console.log('✅ Re-audit metadata embedded into PDF');
+}
+
+// ========================================
 // MAIN ENTRY POINT
 // ========================================
 
@@ -714,6 +742,13 @@ export async function generateExecutiveAuditPDF(
   pdf.addPage();
   renderPage5_SafeZone(pdf, viewModel);
   drawPageFooter(pdf, 5, config.clientName || 'Client');
+  
+  // ============================================================================
+  // EMBED RE-AUDIT METADATA (if provided)
+  // ============================================================================
+  if (config.reauditMetadata) {
+    embedReAuditMetadata(pdf, config.reauditMetadata);
+  }
   
   // Save
   const timestamp = new Date().toISOString().split('T')[0];
