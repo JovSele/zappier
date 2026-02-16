@@ -312,7 +312,7 @@ async function handleFileUpload(file: File) {
     
     if (listResult.success) {
       zapList = listResult.zaps
-      updateStatus('success', `✨ Found ${zapList.length} Zap${zapList.length === 1 ? '' : 's'} - Select one to audit`)
+      updateStatus('success', `Found ${zapList.length} Zap${zapList.length === 1 ? '' : 's'} - Select one to audit`)
       displayZapSelector(zapList)
     } else {
       updateStatus('error', listResult.message)
@@ -730,7 +730,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
       }, 0) / auditResult.per_zap_findings.length
     : 100;
   
-  updateStatus('success', `✅ Analysis complete for ${auditResult.global_metrics.total_zaps} Zap${auditResult.global_metrics.total_zaps === 1 ? '' : 's'}`)
+  updateStatus('success', `Analysis complete for ${auditResult.global_metrics.total_zaps} Zap${auditResult.global_metrics.total_zaps === 1 ? '' : 's'}`)
   
   const resultsEl = document.getElementById('results')
   if (!resultsEl) return
@@ -1061,13 +1061,59 @@ function renderZapTable(filteredZaps: ZapSummary[]) {
     if (selectAllCheckbox) {
       selectAllCheckbox.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement
+        const checkboxes = document.querySelectorAll<HTMLInputElement>('.zap-checkbox')
+        
         if (target.checked) {
-          selectAllActive()
+          // Select ALL (not just active)
+          checkboxes.forEach(checkbox => {
+            checkbox.checked = true
+            const zapId = parseInt(checkbox.dataset.zapId || '0')
+            selectedZapIds.add(zapId)
+          })
         } else {
-          deselectAll()
+          // Deselect all
+          checkboxes.forEach(checkbox => {
+            checkbox.checked = false
+          })
+          selectedZapIds.clear()
         }
+        
+        updateAnalyzeButton()
       })
     }
+    
+    // Individual checkbox handlers - update master checkbox state
+    const checkboxes = document.querySelectorAll<HTMLInputElement>('.zap-checkbox')
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        const zapId = parseInt(checkbox.dataset.zapId || '0')
+        if (checkbox.checked) {
+          selectedZapIds.add(zapId)
+        } else {
+          selectedZapIds.delete(zapId)
+        }
+        
+        // Update master checkbox state
+        const selectAllCheckbox = document.getElementById('select-all-checkbox') as HTMLInputElement
+        if (selectAllCheckbox) {
+          const totalCheckboxes = checkboxes.length
+          const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length
+          
+          if (checkedCount === 0) {
+            selectAllCheckbox.checked = false
+            selectAllCheckbox.indeterminate = false
+          } else if (checkedCount === totalCheckboxes) {
+            selectAllCheckbox.checked = true
+            selectAllCheckbox.indeterminate = false
+          } else {
+            selectAllCheckbox.checked = false
+            selectAllCheckbox.indeterminate = true
+          }
+        }
+        
+        updateAnalyzeButton()
+      })
+    })
   }, 100)
 }
 
@@ -1315,7 +1361,7 @@ async function testV1API() {
       throw new Error(`Invalid schema version: ${auditResult.schema_version}`)
     }
     
-    updateStatus('success', `✅ v1.0.0 API works! Found ${auditResult.per_zap_findings.length} Zaps with ${auditResult.global_metrics.total_monthly_tasks} monthly tasks`)
+    updateStatus('success', `v1.0.0 API works! Found ${auditResult.per_zap_findings.length} Zaps with ${auditResult.global_metrics.total_monthly_tasks} monthly tasks`)
     
     // Log key metrics
     console.log('📊 Global Metrics:', auditResult.global_metrics)
@@ -1324,38 +1370,6 @@ async function testV1API() {
     
   } catch (error) {
     console.error('❌ v1.0.0 API test failed:', error)
-    updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  }
-}
-
-
-// Load test data from JSON file
-async function loadTestData() {
-  if (!wasmReady) {
-    updateStatus('error', 'WASM engine not ready. Please refresh the page.')
-    return
-  }
-  
-  updateStatus('processing', 'Loading test data...')
-  
-  try {
-    // Fetch the test JSON file
-    const response = await fetch('/test-data/bad_example.json')
-    if (!response.ok) {
-      throw new Error(`Failed to load test data: ${response.statusText}`)
-    }
-    
-    const jsonContent = await response.text()
-    console.log('Loaded test data:', jsonContent.substring(0, 200))
-    
-    // ⚠️ TEST DATA BUTTON IS DEPRECATED
-    // The old single-zap workflow has been replaced by batch analysis
-    updateStatus('error', '⚠️ Test data button is deprecated. Please upload a real Zapier export ZIP file instead.')
-    
-    console.warn('💡 To test: Upload a real Zapier export ZIP → Select Zaps → Analyze')
-    
-  } catch (error) {
-    console.error('Error loading test data:', error)
     updateStatus('error', `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
@@ -1371,7 +1385,7 @@ function backToSelector() {
     return
   }
   
-  updateStatus('success', `✨ Found ${zapList.length} Zap${zapList.length === 1 ? '' : 's'} - Select one to audit`)
+  updateStatus('success', `Found ${zapList.length} Zap${zapList.length === 1 ? '' : 's'} - Select one to audit`)
   displayZapSelector(zapList)
 }
 
@@ -1379,8 +1393,7 @@ function backToSelector() {
 function setupDropzone() {
   const dropzone = document.getElementById('dropzone')
   const fileInput = document.getElementById('file-input') as HTMLInputElement
-  const testDataBtn = document.getElementById('test-data-btn')
-  
+    
   if (!dropzone || !fileInput) return
   
   // Click to upload
@@ -1395,13 +1408,6 @@ function setupDropzone() {
       handleFileUpload(target.files[0])
     }
   })
-  
-  // Test data button
-  if (testDataBtn) {
-    testDataBtn.addEventListener('click', () => {
-      loadTestData()
-    })
-  }
   
   // Drag and drop handlers
   dropzone.addEventListener('dragover', (e) => {
@@ -1461,17 +1467,6 @@ function renderUI() {
             🔒 All processing happens locally in your browser
           </p>
           <input type="file" id="file-input" accept=".zip" class="hidden" />
-        </div>
-        
-        <!-- Test Data Button -->
-        <div class="mt-6 text-center">
-          <button id="test-data-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-            </svg>
-            Load Test Data (2 Bad Zaps)
-          </button>
-          <p class="text-xs text-slate-400 mt-2">Contains examples of polling triggers and late filter placement</p>
         </div>
         
         <!-- Status -->
