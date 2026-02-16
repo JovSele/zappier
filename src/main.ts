@@ -75,7 +75,7 @@ function initFirstInstall(): string {
   if (!firstInstall) {
     firstInstall = new Date().toISOString()
     localStorage.setItem('first_install_timestamp', firstInstall)
-    console.log('🎉 First install initialized:', firstInstall)
+    // First install timestamp initialized
   }
   return firstInstall
 }
@@ -194,8 +194,7 @@ async function initWasm() {
     console.log('WASM initialized successfully')
     
     // Test WASM connection
-    const greeting = hello_world()
-    console.log(greeting)
+    hello_world()
     
     updateStatus('ready', 'WASM Engine Ready')
     updateWasmIndicator(true)
@@ -300,7 +299,7 @@ async function handleFileUpload(file: File) {
     const arrayBuffer = await file.arrayBuffer()
     const uint8Array = new Uint8Array(arrayBuffer)
     
-    console.log(`File size: ${uint8Array.length} bytes`)
+    // File uploaded successfully (silent in production)
     
     // Cache ZIP data for later use
     cachedZipData = uint8Array
@@ -309,7 +308,7 @@ async function handleFileUpload(file: File) {
     const listResultJson = parse_zap_list(uint8Array)
     const listResult: ZapListResult = JSON.parse(listResultJson)
     
-    console.log('Zap list result:', listResult)
+    // Zap list parsed (silent in production)
     
     if (listResult.success) {
       zapList = listResult.zaps
@@ -513,7 +512,7 @@ function applyCostCalibration() {
     monthlyBill = 0
     includedTasks = 0
     updateCalibrationBadge()
-    console.warn('⚠️ Zero-division guard: Invalid pricing inputs, using benchmark $0.02/task')
+    // Invalid pricing inputs - using benchmark
     return
   }
   
@@ -525,7 +524,7 @@ function applyCostCalibration() {
   
   updateCalibrationBadge()
   
-  console.log(`💰 Live calibration: $${pricePerTask.toFixed(4)}/task (from $${bill}/${tasks} tasks)`)
+  // Cost calibration updated (silent)
 }
 
 // NEW: Update calibration badge with visual feedback
@@ -673,13 +672,7 @@ async function handleAnalyzeSelected() {
   updateStatus('processing', `Analyzing ${selectedIds.length} Zap${selectedIds.length === 1 ? '' : 's'}...`)
   
   try {
-    // ✅ DEBUG: Log parameters before WASM call
-    console.log('🔍 WASM Call Parameters:', {
-      zipDataSize: cachedZipData.byteLength,
-      selectedIds: selectedIds,
-      plan: currentPlanType,
-      usage: includedTasks || 2000
-    })
+    // WASM call prepared (parameters validated)
     
     // ✅ Use slider state for both plan and usage (synced with UI)
     const plan = currentPlanType // Use selected plan from slider
@@ -704,16 +697,7 @@ async function handleAnalyzeSelected() {
 
     // TypeScript now KNOWS it's valid AuditResult
     const auditResult: AuditResult = rawResult
-    console.log('✅ Validated v1.0.0 Audit Result:', auditResult)
-
-    // 🔍 DEBUG: Log global metrics
-    console.log('📊 GLOBAL METRICS DEBUG:', {
-      total_zaps: auditResult.global_metrics.total_zaps,
-      active_zaps: auditResult.global_metrics.active_zaps,
-      zombie_zaps: auditResult.global_metrics.zombie_zap_count,
-      total_monthly_tasks: auditResult.global_metrics.total_monthly_tasks,
-      high_severity: auditResult.global_metrics.high_severity_flag_count,
-    })
+    // Audit result validated successfully
 
     // 🔍 DEBUG: PER-ZAP STATUS
     console.log('🚨 PER-ZAP STATUS:', auditResult.per_zap_findings.map(z => ({
