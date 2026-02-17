@@ -114,6 +114,12 @@ export function mapAuditToPdfViewModel(
       flagType: opportunity.flag_code,
     }));
 
+    console.log('[mapper debug]', {
+      opportunitiesCount: auditResult.opportunities_ranked.length,
+      priorityActionsCount: priorityActions.length,
+      firstFlagType: auditResult.opportunities_ranked[0]?.flag_code,
+    });
+
   // ===== RISK SUMMARY =====
   const allFlags = auditResult.per_zap_findings.flatMap(zap => zap.flags);
   
