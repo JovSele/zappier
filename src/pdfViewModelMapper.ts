@@ -111,6 +111,7 @@ export function mapAuditToPdfViewModel(
       actionLabel: ACTION_LABELS[opportunity.flag_code] || 'Optimize automation',
       estimatedAnnualImpact: opportunity.estimated_monthly_savings_usd * 12,
       effortMinutes: EFFORT_MAP[opportunity.flag_code] ?? 10,
+      flagType: opportunity.flag_code,
     }));
 
   // ===== RISK SUMMARY =====

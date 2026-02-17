@@ -361,10 +361,12 @@ function getRootCauseLabel(flagType: string | undefined): string {
   if (!flagType) return 'Structural Inefficiency';
   
   const map: Record<string, string> = {
-    'inefficient_logic': 'Excess Task Consumption',
-    'redundant_step': 'Redundant Process Layer',
-    'non_executing': 'Dead Workflow Branch',
-    'filter_position': 'Suboptimal Filter Placement',
+    'FORMATTER_CHAIN': 'Formatter Chain Redundancy',
+    'INTERLEAVED_TRANSFORMATIONS': 'Scattered Data Transformations',
+    'TASK_STEP_COST_INFLATION': 'Excess Task Consumption',
+    'LATE_FILTER': 'Suboptimal Filter Placement',
+    'ZOMBIE_ZAP': 'Dead Workflow Branch',
+    'PLAN_UNDERUTILIZATION': 'Plan Cost Inefficiency',
   };
   return map[flagType] ?? 'Structural Inefficiency';
 }
@@ -376,14 +378,18 @@ function getRootCauseDescription(flagType: string | undefined): string {
   if (!flagType) return 'Structural inefficiency identified — review step configuration.';
   
   const map: Record<string, string> = {
-    'inefficient_logic': 
-      'Merge multiple operations into a single step to eliminate task duplication.',
-    'redundant_step': 
-      'Remove redundant process layer — identical output achievable with fewer steps.',
-    'non_executing': 
-      'Dead branch detected — workflow triggers but produces no downstream output.',
-    'filter_position': 
-      'Filter placement causes unnecessary upstream execution before discard.',
+    'FORMATTER_CHAIN': 
+      'Merge multiple formatting steps into a single operation to reduce task duplication.',
+    'INTERLEAVED_TRANSFORMATIONS': 
+      'Consolidate scattered data transformations — reduces complexity and task overhead.',
+    'TASK_STEP_COST_INFLATION': 
+      'Restructure step sequence to eliminate unnecessary task consumption.',
+    'LATE_FILTER': 
+      'Move filter earlier in workflow — prevents unnecessary execution of upstream steps.',
+    'ZOMBIE_ZAP': 
+      'Automation is active but not executing — deactivate to eliminate wasted plan capacity.',
+    'PLAN_UNDERUTILIZATION': 
+      'Current plan capacity significantly exceeds operational requirements.',
   };
   return map[flagType] ?? 'Structural inefficiency identified — review step configuration.';
 }
@@ -471,6 +477,7 @@ function renderPage2_PriorityActions(
       
       // Root Cause (red, bold, small) - OPTIONAL
       if (safeRender(yPos, pageHeight, 15)) {
+        console.log('[flagType check]', action.flagType, typeof action.flagType);
         pdf.setFontSize(8);
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(192, 57, 43);
