@@ -1,7 +1,6 @@
 import './style.css'
 import init, { 
   hello_world, 
-  parse_zapfile_json, 
   parse_zap_list, 
   //parse_single_zap_audit, 15.2.2026
   analyze_zaps  // ✅ v1.0.0 API (replaces parse_batch_audit)
@@ -10,8 +9,7 @@ import init, {
 import { PDFDocument } from 'pdf-lib'
 import { 
   generateExecutiveAuditPDF,
-  mapAuditToPdfViewModel,
-  type PDFConfig
+  mapAuditToPdfViewModel
 } from './pdfGenerator'
 import type { AuditResult } from './types/audit-schema'
 import { validateAuditResult } from './validation'
@@ -20,9 +18,6 @@ import {
   generateFileHash, 
   deserializeMetadata 
 } from './types/reaudit'
-
-// Keep ParseResult for legacy single-zap workflow (will be migrated later)
-type ParseResult = any
 
 // Type definitions
 interface ZapSummary {
@@ -34,26 +29,6 @@ interface ZapSummary {
   last_run: string | null
   error_rate: number | null
   total_runs: number
-}
-
-interface EfficiencyFlag {
-  zap_id: number
-  zap_title: string
-  flag_type: string
-  severity: string
-  message: string
-  details: string
-  error_rate?: number  // Only present for error_loop flags
-  most_common_error?: string
-  error_trend?: string
-  max_streak?: number
-  estimated_monthly_savings: number
-  estimated_annual_savings: number  // NEW: Centralized from WASM (monthly * 12)
-  formatted_monthly_savings: string  // Pre-formatted for PDF display (e.g., "$2.3k")
-  formatted_annual_savings: string  // Pre-formatted for PDF display (e.g., "$27.6k")
-  savings_explanation: string
-  is_fallback: boolean
-  confidence: string  // "high" | "medium" | "low" - PHASE 2: Trust indicator
 }
 
 interface ZapListResult {
@@ -116,22 +91,6 @@ function generateReportCode(reportId: number): string {
   return `LHA-${year}-${dayOfYear}-${paddedId}`
 }
 
-
-/**
- * Save audit entry to localStorage
- */
-function saveAuditLog(reportId: number, reportCode: string, zapId: number, zapTitle: string) {
-  const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]')
-  logs.push({
-    report_id: reportId,
-    report_code: reportCode,
-    zap_id: zapId,
-    zap_title: zapTitle,
-    timestamp: new Date().toISOString(),
-    report_type: 'full_audit'
-  })
-  localStorage.setItem('auditLogs', JSON.stringify(logs))
-}
 
 // Initialize WASM module
 let wasmReady = false
@@ -604,25 +563,6 @@ function updateAnalyzeButton() {
       analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed')
       analyzeBtn.classList.add('hover:scale-105', 'hover:shadow-lg')
     }
-  }
-}
-
-// ============================================================================
-// PHASE 2: CONFIDENCE BADGE HELPERS
-// ============================================================================
-
-/**
- * Get confidence badge color (hex codes matching PDF)
- * Returns HTML/CSS color classes for UI consistency
- */
-function getConfidenceBadgeColor(confidence: string): { dot: string; hex: string } {
-  const confidenceLower = confidence.toLowerCase()
-  if (confidenceLower === 'high') {
-    return { dot: 'bg-emerald-500', hex: '#10b981' } // Green - matches PDF COLORS.GREEN
-  } else if (confidenceLower === 'medium') {
-    return { dot: 'bg-amber-500', hex: '#f59e0b' } // Amber - matches PDF amber color
-  } else {
-    return { dot: 'bg-rose-500', hex: '#ef4444' } // Red - matches PDF COLORS.RED
   }
 }
 

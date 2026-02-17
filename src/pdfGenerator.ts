@@ -52,6 +52,7 @@ export interface PdfViewModel {
     actionLabel: string;
     estimatedAnnualImpact: number;
     effortMinutes: number;
+    flagType?: string;
   }>;
   
   riskSummary: {
@@ -109,6 +110,21 @@ function formatCurrency(amount: number): string {
 }
 
 /**
+ * Check if there's enough space to safely render content above footer zone
+ * @param yPos - Current Y position
+ * @param pageHeight - Total page height
+ * @param requiredSpace - Minimum space needed (default 10mm)
+ * @returns true if safe to render, false if would overflow into footer
+ */
+function safeRender(
+  yPos: number,
+  pageHeight: number,
+  requiredSpace: number = 10
+): boolean {
+  return yPos + requiredSpace < pageHeight - 30;
+}
+
+/**
  * Draw page footer with confidential statement
  */
 
@@ -156,6 +172,29 @@ function drawPageFooter(
 // ========================================
 // PAGE RENDERING FUNCTIONS
 // ========================================
+
+/**
+ * Calculate Health Score - Calibrated Hybrid Model
+ * Combines architectural issues, remediation effort, and ROI analysis
+ * Formula: 100 - (severityPenalty + effortPenalty + economicPenalty)
+ * - Architectural: min(60, high * 13 + medium * 3)
+ * - Effort: >60min = +2, >30min = +1
+ * - Economic: ROI < 1x = +2
+ * Range: 0-100 (clamped)
+ */
+function calculateHealthScore(vm: PdfViewModel): number {
+  const high = vm.riskSummary.highSeverityCount;
+  const medium = vm.riskSummary.mediumSeverityCount;
+  const annualSavings = vm.financialOverview.recapturableAnnualSpend || 0;
+  const remediationMinutes = vm.financialOverview.estimatedRemediationMinutes || 0;
+  const AUDIT_COST = 79;
+
+  const severityPenalty = Math.min(60, (high * 10) + (medium * 3));
+  const effortPenalty = remediationMinutes > 60 ? 2 : remediationMinutes > 30 ? 1 : 0;
+  const economicPenalty = annualSavings < AUDIT_COST ? 2 : 0;
+
+  return Math.max(0, Math.min(100, 100 - severityPenalty - effortPenalty - economicPenalty));
+}
 
 /**
  * Render Page 1: Executive Summary
@@ -234,8 +273,11 @@ function renderPage1_ExecutiveSummary(
   pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'italic');
-  const multiplierText = `Equivalent to ${viewModel.financialOverview.multiplier}× the cost of this audit.`;
-  pdf.text(multiplierText, PAGE_MARGIN + (CONTENT_WIDTH / 2), yPos, { align: 'center' });
+  const roiMultiplier = viewModel.financialOverview.multiplier;
+  const roiSubtext = roiMultiplier >= 1
+    ? `Equivalent to ${roiMultiplier.toFixed(1)}× the cost of this audit.`
+    : 'Low financial leakage detected.';
+  pdf.text(roiSubtext, PAGE_MARGIN + (CONTENT_WIDTH / 2), yPos, { align: 'center' });
   
   yPos += 20;
 
@@ -275,6 +317,92 @@ function renderPage1_ExecutiveSummary(
 
   // ===== DIVIDER 3 =====
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+
+  // ── HEALTH SCORE ────────────────────────────────────── (OPTIONAL)
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  
+  if (safeRender(yPos, pageHeight, 20)) {
+    yPos += 10;
+    pdf.setDrawColor(229, 231, 235);
+    pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+    yPos += 8;
+
+    const healthScore = calculateHealthScore(viewModel);
+    const isGood = healthScore >= 80;
+    const isMedium = healthScore >= 50 && healthScore < 80;
+
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(100, 116, 139);
+    pdf.text('Automation Health Score', PAGE_MARGIN, yPos);
+
+    pdf.setFont('helvetica', 'bold');
+    if (isGood) pdf.setTextColor(22, 163, 74);
+    else if (isMedium) pdf.setTextColor(217, 119, 6);
+    else pdf.setTextColor(192, 57, 43);
+
+    pdf.text(`${healthScore} / 100`, PAGE_MARGIN + CONTENT_WIDTH, yPos, { align: 'right' });
+    yPos += 5;
+
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(148, 163, 184);
+    const scoreLabel = isGood ? 'All systems operating within benchmarks'
+      : isMedium ? 'Minor inefficiencies detected'
+      : 'Immediate review recommended';
+    pdf.text(scoreLabel, PAGE_MARGIN, yPos);
+  }
+}
+
+/**
+ * Map flag type to Root Cause label
+ */
+function getRootCauseLabel(flagType: string | undefined): string {
+  if (!flagType) return 'Structural Inefficiency';
+  
+  const map: Record<string, string> = {
+    'inefficient_logic': 'Excess Task Consumption',
+    'redundant_step': 'Redundant Process Layer',
+    'non_executing': 'Dead Workflow Branch',
+    'filter_position': 'Suboptimal Filter Placement',
+  };
+  return map[flagType] ?? 'Structural Inefficiency';
+}
+
+/**
+ * Map flag type to diagnostic description explaining the issue
+ */
+function getRootCauseDescription(flagType: string | undefined): string {
+  if (!flagType) return 'Structural inefficiency identified — review step configuration.';
+  
+  const map: Record<string, string> = {
+    'inefficient_logic': 
+      'Merge multiple operations into a single step to eliminate task duplication.',
+    'redundant_step': 
+      'Remove redundant process layer — identical output achievable with fewer steps.',
+    'non_executing': 
+      'Dead branch detected — workflow triggers but produces no downstream output.',
+    'filter_position': 
+      'Filter placement causes unnecessary upstream execution before discard.',
+  };
+  return map[flagType] ?? 'Structural inefficiency identified — review step configuration.';
+}
+
+/**
+ * Derive workflow pattern description based on audit data
+ */
+function deriveWorkflowPattern(vm: PdfViewModel): string {
+  const highCount = vm.riskSummary.highSeverityCount;
+  const zapCount = vm.financialOverview.totalZaps;
+
+  if (highCount === 0) {
+    return `${zapCount} workflow${zapCount !== 1 ? 's' : ''} — no critical branches detected`;
+  }
+
+  const redundant = vm.riskSummary.redundancyPatterns;
+  const inefficient = vm.riskSummary.inefficientLogicPatterns;
+
+  return `Linear chain with ${inefficient} conditional branch${inefficient !== 1 ? 'es' : ''}, ${redundant} redundanc${redundant !== 1 ? 'ies' : 'y'}`;
 }
 
 /**
@@ -325,6 +453,8 @@ function renderPage2_PriorityActions(
     yPos += 15;
   } else {
     // Render each action
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    
     viewModel.priorityActions.forEach((action, index) => {
       // Checkbox
       pdf.setDrawColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
@@ -339,8 +469,34 @@ function renderPage2_PriorityActions(
       
       yPos += 7;
       
+      // Root Cause (red, bold, small) - OPTIONAL
+      if (safeRender(yPos, pageHeight, 15)) {
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(192, 57, 43);
+        pdf.text(`Root Cause: ${getRootCauseLabel(action.flagType)}`, PAGE_MARGIN + 12, yPos);
+        yPos += 5;
+      }
+      
+      // Root Cause Description (gray, normal, small) - OPTIONAL
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      if (safeRender(yPos, pageHeight, 12)) {
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+        pdf.text(
+          getRootCauseDescription(action.flagType), 
+          PAGE_MARGIN + 12, 
+          yPos,
+          { maxWidth: pageWidth - PAGE_MARGIN * 2 - 12 }
+        );
+        yPos += 5;
+      }
+      
       // Action label (normal, indented)
+      pdf.setFontSize(12);
       pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
       pdf.text(action.actionLabel, PAGE_MARGIN + 12, yPos);
       
       yPos += 7;
@@ -371,6 +527,21 @@ function renderPage2_PriorityActions(
   // ===== FINAL DIVIDER =====
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+
+  // ── WORKFLOW PATTERN INSIGHT ────────────────────────── (OPTIONAL)
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  
+  if (safeRender(yPos, pageHeight, 12)) {
+    yPos += 12;
+    pdf.setDrawColor(229, 231, 235);
+    pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
+    yPos += 7;
+
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(148, 163, 184);
+    pdf.text(`Workflow Pattern: ${deriveWorkflowPattern(viewModel)}`, PAGE_MARGIN, yPos);
+  }
 }
 
 /**
@@ -447,6 +618,20 @@ function renderPage3_InfrastructureHealth(
     
     yPos += 7;
 
+    // High Severity subtext (if any high severity issues exist) - OPTIONAL
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    
+    if (riskSummary.highSeverityCount > 0 && safeRender(yPos, pageHeight, 10)) {
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'italic');
+      pdf.setTextColor(192, 57, 43);
+      pdf.text('Requires immediate attention', PAGE_MARGIN + 9, yPos);
+      yPos += 4;
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    }
+
     // Medium Severity
     pdf.setFont('helvetica', 'normal');
     pdf.text('Medium Severity:', PAGE_MARGIN + 5, yPos);
@@ -470,23 +655,48 @@ function renderPage3_InfrastructureHealth(
     yPos += 12;
 
     // Pattern items
-    const patterns = [
-      { label: 'Inefficient Logic:', count: riskSummary.inefficientLogicPatterns },
-      { label: 'Redundant Steps:', count: riskSummary.redundancyPatterns },
-      { label: 'Non-Executing:', count: riskSummary.nonExecutingAutomations }
-    ];
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    
+    // Inefficient Logic
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.text('Root Cause — Inefficient Logic:', PAGE_MARGIN, yPos);
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+    const inefficientCount = riskSummary.inefficientLogicPatterns;
+    pdf.text(
+      `${inefficientCount} instance${inefficientCount !== 1 ? 's' : ''}`,
+      pageWidth - PAGE_MARGIN,
+      yPos,
+      { align: 'right' }
+    );
+    yPos += 7;
 
-    patterns.forEach(pattern => {
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(pattern.label, PAGE_MARGIN + 5, yPos);
-      
-      // Instance/instances
-      const instanceText = pattern.count === 1 ? 'instance' : 'instances';
-      pdf.text(`${pattern.count} ${instanceText}`, PAGE_MARGIN + 60, yPos);
-      
-      yPos += 7;
-    });
+    // Redundant Steps
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.text('Root Cause — Redundant Steps:', PAGE_MARGIN, yPos);
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+    const redundantCount = riskSummary.redundancyPatterns;
+    pdf.text(
+      `${redundantCount} instance${redundantCount !== 1 ? 's' : ''}`,
+      pageWidth - PAGE_MARGIN,
+      yPos,
+      { align: 'right' }
+    );
+    yPos += 7;
+
+    // Non-Executing
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.text('Root Cause — Non-Executing:', PAGE_MARGIN, yPos);
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+    const nonExecutingCount = riskSummary.nonExecutingAutomations;
+    pdf.text(
+      `${nonExecutingCount} instance${nonExecutingCount !== 1 ? 's' : ''}`,
+      pageWidth - PAGE_MARGIN,
+      yPos,
+      { align: 'right' }
+    );
+    yPos += 7;
     
     yPos += 8;
   }
@@ -543,23 +753,43 @@ function renderPage4_PlanAnalysis(
   
   yPos += 12;
 
-  /// ===== CAPACITY STATEMENT =====
-  pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-  pdf.setFontSize(12);
-  pdf.setFont('helvetica', 'normal');
+  /// ===== UTILIZATION ASSESSMENT ===== (OPTIONAL)
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const utilizationPct = viewModel.planSummary.usagePercent;
+  
+  // Calculate verdict and recommended action with stronger consultant tone
+  let utilizationVerdict: string;
+  let recommendedAction: string;
 
-  // Conditional wording based on usage level
-  let capacityText: string;
-  if (viewModel.planSummary.usagePercent < 5) {
-    capacityText = 'Current plan utilization is minimal.';
+  if (utilizationPct === 0) {
+    utilizationVerdict = 'Zero task consumption detected in audit window.';
+    recommendedAction = 'High Optimization Potential — plan cost exceeds operational value.';
+  } else if (utilizationPct < 10) {
+    utilizationVerdict = 'Critical underutilization relative to plan capacity.';
+    recommendedAction = 'High Optimization Potential — significant capacity available.';
+  } else if (utilizationPct < 30) {
+    utilizationVerdict = 
+      'Current plan is functionally sufficient but economically inefficient relative to workload.';
+    recommendedAction = viewModel.planSummary.downgradeRecommended
+      ? 'Downgrade recommended — current tier exceeds operational requirements.'
+      : 'Plan review recommended — utilization below optimal threshold.';
+  } else if (utilizationPct < 70) {
+    utilizationVerdict = 'Plan utilization within acceptable operational range.';
+    recommendedAction = 'Current plan is appropriate.';
   } else {
-    const excessPercent = (100 - viewModel.planSummary.usagePercent).toFixed(1);
-    capacityText = `Your current capacity exceeds requirements by ${excessPercent}%.`;
+    utilizationVerdict = 'High utilization — plan capacity approaching operational limits.';
+    recommendedAction = 'Monitor task consumption — consider plan upgrade proactively.';
+  }
+  
+  if (safeRender(yPos, pageHeight, 25)) {
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(utilizationVerdict, PAGE_MARGIN, yPos);
+    yPos += 8;
   }
 
-  pdf.text(capacityText, PAGE_MARGIN, yPos);
-
-  yPos += 15;
+  yPos += 7;
 
   // ===== PREMIUM FEATURES (if any) =====
   if (viewModel.planSummary.premiumFeaturesDetected.length > 0) {
@@ -589,23 +819,8 @@ function renderPage4_PlanAnalysis(
   yPos += 7;
 
   pdf.setFont('helvetica', 'normal');
-
-  // Conditional recommendation based on usage and downgrade safety
-  if (viewModel.planSummary.usagePercent < 5) {
-    // Very low usage - softer wording
-    pdf.text('Plan review recommended.', PAGE_MARGIN, yPos);
-    yPos += 7;
-  } else if (viewModel.planSummary.downgradeRecommended) {
-    // Moderate usage - direct recommendation
-    pdf.text('Adjust to lower tier to reduce costs.', PAGE_MARGIN, yPos);
-    yPos += 7;
-  } else {
-    // Current plan is appropriate
-    pdf.text('Current plan is appropriate.', PAGE_MARGIN, yPos);
-    yPos += 7;
-    pdf.text('No downgrade recommended.', PAGE_MARGIN, yPos);
-    yPos += 7;
-  }
+  pdf.text(recommendedAction, PAGE_MARGIN, yPos);
+  yPos += 7;
 
   // ===== FINAL DIVIDER =====
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
