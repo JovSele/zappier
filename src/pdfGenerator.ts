@@ -45,6 +45,7 @@ export interface PdfViewModel {
     activeZaps: number;
     highSeverityCount: number;
     estimatedRemediationMinutes: number;
+    totalOpportunitiesCount?: number;
   }
   
   priorityActions: Array<{
@@ -88,11 +89,11 @@ const COLORS = {
 };
 
 const LAYOUT = {
-  PAGE_MARGIN: 20,
-  TOP_MARGIN: 60,
-  SECTION_SPACING: 40,
-  LINE_SPACING: 20,
-  CONTENT_WIDTH: 170  // A4 width - 2*margin
+  PAGE_MARGIN: 22,
+  TOP_MARGIN: 45,
+  SECTION_SPACING: 32,
+  LINE_SPACING: 18,
+  CONTENT_WIDTH: 166  // A4 width - 2*margin
 };
 
 // ========================================
@@ -149,7 +150,7 @@ function drawPageFooter(
 
   // LINE 1: Confidential statement (left only)
   pdf.text(
-    `CONFIDENTIAL AUDIT — Prepared for ${clientName}`,
+    `CONFIDENTIAL — Prepared exclusively for ${clientName}`,
     margin,
     pageHeight - 13
   );
@@ -194,6 +195,17 @@ function calculateHealthScore(vm: PdfViewModel): number {
   const economicPenalty = annualSavings < AUDIT_COST ? 2 : 0;
 
   return Math.max(0, Math.min(100, 100 - severityPenalty - effortPenalty - economicPenalty));
+}
+
+/**
+ * Get Health Score benchmark category
+ * Board-level classification for executive reporting
+ */
+function getHealthScoreCategory(score: number): string {
+  if (score >= 90) return 'OPTIMAL';
+  if (score >= 75) return 'STABLE';
+  if (score >= 50) return 'NEEDS ATTENTION';
+  return 'CRITICAL RISK';
 }
 
 /**
@@ -247,38 +259,56 @@ function renderPage1_ExecutiveSummary(
   
   yPos += 20;
 
-  // ===== MAIN METRIC: Recapturable Spend =====
+  // ===== DUAL COLUMN LAYOUT: ROI + HEALTH SCORE =====
+  const leftColX = PAGE_MARGIN;
+  const rightColX = PAGE_MARGIN + CONTENT_WIDTH / 2 + 10;
+
+  // LEFT COLUMN: Financial amount (red, large)
   const spendAmount = formatCurrency(viewModel.financialOverview.recapturableAnnualSpend);
-  
   pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
-  pdf.setFontSize(28);
+  pdf.setFontSize(32);
   pdf.setFont('helvetica', 'bold');
-  
-  // Center the amount
-  const amountWidth = pdf.getTextWidth(spendAmount);
-  const centerX = PAGE_MARGIN + (CONTENT_WIDTH / 2) - (amountWidth / 2);
-  pdf.text(spendAmount, centerX, yPos);
-  
+  pdf.text(spendAmount, leftColX, yPos);
+
+  // RIGHT COLUMN: Health Score
+  const healthScore = calculateHealthScore(viewModel);
+  const category = getHealthScoreCategory(healthScore);
+
+  pdf.setFontSize(32);
+  pdf.setFont('helvetica', 'bold');
+
+  // Color based on category
+  if (healthScore >= 75) pdf.setTextColor(22, 163, 74);      // green
+  else if (healthScore >= 50) pdf.setTextColor(217, 119, 6); // orange
+  else pdf.setTextColor(192, 57, 43);                        // red
+
+  pdf.text(`${healthScore} / 100`, rightColX, yPos);
+
   yPos += 10;
 
-  // Label
+  // LEFT: Label
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-  pdf.setFontSize(12);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('Recapturable Annual Spend', PAGE_MARGIN + (CONTENT_WIDTH / 2), yPos, { align: 'center' });
-  
-  yPos += 15;
-
-  // Multiplier statement
-  pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
   pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Recapturable Annual Spend', leftColX, yPos);
+
+  // RIGHT: Category
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+  pdf.text(`Category: ${category}`, rightColX, yPos);
+
+  yPos += 12;
+
+  // ROI subtext (left only)
+  pdf.setFontSize(9);
   pdf.setFont('helvetica', 'italic');
   const roiMultiplier = viewModel.financialOverview.multiplier;
   const roiSubtext = roiMultiplier >= 1
     ? `Equivalent to ${roiMultiplier.toFixed(1)}× the cost of this audit.`
     : 'Low financial leakage detected.';
-  pdf.text(roiSubtext, PAGE_MARGIN + (CONTENT_WIDTH / 2), yPos, { align: 'center' });
-  
+  pdf.text(roiSubtext, leftColX, yPos, { maxWidth: CONTENT_WIDTH / 2 - 5 });
+
   yPos += 20;
 
   // ===== DIVIDER 2 =====
@@ -317,41 +347,6 @@ function renderPage1_ExecutiveSummary(
 
   // ===== DIVIDER 3 =====
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
-
-  // ── HEALTH SCORE ────────────────────────────────────── (OPTIONAL)
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  
-  if (safeRender(yPos, pageHeight, 20)) {
-    yPos += 10;
-    pdf.setDrawColor(229, 231, 235);
-    pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
-    yPos += 8;
-
-    const healthScore = calculateHealthScore(viewModel);
-    const isGood = healthScore >= 80;
-    const isMedium = healthScore >= 50 && healthScore < 80;
-
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(100, 116, 139);
-    pdf.text('Automation Health Score', PAGE_MARGIN, yPos);
-
-    pdf.setFont('helvetica', 'bold');
-    if (isGood) pdf.setTextColor(22, 163, 74);
-    else if (isMedium) pdf.setTextColor(217, 119, 6);
-    else pdf.setTextColor(192, 57, 43);
-
-    pdf.text(`${healthScore} / 100`, PAGE_MARGIN + CONTENT_WIDTH, yPos, { align: 'right' });
-    yPos += 5;
-
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(148, 163, 184);
-    const scoreLabel = isGood ? 'All systems operating within benchmarks'
-      : isMedium ? 'Minor inefficiencies detected'
-      : 'Immediate review recommended';
-    pdf.text(scoreLabel, PAGE_MARGIN, yPos);
-  }
 }
 
 /**
@@ -473,16 +468,15 @@ function renderPage2_PriorityActions(
       pdf.setFont('helvetica', 'bold');
       pdf.text(action.zapName, PAGE_MARGIN + 8, yPos);
       
-      yPos += 7;
+      yPos += 6;
       
       // Root Cause (red, bold, small) - OPTIONAL
       if (safeRender(yPos, pageHeight, 15)) {
-        console.log('[flagType check]', action.flagType, typeof action.flagType);
         pdf.setFontSize(8);
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(192, 57, 43);
         pdf.text(`Root Cause: ${getRootCauseLabel(action.flagType)}`, PAGE_MARGIN + 12, yPos);
-        yPos += 5;
+        yPos += 4;
       }
       
       // Root Cause Description (gray, normal, small) - OPTIONAL
@@ -497,7 +491,7 @@ function renderPage2_PriorityActions(
           yPos,
           { maxWidth: pageWidth - PAGE_MARGIN * 2 - 12 }
         );
-        yPos += 5;
+        yPos += 4;
       }
       
       // Action label (normal, indented)
@@ -506,29 +500,49 @@ function renderPage2_PriorityActions(
       pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
       pdf.text(action.actionLabel, PAGE_MARGIN + 12, yPos);
       
-      yPos += 7;
+      yPos += 6;
       
-      // Impact (secondary color, indented)
+      // Impact + Effort (single line, secondary color, indented)
       pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-      pdf.setFontSize(10);
+      pdf.setFontSize(11);
       const impactText = `Impact: ${formatCurrency(action.estimatedAnnualImpact)}/year`;
+      const effortText = `Effort: ${action.effortMinutes} min`;
+      
+      // Left: Impact
       pdf.text(impactText, PAGE_MARGIN + 12, yPos);
       
-      yPos += 5;
+      // Right: Effort (calculate position based on Impact width + spacing)
+      const impactWidth = pdf.getTextWidth(impactText);
+      pdf.text(effortText, PAGE_MARGIN + 12 + impactWidth + 15, yPos);
       
-      // Effort (secondary color, indented)
-      pdf.text(`Effort: ${action.effortMinutes} min`, PAGE_MARGIN + 12, yPos);
-      
-      yPos += 12;
+      yPos += 6;
       
       // Divider between items (except after last item)
       if (index < viewModel.priorityActions.length - 1) {
         pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
         pdf.setLineWidth(0.3);
         pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
-        yPos += 12;
+        yPos += 10;
       }
     });
+  }
+
+  // ===== INFO NOTE (if more opportunities exist) =====
+  const totalOpportunities = viewModel.financialOverview.totalOpportunitiesCount || 0;
+  const shownActions = viewModel.priorityActions.length;
+
+  if (totalOpportunities > shownActions) {
+    yPos += 8;
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(100, 116, 139); // slate-500
+    const additionalCount = totalOpportunities - shownActions;
+    pdf.text(
+      `Note: Showing top ${shownActions} priority actions. Additional ${additionalCount} opportunit${additionalCount !== 1 ? 'ies' : 'y'} available in detailed audit.`,
+      PAGE_MARGIN,
+      yPos
+    );
+    yPos += 10;
   }
 
   // ===== FINAL DIVIDER =====
@@ -566,7 +580,7 @@ function renderPage3_InfrastructureHealth(
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Infrastructure Health', PAGE_MARGIN, yPos);
+  pdf.text('Infrastructure Risk Assessment', PAGE_MARGIN, yPos);
   
   yPos += 12;
 
@@ -624,20 +638,6 @@ function renderPage3_InfrastructureHealth(
     pdf.text(riskSummary.highSeverityCount.toString(), PAGE_MARGIN + 60, yPos);
     
     yPos += 7;
-
-    // High Severity subtext (if any high severity issues exist) - OPTIONAL
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    
-    if (riskSummary.highSeverityCount > 0 && safeRender(yPos, pageHeight, 10)) {
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'italic');
-      pdf.setTextColor(192, 57, 43);
-      pdf.text('Requires immediate attention', PAGE_MARGIN + 9, yPos);
-      yPos += 4;
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-    }
 
     // Medium Severity
     pdf.setFont('helvetica', 'normal');
@@ -817,11 +817,11 @@ function renderPage4_PlanAnalysis(
     yPos += 9;
   }
 
- // ===== RECOMMENDED ACTION =====
+ // ===== EXECUTIVE VERDICT =====
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(12);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Recommended Action:', PAGE_MARGIN, yPos);
+  pdf.text('Executive Verdict:', PAGE_MARGIN, yPos);
 
   yPos += 7;
 
@@ -940,30 +940,31 @@ export async function generateExecutiveAuditPDF(
   config: PDFConfig
 ): Promise<void> {
   const pdf = new jsPDF('p', 'mm', 'a4');
+  const clientName = config.clientName || 'Client';
   
   // Page 1: Executive Summary
   renderPage1_ExecutiveSummary(pdf, viewModel, config);
-  drawPageFooter(pdf, 1, config.clientName || 'Client');
+  drawPageFooter(pdf, 1, clientName);
   
   // Page 2: Priority Actions
   pdf.addPage();
   renderPage2_PriorityActions(pdf, viewModel);
-  drawPageFooter(pdf, 2, config.clientName || 'Client');
+  drawPageFooter(pdf, 2, clientName);
   
-  // Page 3: Infrastructure Health
+  // Page 3: Infrastructure Risk Assessment
   pdf.addPage();
   renderPage3_InfrastructureHealth(pdf, viewModel);
-  drawPageFooter(pdf, 3, config.clientName || 'Client');
+  drawPageFooter(pdf, 3, clientName);
   
   // Page 4: Plan Analysis
   pdf.addPage();
   renderPage4_PlanAnalysis(pdf, viewModel);
-  drawPageFooter(pdf, 4, config.clientName || 'Client');
+  drawPageFooter(pdf, 4, clientName);
   
-  // Page 5: Verified Stable Automations (Safe Zone)
+  // Page 5: Safe Zone
   pdf.addPage();
   renderPage5_SafeZone(pdf, viewModel);
-  drawPageFooter(pdf, 5, config.clientName || 'Client');
+  drawPageFooter(pdf, 5, clientName);
   
   // ============================================================================
   // EMBED RE-AUDIT METADATA (if provided)
