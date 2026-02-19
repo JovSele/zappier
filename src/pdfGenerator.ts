@@ -264,19 +264,25 @@ function renderPage1_ExecutiveSummary(
   const rightColX = PAGE_MARGIN + CONTENT_WIDTH / 2 + 10;
 
   // Calculate box dimensions
-  const boxWidth = (CONTENT_WIDTH / 2) - 5;  // Slight gap between boxes
-  const boxHeight = 32;  // Height to contain all content
-  const boxY = yPos - 8;  // Start slightly above text
+  const boxWidth = (CONTENT_WIDTH / 2) - 8;  // Wider gap between boxes
+  const boxPadding = 4;  // Internal padding
+  const boxHeight = 28;  // Height to contain metric + labels
+  const boxY = yPos - 6;  // Start above text
 
-  // LEFT BOX: ROI background
-  pdf.setFillColor(248, 250, 252);  // slate-50 — very subtle gray
-  pdf.rect(leftColX - 3, boxY, boxWidth, boxHeight, 'F');  // 'F' = filled
+  // LEFT BOX: ROI
+  pdf.setFillColor(250, 251, 252);  // slate-50 — very subtle background
+  pdf.setDrawColor(203, 213, 225);  // slate-300 — subtle border
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(leftColX - boxPadding, boxY, boxWidth, boxHeight, 2, 2, 'FD');  // 'FD' = Fill + Draw
 
-  // RIGHT BOX: Health Score background
-  pdf.setFillColor(248, 250, 252);  // same subtle gray
-  pdf.rect(rightColX - 3, boxY, boxWidth, boxHeight, 'F');
+  // RIGHT BOX: Health Score
+  pdf.setFillColor(250, 251, 252);  // same background
+  pdf.setDrawColor(203, 213, 225);  // same border
+  pdf.roundedRect(rightColX - boxPadding, boxY, boxWidth, boxHeight, 2, 2, 'FD');
 
-  // Now render text on top of backgrounds
+  // Reset for text rendering
+  pdf.setDrawColor(0, 0, 0);
+
   // LEFT COLUMN: Financial amount (PRIMARY METRIC — fontSize 34)
   const spendAmount = formatCurrency(viewModel.financialOverview.recapturableAnnualSpend);
   pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
