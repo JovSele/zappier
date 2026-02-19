@@ -263,18 +263,32 @@ function renderPage1_ExecutiveSummary(
   const leftColX = PAGE_MARGIN;
   const rightColX = PAGE_MARGIN + CONTENT_WIDTH / 2 + 10;
 
-  // LEFT COLUMN: Financial amount (red, large)
+  // Calculate box dimensions
+  const boxWidth = (CONTENT_WIDTH / 2) - 5;  // Slight gap between boxes
+  const boxHeight = 32;  // Height to contain all content
+  const boxY = yPos - 8;  // Start slightly above text
+
+  // LEFT BOX: ROI background
+  pdf.setFillColor(248, 250, 252);  // slate-50 — very subtle gray
+  pdf.rect(leftColX - 3, boxY, boxWidth, boxHeight, 'F');  // 'F' = filled
+
+  // RIGHT BOX: Health Score background
+  pdf.setFillColor(248, 250, 252);  // same subtle gray
+  pdf.rect(rightColX - 3, boxY, boxWidth, boxHeight, 'F');
+
+  // Now render text on top of backgrounds
+  // LEFT COLUMN: Financial amount (PRIMARY METRIC — fontSize 34)
   const spendAmount = formatCurrency(viewModel.financialOverview.recapturableAnnualSpend);
   pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
-  pdf.setFontSize(32);
+  pdf.setFontSize(34);
   pdf.setFont('helvetica', 'bold');
   pdf.text(spendAmount, leftColX, yPos);
 
-  // RIGHT COLUMN: Health Score
+  // RIGHT COLUMN: Health Score (SECONDARY METRIC — fontSize 24)
   const healthScore = calculateHealthScore(viewModel);
   const category = getHealthScoreCategory(healthScore);
 
-  pdf.setFontSize(32);
+  pdf.setFontSize(24);
   pdf.setFont('helvetica', 'bold');
 
   // Color based on category
@@ -282,7 +296,7 @@ function renderPage1_ExecutiveSummary(
   else if (healthScore >= 50) pdf.setTextColor(217, 119, 6); // orange
   else pdf.setTextColor(192, 57, 43);                        // red
 
-  pdf.text(`${healthScore} / 100`, rightColX, yPos);
+  pdf.text(`${healthScore} / 100`, rightColX, yPos + 2);
 
   yPos += 10;
 
@@ -292,11 +306,11 @@ function renderPage1_ExecutiveSummary(
   pdf.setFont('helvetica', 'normal');
   pdf.text('Recapturable Annual Spend', leftColX, yPos);
 
-  // RIGHT: Category
+  // RIGHT: Health Score label
   pdf.setFontSize(11);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-  pdf.text(`Category: ${category}`, rightColX, yPos);
+  pdf.text(`Health Score — ${category}`, rightColX, yPos);
 
   yPos += 12;
 
@@ -348,12 +362,16 @@ function renderPage1_ExecutiveSummary(
   const totalZaps = viewModel.financialOverview.totalZaps;
   const activeZaps = viewModel.financialOverview.activeZaps;
 
+  // Total Zaps line
+  stats.push(`Total Zaps Analyzed: ${totalZaps}`);
+
+  // Status line (separate)
   if (activeZaps === 0) {
-    stats.push(`Total Zaps Analyzed: ${totalZaps} (all inactive)`);
+    stats.push('Status: No active automations detected');
   } else if (activeZaps === totalZaps) {
-    stats.push(`Total Zaps Analyzed: ${totalZaps} (all active)`);
+    stats.push('Status: All automations active');
   } else {
-    stats.push(`Active Zaps: ${activeZaps} of ${totalZaps}`);
+    stats.push(`Status: ${activeZaps} of ${totalZaps} automations active`);
   }
 
   stats.push(`High Priority Issues: ${viewModel.financialOverview.highSeverityCount}`);
@@ -579,7 +597,7 @@ function renderPage2_PriorityActions(
         
         // Extra spacing between flags (if multiple flags for same Zap)
         if (flagIndex < actions.length - 1) {
-          yPos += 4;
+          yPos += 8;  // doubled from 4 to 8 for clearer separation
         }
       });
       
@@ -791,6 +809,40 @@ function renderPage3_InfrastructureHealth(
     yPos += 7;
     
     yPos += 8;
+  }
+
+  // ===== RISK ASSESSMENT INTERPRETATION ===== (OPTIONAL)
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  if (safeRender(yPos, pageHeight, 15)) {
+    yPos += 12;
+    
+    // Generate interpretation based on risk levels
+    let interpretation = '';
+    const { highSeverityCount, mediumSeverityCount } = viewModel.riskSummary;
+    
+    if (highSeverityCount === 0 && mediumSeverityCount === 0) {
+      interpretation = 'Risk Assessment: No structural inefficiencies detected. Infrastructure operates within optimal parameters.';
+    } else if (highSeverityCount === 0) {
+      interpretation = 'Risk Assessment: Low-severity findings with minimal operational impact. Infrastructure remains stable.';
+    } else if (highSeverityCount === 1) {
+      interpretation = 'Risk Assessment: Isolated high-severity finding with minimal structural impact. Remediation recommended.';
+    } else if (highSeverityCount <= 3) {
+      interpretation = 'Risk Assessment: Multiple high-severity findings detected. Immediate remediation required to prevent operational degradation.';
+    } else {
+      interpretation = 'Risk Assessment: Systemic inefficiencies detected across infrastructure. Comprehensive remediation plan required.';
+    }
+    
+    // Render interpretation (gray italic, professional tone)
+    pdf.setFontSize(9.5);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    pdf.text(interpretation, PAGE_MARGIN, yPos, { 
+      maxWidth: pageWidth - PAGE_MARGIN * 2 
+    });
+    
+    yPos += 10;
   }
 
   // ===== FINAL DIVIDER =====
