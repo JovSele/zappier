@@ -264,15 +264,15 @@ function renderPage1_ExecutiveSummary(
   const rightColX = PAGE_MARGIN + CONTENT_WIDTH / 2 + 10;
 
   // Calculate box dimensions
-  const boxWidth = (CONTENT_WIDTH / 2) - 8;  // Wider gap between boxes
-  const boxPadding = 4;  // Internal padding
-  const boxHeight = 28;  // Height to contain metric + labels
-  const boxY = yPos - 6;  // Start above text
+  const boxWidth = (CONTENT_WIDTH / 2) - 5;  // wider boxes
+  const boxPadding = 8;  // more internal padding
+  const boxHeight = 35;  // taller boxes
+  const boxY = yPos - 8;  // start higher
 
   // LEFT BOX: ROI
   pdf.setFillColor(250, 251, 252);  // slate-50 — very subtle background
   pdf.setDrawColor(203, 213, 225);  // slate-300 — subtle border
-  pdf.setLineWidth(0.1);
+  pdf.setLineWidth(0.5);
   pdf.roundedRect(leftColX - boxPadding, boxY, boxWidth, boxHeight, 2, 2, 'FD');  // 'FD' = Fill + Draw
 
   // RIGHT BOX: Health Score
@@ -283,14 +283,16 @@ function renderPage1_ExecutiveSummary(
   // Reset for text rendering
   pdf.setDrawColor(0, 0, 0);
 
-  // LEFT COLUMN: Financial amount (PRIMARY METRIC — fontSize 34)
+  // LEFT COLUMN: Financial amount (PRIMARY METRIC — fontSize 34, centered in box)
   const spendAmount = formatCurrency(viewModel.financialOverview.recapturableAnnualSpend);
   pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
   pdf.setFontSize(34);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(spendAmount, leftColX, yPos);
+  const spendWidth = pdf.getTextWidth(spendAmount);
+  const leftCenterX = leftColX - boxPadding + (boxWidth / 2) - (spendWidth / 2);
+  pdf.text(spendAmount, leftCenterX, yPos);
 
-  // RIGHT COLUMN: Health Score (SECONDARY METRIC — fontSize 24)
+  // RIGHT COLUMN: Health Score (SECONDARY METRIC — fontSize 24, centered in box)
   const healthScore = calculateHealthScore(viewModel);
   const category = getHealthScoreCategory(healthScore);
 
@@ -302,21 +304,30 @@ function renderPage1_ExecutiveSummary(
   else if (healthScore >= 50) pdf.setTextColor(217, 119, 6); // orange
   else pdf.setTextColor(192, 57, 43);                        // red
 
-  pdf.text(`${healthScore} / 100`, rightColX, yPos + 2);
+  const scoreText = `${healthScore} / 100`;
+  const scoreWidth = pdf.getTextWidth(scoreText);
+  const rightCenterX = rightColX - boxPadding + (boxWidth / 2) - (scoreWidth / 2);
+  pdf.text(scoreText, rightCenterX, yPos + 2);
 
   yPos += 10;
 
-  // LEFT: Label
+  // LEFT: Label (centered in box)
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(11);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('Recapturable Annual Spend', leftColX, yPos);
+  const leftLabel = 'Recapturable Annual Spend';
+  const leftLabelWidth = pdf.getTextWidth(leftLabel);
+  const leftLabelX = leftColX - boxPadding + (boxWidth / 2) - (leftLabelWidth / 2);
+  pdf.text(leftLabel, leftLabelX, yPos);
 
-  // RIGHT: Health Score label
+  // RIGHT: Health Score label (centered in box)
   pdf.setFontSize(11);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-  pdf.text(`Health Score — ${category}`, rightColX, yPos);
+  const rightLabel = `Health Score — ${category}`;
+  const rightLabelWidth = pdf.getTextWidth(rightLabel);
+  const rightLabelX = rightColX - boxPadding + (boxWidth / 2) - (rightLabelWidth / 2);
+  pdf.text(rightLabel, rightLabelX, yPos);
 
   yPos += 12;
 
