@@ -288,12 +288,12 @@ function renderPage1_ExecutiveSummary(
 
   // LEFT: Label
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-  pdf.setFontSize(10);
+  pdf.setFontSize(11);
   pdf.setFont('helvetica', 'normal');
   pdf.text('Recapturable Annual Spend', leftColX, yPos);
 
   // RIGHT: Category
-  pdf.setFontSize(8);
+  pdf.setFontSize(11);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
   pdf.text(`Category: ${category}`, rightColX, yPos);
@@ -301,13 +301,34 @@ function renderPage1_ExecutiveSummary(
   yPos += 12;
 
   // ROI subtext (left only)
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'italic');
+  pdf.setFontSize(10);
   const roiMultiplier = viewModel.financialOverview.multiplier;
-  const roiSubtext = roiMultiplier >= 1
-    ? `Equivalent to ${roiMultiplier.toFixed(1)}× the cost of this audit.`
-    : 'Low financial leakage detected.';
-  pdf.text(roiSubtext, leftColX, yPos, { maxWidth: CONTENT_WIDTH / 2 - 5 });
+  
+  if (roiMultiplier >= 1) {
+    // Split into 3 parts: "Equivalent to " + "9.5×" + " the cost of this audit."
+    const prefix = 'Equivalent to ';
+    const multiplierText = `${roiMultiplier.toFixed(1)}×`;
+    const suffix = ' the cost of this audit.';
+    
+    // Prefix (italic, normal)
+    pdf.setFont('helvetica', 'italic');
+    pdf.text(prefix, leftColX, yPos);
+    
+    // Multiplier (bold, italic)
+    const prefixWidth = pdf.getTextWidth(prefix);
+    pdf.setFont('helvetica', 'bolditalic');
+    pdf.text(multiplierText, leftColX + prefixWidth, yPos);
+    
+    // Suffix (italic, normal)
+    const multiplierWidth = pdf.getTextWidth(multiplierText);
+    pdf.setFont('helvetica', 'italic');
+    pdf.text(suffix, leftColX + prefixWidth + multiplierWidth, yPos, { 
+      maxWidth: CONTENT_WIDTH / 2 - 5 - prefixWidth - multiplierWidth 
+    });
+  } else {
+    pdf.setFont('helvetica', 'italic');
+    pdf.text('Low financial leakage detected.', leftColX, yPos, { maxWidth: CONTENT_WIDTH / 2 - 5 });
+  }
 
   yPos += 20;
 
@@ -338,10 +359,33 @@ function renderPage1_ExecutiveSummary(
   stats.push(`High Priority Issues: ${viewModel.financialOverview.highSeverityCount}`);
   stats.push(`Estimated Remediation Time: ${viewModel.financialOverview.estimatedRemediationMinutes} minutes`);
 
+  // Render stats with bold values
   stats.forEach(stat => {
-    pdf.text(stat, PAGE_MARGIN, yPos);
+    // Split stat into label + value using the last ": "
+    const lastColonIndex = stat.lastIndexOf(': ');
+    if (lastColonIndex > -1) {
+      const label = stat.substring(0, lastColonIndex + 2); // Include ": "
+      const value = stat.substring(lastColonIndex + 2);
+      
+      // Label (normal)
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(label, PAGE_MARGIN, yPos);
+      
+      // Value (bold)
+      const labelWidth = pdf.getTextWidth(label);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(value, PAGE_MARGIN + labelWidth, yPos);
+    } else {
+      // Fallback if no colon found
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(stat, PAGE_MARGIN, yPos);
+    }
+    
     yPos += 7;
   });
+  
+  // Reset font
+  pdf.setFont('helvetica', 'normal');
   
   yPos += 8;
 
@@ -453,77 +497,101 @@ function renderPage2_PriorityActions(
     
     yPos += 15;
   } else {
-    // Render each action
+    // Group actions by zapName
+    const groupedActions = new Map<string, typeof viewModel.priorityActions>();
+    
+    viewModel.priorityActions.forEach(action => {
+      const existing = groupedActions.get(action.zapName) || [];
+      existing.push(action);
+      groupedActions.set(action.zapName, existing);
+    });
+    
     const pageHeight = pdf.internal.pageSize.getHeight();
     
-    viewModel.priorityActions.forEach((action, index) => {
+    // Render each Zap group
+    let groupIndex = 0;
+    
+    groupedActions.forEach((actions, zapName) => {
       // Checkbox
       pdf.setDrawColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
       pdf.setLineWidth(0.3);
-      pdf.rect(PAGE_MARGIN, yPos - 3, 4, 4); // Empty checkbox
+      pdf.rect(PAGE_MARGIN, yPos - 3, 4, 4);
       
       // Zap name (bold, primary color)
       pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
       pdf.setFontSize(12);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(action.zapName, PAGE_MARGIN + 8, yPos);
+      pdf.text(zapName, PAGE_MARGIN + 8, yPos);
       
       yPos += 6;
       
-      // Root Cause (red, bold, small) - OPTIONAL
-      if (safeRender(yPos, pageHeight, 15)) {
-        pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(192, 57, 43);
-        pdf.text(`Root Cause: ${getRootCauseLabel(action.flagType)}`, PAGE_MARGIN + 12, yPos);
-        yPos += 4;
-      }
-      
-      // Root Cause Description (gray, normal, small) - OPTIONAL
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      if (safeRender(yPos, pageHeight, 12)) {
-        pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'normal');
+      // Render all flags for this Zap
+      actions.forEach((action, flagIndex) => {
+        // Root Cause (red, bold)
+        if (safeRender(yPos, pageHeight, 15)) {
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(192, 57, 43);
+          pdf.text(`Root Cause: ${getRootCauseLabel(action.flagType)}`, PAGE_MARGIN + 8, yPos);
+          yPos += 5;
+        }
+        
+        // Root Cause Description (gray, normal)
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        if (safeRender(yPos, pageHeight, 12)) {
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+          pdf.text(
+            getRootCauseDescription(action.flagType), 
+            PAGE_MARGIN + 8, 
+            yPos,
+            { maxWidth: pageWidth - PAGE_MARGIN * 2 - 8 }
+          );
+          yPos += 6;
+        }
+        
+        // Impact + Effort (split: gray labels, dark values)
+        pdf.setFontSize(11);
+        
+        // LEFT: Impact
         pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-        pdf.text(
-          getRootCauseDescription(action.flagType), 
-          PAGE_MARGIN + 12, 
-          yPos,
-          { maxWidth: pageWidth - PAGE_MARGIN * 2 - 12 }
-        );
-        yPos += 4;
-      }
+        pdf.text('Impact:', PAGE_MARGIN + 8, yPos);
+        
+        const impactValue = `${formatCurrency(action.estimatedAnnualImpact)}/year`;
+        const impactLabelWidth = pdf.getTextWidth('Impact: ');
+        pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+        pdf.text(impactValue, PAGE_MARGIN + 8 + impactLabelWidth, yPos);
+        
+        // RIGHT: Effort
+        const impactTotalWidth = impactLabelWidth + pdf.getTextWidth(impactValue);
+        const effortX = PAGE_MARGIN + 8 + impactTotalWidth + 15;
+        
+        pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+        pdf.text('Effort:', effortX, yPos);
+        
+        const effortValue = `${action.effortMinutes} min`;
+        const effortLabelWidth = pdf.getTextWidth('Effort: ');
+        pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+        pdf.text(effortValue, effortX + effortLabelWidth, yPos);
+        
+        yPos += 6;
+        
+        // Extra spacing between flags (if multiple flags for same Zap)
+        if (flagIndex < actions.length - 1) {
+          yPos += 4;
+        }
+      });
       
-      // Action label (normal, indented)
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-      pdf.text(action.actionLabel, PAGE_MARGIN + 12, yPos);
-      
-      yPos += 6;
-      
-      // Impact + Effort (single line, secondary color, indented)
-      pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-      pdf.setFontSize(11);
-      const impactText = `Impact: ${formatCurrency(action.estimatedAnnualImpact)}/year`;
-      const effortText = `Effort: ${action.effortMinutes} min`;
-      
-      // Left: Impact
-      pdf.text(impactText, PAGE_MARGIN + 12, yPos);
-      
-      // Right: Effort (calculate position based on Impact width + spacing)
-      const impactWidth = pdf.getTextWidth(impactText);
-      pdf.text(effortText, PAGE_MARGIN + 12 + impactWidth + 15, yPos);
-      
-      yPos += 6;
-      
-      // Divider between items (except after last item)
-      if (index < viewModel.priorityActions.length - 1) {
+      // Divider between Zap groups (except after last group)
+      if (groupIndex < groupedActions.size - 1) {
         pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
         pdf.setLineWidth(0.3);
         pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
         yPos += 10;
       }
+      
+      groupIndex++;
     });
   }
 
@@ -553,15 +621,20 @@ function renderPage2_PriorityActions(
   const pageHeight = pdf.internal.pageSize.getHeight();
   
   if (safeRender(yPos, pageHeight, 12)) {
-    yPos += 12;
-    pdf.setDrawColor(229, 231, 235);
-    pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
-    yPos += 7;
-
-    pdf.setFontSize(8);
+    yPos += 8;  // smaller spacing, no divider line
+    
+    pdf.setFontSize(11);
+    
+    // Label (gray, italic)
     pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(148, 163, 184);
-    pdf.text(`Workflow Pattern: ${deriveWorkflowPattern(viewModel)}`, PAGE_MARGIN, yPos);
+    pdf.setTextColor(148, 163, 184); // slate-400
+    pdf.text('Workflow Pattern:', PAGE_MARGIN, yPos);
+    
+    // Value (dark, normal)
+    const labelWidth = pdf.getTextWidth('Workflow Pattern: ');
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.text(deriveWorkflowPattern(viewModel), PAGE_MARGIN + labelWidth, yPos);
   }
 }
 
@@ -631,20 +704,32 @@ function renderPage3_InfrastructureHealth(
 
     // High Severity
     pdf.setFontSize(12);
+    
+    // Label (gray)
     pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
     pdf.text('High Severity:', PAGE_MARGIN + 5, yPos);
     
+    // Count (red, bold)
     pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
     pdf.text(riskSummary.highSeverityCount.toString(), PAGE_MARGIN + 60, yPos);
     
     yPos += 7;
 
     // Medium Severity
+    // Label (gray)
     pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
     pdf.text('Medium Severity:', PAGE_MARGIN + 5, yPos);
     
+    // Count (orange, bold)
     pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(217, 119, 6); // orange
     pdf.text(riskSummary.mediumSeverityCount.toString(), PAGE_MARGIN + 60, yPos);
+    
+    // Reset color to primary for next section
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
     
     yPos += 15;
 
@@ -751,18 +836,36 @@ function renderPage4_PlanAnalysis(
   yPos += 7;
 
   // ===== TASK USAGE =====
+  // Label (normal, primary color)
   pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.text('Task Usage:', PAGE_MARGIN, yPos);
   
+  // Value (bold, color-coded by severity)
   pdf.setFont('helvetica', 'bold');
-  const usageText = `${viewModel.planSummary.usagePercent}%`;
+  const utilizationPct = viewModel.planSummary.usagePercent;
+  const usageText = `${utilizationPct}%`;
+  
+  // Color logic
+  if (utilizationPct < 10) {
+    pdf.setTextColor(192, 57, 43); // red — critical underutilization
+  } else if (utilizationPct < 30) {
+    pdf.setTextColor(217, 119, 6); // orange — warning underutilization
+  } else if (utilizationPct <= 70) {
+    pdf.setTextColor(22, 163, 74); // green — optimal range
+  } else {
+    pdf.setTextColor(217, 119, 6); // orange — approaching capacity
+  }
+  
   pdf.text(usageText, PAGE_MARGIN + 40, yPos);
+  
+  // Reset to primary color
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   
   yPos += 12;
 
   /// ===== UTILIZATION ASSESSMENT ===== (OPTIONAL)
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const utilizationPct = viewModel.planSummary.usagePercent;
   
   // Calculate verdict and recommended action with stronger consultant tone
   let utilizationVerdict: string;
@@ -825,8 +928,27 @@ function renderPage4_PlanAnalysis(
 
   yPos += 7;
 
+  // Verdict text — color-coded by severity
   pdf.setFont('helvetica', 'normal');
+  
+  // Color logic based on verdict content
+  if (recommendedAction.includes('High Optimization Potential')) {
+    pdf.setTextColor(192, 57, 43); // red — critical issue
+  } else if (recommendedAction.includes('Downgrade recommended') || 
+             recommendedAction.includes('Plan review recommended')) {
+    pdf.setTextColor(217, 119, 6); // orange — warning
+  } else if (recommendedAction.includes('appropriate') || 
+             recommendedAction.includes('optimal')) {
+    pdf.setTextColor(22, 163, 74); // green — all good
+  } else {
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b); // default
+  }
+  
   pdf.text(recommendedAction, PAGE_MARGIN, yPos);
+  
+  // Reset color
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+  
   yPos += 7;
 
   // ===== FINAL DIVIDER =====
