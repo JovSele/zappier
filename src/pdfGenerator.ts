@@ -272,7 +272,7 @@ function renderPage1_ExecutiveSummary(
   // LEFT BOX: ROI
   pdf.setFillColor(250, 251, 252);  // slate-50 — very subtle background
   pdf.setDrawColor(203, 213, 225);  // slate-300 — subtle border
-  pdf.setLineWidth(0.5);
+  pdf.setLineWidth(0.1);
   pdf.roundedRect(leftColX - boxPadding, boxY, boxWidth, boxHeight, 2, 2, 'FD');  // 'FD' = Fill + Draw
 
   // RIGHT BOX: Health Score
