@@ -975,7 +975,7 @@ function renderPage4_PlanAnalysis(
     utilizationVerdict = 'Zero task consumption detected during the analyzed period.';
     recommendedAction = 'High Optimization Potential — plan cost exceeds operational value.';
   } else if (utilizationPct < 10) {
-    utilizationVerdict = 'Material underutilization relative to plan capacity.';
+    utilizationVerdict = 'Critical underutilization relative to plan capacity.';
     recommendedAction = 'High Optimization Potential — significant capacity available.';
   } else if (utilizationPct < 30) {
     utilizationVerdict = 
@@ -984,11 +984,11 @@ function renderPage4_PlanAnalysis(
       ? 'Downgrade recommended — current tier exceeds operational requirements.'
       : 'Optimization potential identified — current tier exceeds operational needs.';
   } else if (utilizationPct < 70) {
-    utilizationVerdict = 'Plan utilization within acceptable operational thresholds.';
-    recommendedAction = 'Current plan remains aligned with operational demand.';
+    utilizationVerdict = 'Plan utilization within acceptable operational range.';
+    recommendedAction = 'Current plan is appropriate.';
   } else {
-    utilizationVerdict = 'Elevated utilization — capacity buffer narrowing.';
-    recommendedAction = 'Monitor consumption trends — evaluate upgrade if growth persists.';
+    utilizationVerdict = 'High utilization — plan capacity approaching operational limits.';
+    recommendedAction = 'Monitor task consumption — consider plan upgrade proactively.';
   }
   
   if (safeRender(yPos, pageHeight, 25)) {
