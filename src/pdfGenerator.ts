@@ -85,7 +85,23 @@ const COLORS = {
   TEXT_PRIMARY: { r: 30, g: 41, b: 59 },    // #1E293B - Slate-900
   TEXT_SECONDARY: { r: 100, g: 116, b: 139 }, // #64748B - Slate-500
   DIVIDER: { r: 229, g: 231, b: 235 },       // #E5E7EB - Gray-200
-  BACKGROUND: { r: 255, g: 255, b: 255 }     // #FFFFFF
+  BACKGROUND: { r: 255, g: 255, b: 255 },    // #FFFFFF
+  
+  // Drawing & borders
+  BLACK: { r: 0, g: 0, b: 0 },
+  GRAY_FOOTER: { r: 119, g: 119, b: 119 },
+  
+  // Severity colors
+  GREEN_SUCCESS: { r: 22, g: 163, b: 74 },
+  ORANGE_WARNING: { r: 217, g: 119, b: 6 },
+  
+  // Box styling
+  BOX_BACKGROUND: { r: 250, g: 251, b: 252 },      // slate-50
+  BOX_BORDER_STRONG: { r: 203, g: 213, b: 225 },   // slate-300
+  BOX_BORDER_LIGHT: { r: 226, g: 232, b: 240 },    // slate-200
+  
+  // Typography accents
+  SLATE_400: { r: 148, g: 163, b: 184 }
 };
 
 const LAYOUT = {
@@ -143,8 +159,8 @@ function drawPageFooter(
   pdf.setLineWidth(0.3);
   pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
 
-  // Set footer text color (gray #777 = rgb(119, 119, 119))
-  pdf.setTextColor(119, 119, 119);
+  // Set footer text color
+  pdf.setTextColor(COLORS.GRAY_FOOTER.r, COLORS.GRAY_FOOTER.g, COLORS.GRAY_FOOTER.b);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'normal');
 
@@ -178,7 +194,7 @@ function drawPageFooter(
  * Calculate Health Score - Calibrated Hybrid Model
  * Combines architectural issues, remediation effort, and ROI analysis
  * Formula: 100 - (severityPenalty + effortPenalty + economicPenalty)
- * - Architectural: min(60, high * 13 + medium * 3)
+ * - Architectural: min(60, high * 10 + medium * 3)
  * - Effort: >60min = +2, >30min = +1
  * - Economic: ROI < 1x = +2
  * Range: 0-100 (clamped)
@@ -204,8 +220,8 @@ function calculateHealthScore(vm: PdfViewModel): number {
 function getHealthScoreCategory(score: number): string {
   if (score >= 90) return 'OPTIMAL';
   if (score >= 75) return 'STABLE';
-  if (score >= 50) return 'NEEDS ATTENTION';
-  return 'CRITICAL RISK';
+  if (score >= 50) return 'AT RISK';
+  return 'CRITICAL';
 }
 
 /**
@@ -260,30 +276,38 @@ function renderPage1_ExecutiveSummary(
   yPos += 24;
 
   // ===== DUAL COLUMN LAYOUT: ROI + HEALTH SCORE =====
-  const boxOffset = 10;  // 10mm offset doprava
-  const leftColX = PAGE_MARGIN + boxOffset;
-  const rightColX = PAGE_MARGIN + CONTENT_WIDTH / 2 + 10 + boxOffset;
+  // Clean column layout with explicit gap
+  const boxGap = 12;  // gap between boxes
+  const boxPadding = 8;  // internal padding
+  const boxHeight = 42;
+  const boxY = yPos - 14;
 
-  // Calculate box dimensions
-  const leftBoxWidth = (CONTENT_WIDTH / 2) + 5;  
-  const rightBoxWidth = (CONTENT_WIDTH / 2) - 15;  
-  const boxHeight = 42;  // bolo 35, teraz 42 (o 7mm vyššie)
-  const boxPadding = 8;  // more internal padding
-  const boxY = yPos - 14;  // start higher
+  // Calculate symmetric box dimensions
+  const totalBoxesWidth = CONTENT_WIDTH - boxGap;  // total space for both boxes
+  const leftBoxWidth = totalBoxesWidth / 2;
+  const rightBoxWidth = totalBoxesWidth / 2;  // symmetric
+
+  // Calculate box positions
+  const leftBoxStartX = PAGE_MARGIN;
+  const rightBoxStartX = leftBoxStartX + leftBoxWidth + boxGap;
+
+  // Column X positions (for text centering)
+  const leftColX = leftBoxStartX + boxPadding;
+  const rightColX = rightBoxStartX + boxPadding;
 
   // LEFT BOX: ROI
-  pdf.setFillColor(250, 251, 252);  // slate-50 — very subtle background
-  pdf.setDrawColor(203, 213, 225);  // slate-300 — subtle border
+  pdf.setFillColor(COLORS.BOX_BACKGROUND.r, COLORS.BOX_BACKGROUND.g, COLORS.BOX_BACKGROUND.b);
+  pdf.setDrawColor(COLORS.BOX_BORDER_STRONG.r, COLORS.BOX_BORDER_STRONG.g, COLORS.BOX_BORDER_STRONG.b);
   pdf.setLineWidth(0.1);
   pdf.roundedRect(leftColX - boxPadding, boxY, leftBoxWidth, boxHeight, 2, 2, 'FD');  // 'FD' = Fill + Draw
 
   // RIGHT BOX: Health Score
-  pdf.setFillColor(250, 251, 252);  // same background
-  pdf.setDrawColor(203, 213, 225);  // same border
+  pdf.setFillColor(COLORS.BOX_BACKGROUND.r, COLORS.BOX_BACKGROUND.g, COLORS.BOX_BACKGROUND.b);
+  pdf.setDrawColor(COLORS.BOX_BORDER_STRONG.r, COLORS.BOX_BORDER_STRONG.g, COLORS.BOX_BORDER_STRONG.b);
   pdf.roundedRect(rightColX - boxPadding, boxY, rightBoxWidth, boxHeight, 2, 2, 'FD');
 
   // Reset for text rendering
-  pdf.setDrawColor(0, 0, 0);
+  pdf.setDrawColor(COLORS.BLACK.r, COLORS.BLACK.g, COLORS.BLACK.b);
 
   // LEFT COLUMN: Financial amount (PRIMARY METRIC — fontSize 34, centered in box)
   const spendAmount = formatCurrency(viewModel.financialOverview.recapturableAnnualSpend);
@@ -302,9 +326,9 @@ function renderPage1_ExecutiveSummary(
   pdf.setFont('helvetica', 'bold');
 
   // Color based on category
-  if (healthScore >= 75) pdf.setTextColor(22, 163, 74);      // green
-  else if (healthScore >= 50) pdf.setTextColor(217, 119, 6); // orange
-  else pdf.setTextColor(192, 57, 43);                        // red
+  if (healthScore >= 75) pdf.setTextColor(COLORS.GREEN_SUCCESS.r, COLORS.GREEN_SUCCESS.g, COLORS.GREEN_SUCCESS.b);
+  else if (healthScore >= 50) pdf.setTextColor(COLORS.ORANGE_WARNING.r, COLORS.ORANGE_WARNING.g, COLORS.ORANGE_WARNING.b);
+  else pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
 
   const scoreText = `${healthScore} / 100`;
   const scoreWidth = pdf.getTextWidth(scoreText);
@@ -510,6 +534,7 @@ function renderPage2_PriorityActions(
   viewModel: PdfViewModel
 ): void {
   const { PAGE_MARGIN, TOP_MARGIN, CONTENT_WIDTH } = LAYOUT;
+  const pageHeight = pdf.internal.pageSize.getHeight();
   let yPos = TOP_MARGIN;
 
   // ===== HEADER =====
@@ -557,8 +582,6 @@ function renderPage2_PriorityActions(
       groupedActions.set(action.zapName, existing);
     });
     
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    
     // Render each Zap group
     let groupIndex = 0;
     
@@ -578,42 +601,49 @@ function renderPage2_PriorityActions(
       
       // Render all flags for this Zap
       actions.forEach((action, flagIndex) => {
-        // Calculate box dimensions for this finding
-        const findingBoxY = yPos - 5;  // Start slightly above text
-        const findingBoxHeight = 21;   // Height to contain Root Cause + Description + Impact/Effort
-        const findingBoxWidth = CONTENT_WIDTH - 10;  // Full width minus margins
+        // Calculate dynamic box height based on content
+        const pageWidth = pdf.internal.pageSize.getWidth();
         const findingBoxX = PAGE_MARGIN + 8;
+        const findingBoxWidth = CONTENT_WIDTH - 10;
         
-        // Draw finding box
-        pdf.setFillColor(250, 251, 252);  // slate-50 — subtle background
-        pdf.setDrawColor(226, 232, 240);  // slate-200 — lighter border than Page 1
+        // Measure description text height
+        const descriptionText = getRootCauseDescription(action.flagType);
+        const descriptionMaxWidth = pageWidth - PAGE_MARGIN * 2 - 12;
+        const descriptionLines = pdf.splitTextToSize(descriptionText, descriptionMaxWidth);
+        const descriptionLineCount = descriptionLines.length;
+        
+        // Calculate heights (in mm)
+        const rootCauseHeight = 5;           // Root Cause label line
+        const descriptionHeight = descriptionLineCount * 5;  // 5mm per line
+        const impactHeight = 8;              // Impact + Effort + exit margin
+        const boxPaddingVertical = 4;        // top + bottom internal padding
+        
+        const findingBoxHeight = boxPaddingVertical + rootCauseHeight + descriptionHeight + impactHeight;
+        const findingBoxY = yPos - 5;
+        
+        // Draw box with dynamic height
+        pdf.setFillColor(COLORS.BOX_BACKGROUND.r, COLORS.BOX_BACKGROUND.g, COLORS.BOX_BACKGROUND.b);
+        pdf.setDrawColor(COLORS.BOX_BORDER_LIGHT.r, COLORS.BOX_BORDER_LIGHT.g, COLORS.BOX_BORDER_LIGHT.b);
         pdf.setLineWidth(0.3);
         pdf.roundedRect(findingBoxX - 2, findingBoxY, findingBoxWidth, findingBoxHeight, 2, 2, 'FD');
         
-        // Reset draw color
-        pdf.setDrawColor(0, 0, 0);
+        pdf.setDrawColor(COLORS.BLACK.r, COLORS.BLACK.g, COLORS.BLACK.b);
         
         // Root Cause (red, bold) — now rendered inside box
         if (safeRender(yPos, pageHeight, 15)) {
           pdf.setFontSize(11);
           pdf.setFont('helvetica', 'bold');
-          pdf.setTextColor(192, 57, 43);
+          pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
           pdf.text(`Root Cause: ${getRootCauseLabel(action.flagType)}`, PAGE_MARGIN + 10, yPos);
           yPos += 5;
         }
         
-        // Root Cause Description (gray, normal)
-        const pageWidth = pdf.internal.pageSize.getWidth();
+        // Root Cause Description (gray, normal) - render pre-split lines
         if (safeRender(yPos, pageHeight, 12)) {
           pdf.setFontSize(11);
           pdf.setFont('helvetica', 'normal');
           pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-          pdf.text(
-            getRootCauseDescription(action.flagType), 
-            PAGE_MARGIN + 10,  // Increased indent inside box
-            yPos,
-            { maxWidth: pageWidth - PAGE_MARGIN * 2 - 12 }
-          );
+          pdf.text(descriptionLines, PAGE_MARGIN + 10, yPos);
           yPos += 6;
         }
         
@@ -669,7 +699,7 @@ function renderPage2_PriorityActions(
     yPos += 8;
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(100, 116, 139); // slate-500
+    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
     const additionalCount = totalOpportunities - shownActions;
     pdf.text(
       `Note: Showing top ${shownActions} priority actions. Additional ${additionalCount} opportunit${additionalCount !== 1 ? 'ies' : 'y'} available in detailed audit.`,
@@ -684,8 +714,6 @@ function renderPage2_PriorityActions(
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
 
   // ── WORKFLOW PATTERN INSIGHT ────────────────────────── (OPTIONAL)
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  
   if (safeRender(yPos, pageHeight, 12)) {
     yPos += 8;  // smaller spacing, no divider line
     
@@ -693,14 +721,17 @@ function renderPage2_PriorityActions(
     
     // Label (gray, italic)
     pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(148, 163, 184); // slate-400
+    pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
     pdf.text('Workflow Pattern:', PAGE_MARGIN, yPos);
     
     // Value (dark, normal)
     const labelWidth = pdf.getTextWidth('Workflow Pattern: ');
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-    pdf.text(deriveWorkflowPattern(viewModel), PAGE_MARGIN + labelWidth, yPos);
+    const availableWidth = CONTENT_WIDTH - labelWidth - 2;  // -2mm safety margin
+    pdf.text(deriveWorkflowPattern(viewModel), PAGE_MARGIN + labelWidth, yPos, { 
+      maxWidth: availableWidth 
+    });
   }
 }
 
@@ -791,7 +822,7 @@ function renderPage3_InfrastructureHealth(
     
     // Count (orange, bold)
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(217, 119, 6); // orange
+    pdf.setTextColor(COLORS.ORANGE_WARNING.r, COLORS.ORANGE_WARNING.g, COLORS.ORANGE_WARNING.b);
     pdf.text(riskSummary.mediumSeverityCount.toString(), PAGE_MARGIN + 60, yPos);
     
     // Reset color to primary for next section
@@ -870,15 +901,15 @@ function renderPage3_InfrastructureHealth(
     const { highSeverityCount, mediumSeverityCount } = viewModel.riskSummary;
     
     if (highSeverityCount === 0 && mediumSeverityCount === 0) {
-      interpretation = 'Risk Assessment: No structural inefficiencies detected. Infrastructure operates within optimal parameters.';
+      interpretation = 'No structural inefficiencies detected. Infrastructure operates within optimal parameters.';
     } else if (highSeverityCount === 0) {
-      interpretation = 'Risk Assessment: Low-severity findings with minimal operational impact. Infrastructure remains stable.';
+      interpretation = 'Low-severity findings with minimal operational impact. Infrastructure remains stable.';
     } else if (highSeverityCount === 1) {
-      interpretation = 'Risk Assessment: Isolated high-severity finding with minimal structural impact. Remediation recommended.';
+      interpretation = 'Isolated high-severity finding detected. Targeted remediation recommended.';
     } else if (highSeverityCount <= 3) {
-      interpretation = 'Risk Assessment: Multiple high-severity findings detected. Immediate remediation required to prevent operational degradation.';
+      interpretation = 'Multiple high-severity findings detected. Immediate remediation required to prevent operational degradation.';
     } else {
-      interpretation = 'Risk Assessment: Systemic inefficiencies detected across infrastructure. Comprehensive remediation plan required.';
+      interpretation = 'Systemic inefficiencies detected across infrastructure. Comprehensive remediation plan required.';
     }
     
     // Render interpretation (gray italic, professional tone)
@@ -948,13 +979,13 @@ function renderPage4_PlanAnalysis(
   
   // Color logic
   if (utilizationPct < 10) {
-    pdf.setTextColor(192, 57, 43); // red — critical underutilization
+    pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
   } else if (utilizationPct < 30) {
-    pdf.setTextColor(217, 119, 6); // orange — warning underutilization
+    pdf.setTextColor(COLORS.ORANGE_WARNING.r, COLORS.ORANGE_WARNING.g, COLORS.ORANGE_WARNING.b);
   } else if (utilizationPct <= 70) {
-    pdf.setTextColor(22, 163, 74); // green — optimal range
+    pdf.setTextColor(COLORS.GREEN_SUCCESS.r, COLORS.GREEN_SUCCESS.g, COLORS.GREEN_SUCCESS.b);
   } else {
-    pdf.setTextColor(217, 119, 6); // orange — approaching capacity
+    pdf.setTextColor(COLORS.ORANGE_WARNING.r, COLORS.ORANGE_WARNING.g, COLORS.ORANGE_WARNING.b);
   }
   
   pdf.text(usageText, PAGE_MARGIN + 40, yPos);
@@ -967,26 +998,34 @@ function renderPage4_PlanAnalysis(
   /// ===== UTILIZATION ASSESSMENT ===== (OPTIONAL)
   const pageHeight = pdf.internal.pageSize.getHeight();
   
-  // Calculate verdict and recommended action with stronger consultant tone
+  // Step 1: Determine severity level based on utilization
+  type VerdictSeverity = 'critical' | 'warning' | 'optimal';
+
   let utilizationVerdict: string;
   let recommendedAction: string;
+  let verdictSeverity: VerdictSeverity;
 
   if (utilizationPct === 0) {
+    verdictSeverity = 'critical';
     utilizationVerdict = 'Zero task consumption detected during the analyzed period.';
     recommendedAction = 'High Optimization Potential — plan cost exceeds operational value.';
   } else if (utilizationPct < 10) {
+    verdictSeverity = 'critical';
     utilizationVerdict = 'Critical underutilization relative to plan capacity.';
     recommendedAction = 'High Optimization Potential — significant capacity available.';
   } else if (utilizationPct < 30) {
+    verdictSeverity = 'warning';
     utilizationVerdict = 
       'Plan capacity exceeds operational requirements — economic inefficiency detected.';
     recommendedAction = viewModel.planSummary.downgradeRecommended
       ? 'Downgrade recommended — current tier exceeds operational requirements.'
       : 'Optimization potential identified — current tier exceeds operational needs.';
   } else if (utilizationPct < 70) {
+    verdictSeverity = 'optimal';
     utilizationVerdict = 'Plan utilization within acceptable operational range.';
     recommendedAction = 'Current plan is appropriate.';
   } else {
+    verdictSeverity = 'warning';
     utilizationVerdict = 'High utilization — plan capacity approaching operational limits.';
     recommendedAction = 'Monitor task consumption — consider plan upgrade proactively.';
   }
@@ -995,7 +1034,9 @@ function renderPage4_PlanAnalysis(
     pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(utilizationVerdict, PAGE_MARGIN, yPos);
+    pdf.text(utilizationVerdict, PAGE_MARGIN, yPos, { 
+      maxWidth: CONTENT_WIDTH 
+    });
     yPos += 8;
   }
 
@@ -1028,23 +1069,25 @@ function renderPage4_PlanAnalysis(
 
   yPos += 7;
 
-  // Verdict text — color-coded by severity
+  // Verdict text — color-coded by severity enum
   pdf.setFont('helvetica', 'normal');
   
-  // Color logic based on verdict content
-  if (recommendedAction.includes('High Optimization Potential')) {
-    pdf.setTextColor(192, 57, 43); // red — critical issue
-  } else if (recommendedAction.includes('Downgrade recommended') || 
-             recommendedAction.includes('Plan review recommended')) {
-    pdf.setTextColor(217, 119, 6); // orange — warning
-  } else if (recommendedAction.includes('appropriate') || 
-             recommendedAction.includes('optimal')) {
-    pdf.setTextColor(22, 163, 74); // green — all good
-  } else {
-    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b); // default
+  // Color logic based on severity enum
+  switch (verdictSeverity) {
+    case 'critical':
+      pdf.setTextColor(COLORS.PRIMARY_RED.r, COLORS.PRIMARY_RED.g, COLORS.PRIMARY_RED.b);
+      break;
+    case 'warning':
+      pdf.setTextColor(COLORS.ORANGE_WARNING.r, COLORS.ORANGE_WARNING.g, COLORS.ORANGE_WARNING.b);
+      break;
+    case 'optimal':
+      pdf.setTextColor(COLORS.GREEN_SUCCESS.r, COLORS.GREEN_SUCCESS.g, COLORS.GREEN_SUCCESS.b);
+      break;
   }
   
-  pdf.text(recommendedAction, PAGE_MARGIN, yPos);
+  pdf.text(recommendedAction, PAGE_MARGIN, yPos, { 
+    maxWidth: CONTENT_WIDTH 
+  });
   
   // Reset color
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
@@ -1103,10 +1146,35 @@ function renderPage5_SafeZone(
     yPos += 12;
 
     // ===== LIST OF SAFE ZAPS =====
-    viewModel.safeZone.optimizedZaps.forEach(zap => {
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    let renderedCount = 0;
+    const totalZaps = viewModel.safeZone.optimizedZaps.length;
+
+    for (const zap of viewModel.safeZone.optimizedZaps) {
+      // Check if we have space for this item + potential truncation message
+      if (!safeRender(yPos, pageHeight, 12)) {
+        // Not enough space - show truncation message
+        const remaining = totalZaps - renderedCount;
+        yPos += 4;
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'italic');
+        pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+        pdf.text(
+          `+${remaining} additional stable automation${remaining !== 1 ? 's' : ''} verified.`,
+          PAGE_MARGIN + 5,
+          yPos
+        );
+        break;
+      }
+      
+      // Render zap item
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
       pdf.text(`• ${zap.zapName}`, PAGE_MARGIN + 5, yPos);
       yPos += 6;
-    });
+      renderedCount++;
+    }
     
     yPos += 9;
 
@@ -1144,8 +1212,6 @@ function embedReAuditMetadata(pdfDoc: jsPDF, metadata: ReAuditMetadata) {
     keywords: keywords,
     subject: 'Zapier Lighthouse Audit Report - Re-Audit Enabled'
   });
-  
-  console.log('✅ Re-audit metadata embedded into PDF');
 }
 
 // ========================================
