@@ -257,28 +257,30 @@ function renderPage1_ExecutiveSummary(
   pdf.setLineWidth(0.3);
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
   
-  yPos += 20;
+  yPos += 24;
 
   // ===== DUAL COLUMN LAYOUT: ROI + HEALTH SCORE =====
-  const leftColX = PAGE_MARGIN;
-  const rightColX = PAGE_MARGIN + CONTENT_WIDTH / 2 + 10;
+  const boxOffset = 10;  // 10mm offset doprava
+  const leftColX = PAGE_MARGIN + boxOffset;
+  const rightColX = PAGE_MARGIN + CONTENT_WIDTH / 2 + 10 + boxOffset;
 
   // Calculate box dimensions
-  const boxWidth = (CONTENT_WIDTH / 2) - 5;  // wider boxes
+  const leftBoxWidth = (CONTENT_WIDTH / 2) + 5;  
+  const rightBoxWidth = (CONTENT_WIDTH / 2) - 15;  
+  const boxHeight = 42;  // bolo 35, teraz 42 (o 7mm vyššie)
   const boxPadding = 8;  // more internal padding
-  const boxHeight = 35;  // taller boxes
-  const boxY = yPos - 8;  // start higher
+  const boxY = yPos - 14;  // start higher
 
   // LEFT BOX: ROI
   pdf.setFillColor(250, 251, 252);  // slate-50 — very subtle background
   pdf.setDrawColor(203, 213, 225);  // slate-300 — subtle border
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(leftColX - boxPadding, boxY, boxWidth, boxHeight, 2, 2, 'FD');  // 'FD' = Fill + Draw
+  pdf.setLineWidth(0.1);
+  pdf.roundedRect(leftColX - boxPadding, boxY, leftBoxWidth, boxHeight, 2, 2, 'FD');  // 'FD' = Fill + Draw
 
   // RIGHT BOX: Health Score
   pdf.setFillColor(250, 251, 252);  // same background
   pdf.setDrawColor(203, 213, 225);  // same border
-  pdf.roundedRect(rightColX - boxPadding, boxY, boxWidth, boxHeight, 2, 2, 'FD');
+  pdf.roundedRect(rightColX - boxPadding, boxY, rightBoxWidth, boxHeight, 2, 2, 'FD');
 
   // Reset for text rendering
   pdf.setDrawColor(0, 0, 0);
@@ -289,7 +291,7 @@ function renderPage1_ExecutiveSummary(
   pdf.setFontSize(34);
   pdf.setFont('helvetica', 'bold');
   const spendWidth = pdf.getTextWidth(spendAmount);
-  const leftCenterX = leftColX - boxPadding + (boxWidth / 2) - (spendWidth / 2);
+  const leftCenterX = leftColX - boxPadding + (leftBoxWidth / 2) - (spendWidth / 2);
   pdf.text(spendAmount, leftCenterX, yPos);
 
   // RIGHT COLUMN: Health Score (SECONDARY METRIC — fontSize 24, centered in box)
@@ -306,7 +308,7 @@ function renderPage1_ExecutiveSummary(
 
   const scoreText = `${healthScore} / 100`;
   const scoreWidth = pdf.getTextWidth(scoreText);
-  const rightCenterX = rightColX - boxPadding + (boxWidth / 2) - (scoreWidth / 2);
+  const rightCenterX = rightColX - boxPadding + (rightBoxWidth / 2) - (scoreWidth / 2);
   pdf.text(scoreText, rightCenterX, yPos + 2);
 
   yPos += 10;
@@ -317,7 +319,7 @@ function renderPage1_ExecutiveSummary(
   pdf.setFont('helvetica', 'normal');
   const leftLabel = 'Recapturable Annual Spend';
   const leftLabelWidth = pdf.getTextWidth(leftLabel);
-  const leftLabelX = leftColX - boxPadding + (boxWidth / 2) - (leftLabelWidth / 2);
+  const leftLabelX = leftColX - boxPadding + (leftBoxWidth / 2) - (leftLabelWidth / 2);
   pdf.text(leftLabel, leftLabelX, yPos);
 
   // RIGHT: Health Score label (centered in box)
@@ -326,46 +328,60 @@ function renderPage1_ExecutiveSummary(
   pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
   const rightLabel = `Health Score — ${category}`;
   const rightLabelWidth = pdf.getTextWidth(rightLabel);
-  const rightLabelX = rightColX - boxPadding + (boxWidth / 2) - (rightLabelWidth / 2);
+  const rightLabelX = rightColX - boxPadding + (rightBoxWidth / 2) - (rightLabelWidth / 2);
   pdf.text(rightLabel, rightLabelX, yPos);
 
   yPos += 12;
 
-  // ROI subtext (left only)
+  // ROI subtext (centered in left box)
   pdf.setFontSize(10);
   const roiMultiplier = viewModel.financialOverview.multiplier;
-  
+
   if (roiMultiplier >= 1) {
-    // Split into 3 parts: "Equivalent to " + "9.5×" + " the cost of this audit."
     const prefix = 'Equivalent to ';
     const multiplierText = `${roiMultiplier.toFixed(1)}×`;
     const suffix = ' the cost of this audit.';
     
-    // Prefix (italic, normal)
+    // Calculate total width
     pdf.setFont('helvetica', 'italic');
-    pdf.text(prefix, leftColX, yPos);
-    
-    // Multiplier (bold, italic)
     const prefixWidth = pdf.getTextWidth(prefix);
     pdf.setFont('helvetica', 'bolditalic');
-    pdf.text(multiplierText, leftColX + prefixWidth, yPos);
-    
-    // Suffix (italic, normal)
     const multiplierWidth = pdf.getTextWidth(multiplierText);
     pdf.setFont('helvetica', 'italic');
-    pdf.text(suffix, leftColX + prefixWidth + multiplierWidth, yPos, { 
-      maxWidth: CONTENT_WIDTH / 2 - 5 - prefixWidth - multiplierWidth 
-    });
-  } else {
+    const suffixWidth = pdf.getTextWidth(suffix);
+    
+    const totalWidth = prefixWidth + multiplierWidth + suffixWidth;
+    
+    // Center the entire text in left box
+    const subtextStartX = leftColX - boxPadding + (leftBoxWidth / 2) - (totalWidth / 2);
+    
+    // Render prefix
     pdf.setFont('helvetica', 'italic');
-    pdf.text('Low financial leakage detected.', leftColX, yPos, { maxWidth: CONTENT_WIDTH / 2 - 5 });
+    pdf.text(prefix, subtextStartX, yPos);
+    
+    // Render multiplier (bold)
+    pdf.setFont('helvetica', 'bolditalic');
+    pdf.text(multiplierText, subtextStartX + prefixWidth, yPos);
+    
+    // Render suffix
+    pdf.setFont('helvetica', 'italic');
+    pdf.text(suffix, subtextStartX + prefixWidth + multiplierWidth, yPos);
+  } else {
+    // Center "Low financial leakage" text
+    pdf.setFont('helvetica', 'italic');
+    const lowLeakageText = 'Low financial leakage detected.';
+    const lowLeakageWidth = pdf.getTextWidth(lowLeakageText);
+    const lowLeakageX = leftColX - boxPadding + (leftBoxWidth / 2) - (lowLeakageWidth / 2);
+    pdf.text(lowLeakageText, lowLeakageX, yPos);
   }
 
   yPos += 20;
 
   // ===== DIVIDER 2 =====
+  pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
   
+
   yPos += 15;
 
   // ===== KEY STATISTICS =====
