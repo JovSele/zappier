@@ -578,12 +578,27 @@ function renderPage2_PriorityActions(
       
       // Render all flags for this Zap
       actions.forEach((action, flagIndex) => {
-        // Root Cause (red, bold)
+        // Calculate box dimensions for this finding
+        const findingBoxY = yPos - 5;  // Start slightly above text
+        const findingBoxHeight = 21;   // Height to contain Root Cause + Description + Impact/Effort
+        const findingBoxWidth = CONTENT_WIDTH - 10;  // Full width minus margins
+        const findingBoxX = PAGE_MARGIN + 8;
+        
+        // Draw finding box
+        pdf.setFillColor(250, 251, 252);  // slate-50 — subtle background
+        pdf.setDrawColor(226, 232, 240);  // slate-200 — lighter border than Page 1
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(findingBoxX - 2, findingBoxY, findingBoxWidth, findingBoxHeight, 2, 2, 'FD');
+        
+        // Reset draw color
+        pdf.setDrawColor(0, 0, 0);
+        
+        // Root Cause (red, bold) — now rendered inside box
         if (safeRender(yPos, pageHeight, 15)) {
           pdf.setFontSize(11);
           pdf.setFont('helvetica', 'bold');
           pdf.setTextColor(192, 57, 43);
-          pdf.text(`Root Cause: ${getRootCauseLabel(action.flagType)}`, PAGE_MARGIN + 8, yPos);
+          pdf.text(`Root Cause: ${getRootCauseLabel(action.flagType)}`, PAGE_MARGIN + 10, yPos);
           yPos += 5;
         }
         
@@ -595,9 +610,9 @@ function renderPage2_PriorityActions(
           pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
           pdf.text(
             getRootCauseDescription(action.flagType), 
-            PAGE_MARGIN + 8, 
+            PAGE_MARGIN + 10,  // Increased indent inside box
             yPos,
-            { maxWidth: pageWidth - PAGE_MARGIN * 2 - 8 }
+            { maxWidth: pageWidth - PAGE_MARGIN * 2 - 12 }
           );
           yPos += 6;
         }
@@ -607,16 +622,16 @@ function renderPage2_PriorityActions(
         
         // LEFT: Impact
         pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-        pdf.text('Impact:', PAGE_MARGIN + 8, yPos);
+        pdf.text('Impact:', PAGE_MARGIN + 10, yPos);  // Increased indent
         
         const impactValue = `${formatCurrency(action.estimatedAnnualImpact)}/year`;
         const impactLabelWidth = pdf.getTextWidth('Impact: ');
         pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-        pdf.text(impactValue, PAGE_MARGIN + 8 + impactLabelWidth, yPos);
+        pdf.text(impactValue, PAGE_MARGIN + 10 + impactLabelWidth, yPos);
         
         // RIGHT: Effort
         const impactTotalWidth = impactLabelWidth + pdf.getTextWidth(impactValue);
-        const effortX = PAGE_MARGIN + 8 + impactTotalWidth + 15;
+        const effortX = PAGE_MARGIN + 10 + impactTotalWidth + 15;
         
         pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
         pdf.text('Effort:', effortX, yPos);
@@ -626,11 +641,11 @@ function renderPage2_PriorityActions(
         pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
         pdf.text(effortValue, effortX + effortLabelWidth, yPos);
         
-        yPos += 6;
+        yPos += 8;  // Exit box with small margin
         
-        // Extra spacing between flags (if multiple flags for same Zap)
+        // Extra spacing between findings (if multiple for same Zap)
         if (flagIndex < actions.length - 1) {
-          yPos += 8;  // doubled from 4 to 8 for clearer separation
+          yPos += 6;  // Reduced from 8 because box provides separation
         }
       });
       
@@ -957,23 +972,23 @@ function renderPage4_PlanAnalysis(
   let recommendedAction: string;
 
   if (utilizationPct === 0) {
-    utilizationVerdict = 'Zero task consumption detected in audit window.';
+    utilizationVerdict = 'Zero task consumption detected during the analyzed period.';
     recommendedAction = 'High Optimization Potential — plan cost exceeds operational value.';
   } else if (utilizationPct < 10) {
-    utilizationVerdict = 'Critical underutilization relative to plan capacity.';
+    utilizationVerdict = 'Material underutilization relative to plan capacity.';
     recommendedAction = 'High Optimization Potential — significant capacity available.';
   } else if (utilizationPct < 30) {
     utilizationVerdict = 
-      'Current plan is functionally sufficient but economically inefficient relative to workload.';
+      'Plan capacity exceeds operational requirements — economic inefficiency detected.';
     recommendedAction = viewModel.planSummary.downgradeRecommended
       ? 'Downgrade recommended — current tier exceeds operational requirements.'
-      : 'Plan review recommended — utilization below optimal threshold.';
+      : 'Optimization potential identified — current tier exceeds operational needs.';
   } else if (utilizationPct < 70) {
-    utilizationVerdict = 'Plan utilization within acceptable operational range.';
-    recommendedAction = 'Current plan is appropriate.';
+    utilizationVerdict = 'Plan utilization within acceptable operational thresholds.';
+    recommendedAction = 'Current plan remains aligned with operational demand.';
   } else {
-    utilizationVerdict = 'High utilization — plan capacity approaching operational limits.';
-    recommendedAction = 'Monitor task consumption — consider plan upgrade proactively.';
+    utilizationVerdict = 'Elevated utilization — capacity buffer narrowing.';
+    recommendedAction = 'Monitor consumption trends — evaluate upgrade if growth persists.';
   }
   
   if (safeRender(yPos, pageHeight, 25)) {
