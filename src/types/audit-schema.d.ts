@@ -1,3 +1,5 @@
+//src/types/audit-schema.d.ts
+
 /**
  * Zapier Lighthouse - Audit Schema Types v1.0.0
  * 

@@ -19,6 +19,9 @@ import {
   deserializeMetadata 
 } from './types/reaudit'
 
+import { generateHandoffPDF } from './handoffGenerator'
+import { mapAuditToHandoffViewModel } from './handoffViewModelMapper'
+
 // Type definitions
 interface ZapSummary {
   id: number
@@ -791,6 +794,61 @@ async function handleAnalyzeSelected() {
   }
 }
 
+async function handleDownloadHandoff(auditResult: AuditResult, btn: HTMLElement) {
+  btn.innerHTML = `
+    <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+    Generating Handoff Report...
+  `
+  btn.classList.add('opacity-75', 'cursor-wait')
+
+  try {
+    const reportId = getNextReportId()
+    const reportCode = generateReportCode(reportId)
+
+    const handoffViewModel = mapAuditToHandoffViewModel(auditResult, reportCode)
+
+    await generateHandoffPDF(handoffViewModel, {
+      reportCode,
+      clientName: 'Client',
+      preparedBy: 'Zapier Lighthouse',
+    })
+
+    btn.innerHTML = `
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+      </svg>
+      Downloaded!
+    `
+    btn.classList.remove('opacity-75', 'cursor-wait')
+    btn.classList.remove('from-emerald-600', 'to-emerald-700')
+    btn.classList.add('bg-slate-600')
+
+    setTimeout(() => {
+      btn.innerHTML = `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        Download Handoff Report
+      `
+      btn.classList.remove('bg-slate-600')
+      btn.classList.add('from-emerald-600', 'to-emerald-700')
+    }, 2000)
+
+  } catch (err) {
+    console.error('Failed to generate Handoff PDF:', err)
+    btn.innerHTML = `
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+      Error
+    `
+    btn.classList.remove('opacity-75', 'cursor-wait')
+    btn.classList.add('bg-rose-600')
+  }
+}
+
 // Display Developer Edition results
 function displayDeveloperEditionResults(auditResult: AuditResult) {
   const avgScore = auditResult.per_zap_findings.length > 0
@@ -810,19 +868,25 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
       <div class="flex items-center justify-between mb-6">
         <h3 class="text-2xl font-bold text-zinc-900" style="letter-spacing: -0.02em;">Developer Edition Results</h3>
         <div class="flex gap-3">
-          <button onclick="backToSelector()" class="inline-flex items-center gap-2 px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Selection
-          </button>
-          <button id="download-dev-pdf-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-            </svg>
-            Download Developer Edition PDF
-          </button>
-        </div>
+            <button onclick="backToSelector()" class="inline-flex items-center gap-2 px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Selection
+            </button>
+            <button id="download-handoff-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Download Handoff Report
+            </button>
+            <button id="download-dev-pdf-btn" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+              </svg>
+              Download Developer Edition PDF
+            </button>
+          </div>
       </div>
       
       <!-- Project Summary Card -->
@@ -916,6 +980,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
   `
   
   // Setup Developer Edition PDF download button
+// Setup Developer Edition PDF download button
   setTimeout(() => {
     const pdfBtn = document.getElementById('download-dev-pdf-btn')
     if (pdfBtn) {
@@ -929,14 +994,10 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
         pdfBtn.classList.add('opacity-75', 'cursor-wait')
         
         try {
-          // Generate report ID and code
           const reportId = getNextReportId()
           const reportCode = generateReportCode(reportId)
-
-          // Generate file hash for verification (re-audit capability)
           const fileHash = await generateFileHash(cachedZipData! as BufferSource)
 
-          // Build re-audit metadata (allows users to restore settings from PDF)
           const reauditMetadata: ReAuditMetadata = {
             report_id: reportId,
             report_code: reportCode,
@@ -952,10 +1013,8 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
             metadata_version: '1.0.0'
           }
 
-          // Transform WASM result → PDF view model
           const viewModel = mapAuditToPdfViewModel(auditResult, reportCode)
 
-          // Generate PDF with embedded re-audit metadata
           await generateExecutiveAuditPDF(viewModel, {
             reportCode: reportCode,
             clientName: 'Batch Analysis',
@@ -995,6 +1054,13 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
         }
       })
     }
+
+    // ── HANDOFF REPORT BUTTON ──────────────────────────────────────────────
+    const handoffBtn = document.getElementById('download-handoff-btn')
+    if (handoffBtn) {
+      handoffBtn.addEventListener('click', () => handleDownloadHandoff(auditResult, handoffBtn))
+    }
+
   }, 100)
 }
 

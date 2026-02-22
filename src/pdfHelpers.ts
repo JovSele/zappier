@@ -1,3 +1,5 @@
+//src/pdfHeplers.ts
+
 // PDF Helper Functions for Zapier Lighthouse
 // Contains utility functions for precise PDF rendering
 
