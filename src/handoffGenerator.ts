@@ -117,27 +117,61 @@ function safeRender(yPos: number, pageHeight: number, requiredSpace: number = 10
   return yPos + requiredSpace < pageHeight - 30;
 }
 
-function drawPageFooter(pdf: jsPDF, pageNum: number, clientName: string, preparedBy: string): void {
+// --- Footer with dynamic page number ---
+function drawPageFooter(pdf: jsPDF, clientName: string, preparedBy: string): void {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = LAYOUT.PAGE_MARGIN;
 
+  // Dynamické číslo aktuálnej stránky
+  const pageNum = pdf.getCurrentPageInfo().pageNumber;
+
+  // Footer line
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
   pdf.setLineWidth(0.3);
   pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
 
+  // Footer text
   pdf.setTextColor(COLORS.GRAY_FOOTER.r, COLORS.GRAY_FOOTER.g, COLORS.GRAY_FOOTER.b);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'normal');
 
-  pdf.text(
-    `HANDOFF REPORT — Prepared for ${clientName} by ${preparedBy}`,
-    margin,
-    pageHeight - 13
-  );
-
+  pdf.text(`HANDOFF REPORT — Prepared for ${clientName} by ${preparedBy}`, margin, pageHeight - 13);
   pdf.text('Data processed locally. No cloud storage.', margin, pageHeight - 8);
   pdf.text(`Page ${pageNum}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+}
+
+// --- Main PDF generation ---
+function generateHandoffPDF(viewModel: ViewModel, config: Config, clientName: string, preparedBy: string) {
+  const pdf = new jsPDF();
+
+  // Page 1: Executive Summary
+  generateExecutiveSummary(pdf, viewModel, config);
+  drawPageFooter(pdf, clientName, preparedBy);
+
+  // Page 2: Per-Zap Breakdown (core value)
+  pdf.addPage();
+  generatePerZapBreakdown(pdf, viewModel, config);
+  drawPageFooter(pdf, clientName, preparedBy);
+
+  // Page 3: Dependency Map
+  pdf.addPage();
+  generateDependencyMap(pdf, viewModel, config);
+  drawPageFooter(pdf, clientName, preparedBy);
+
+  // Page 4: Troubleshooting Guide
+  pdf.addPage();
+  generateTroubleshootingSection(pdf, viewModel, config);
+  drawPageFooter(pdf, clientName, preparedBy);
+
+  // Page 5: Handoff Checklist
+  pdf.addPage();
+  generateHandoffChecklist(pdf, viewModel, config);
+  drawPageFooter(pdf, clientName, preparedBy);
+
+  // Save
+  const timestamp = new Date().toISOString().split('T')[0];
+  pdf.save(`Handoff_Report_${config.reportCode}_${timestamp}.pdf`);
 }
 
 // ========================================
@@ -193,7 +227,23 @@ function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, config: Hand
   const purposeLines = pdf.splitTextToSize(vm.summary.stackPurpose, CONTENT_WIDTH);
   pdf.text(purposeLines, PAGE_MARGIN, yPos);
 
-  yPos += purposeLines.length * 6 + 12;
+  yPos += purposeLines.length * 6 + 6;
+
+  // Executive clarity layer
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'italic');
+  pdf.setTextColor(
+    COLORS.TEXT_SECONDARY.r,
+    COLORS.TEXT_SECONDARY.g,
+    COLORS.TEXT_SECONDARY.b
+  );
+
+  const primaryFunctionLines = pdf.splitTextToSize(
+    `Failure Impact: Disruption would affect data flow across connected systems.`,
+    CONTENT_WIDTH
+  );
+  pdf.text(primaryFunctionLines, PAGE_MARGIN, yPos);
+  yPos += primaryFunctionLines.length * 5 + 12;
 
   // ===== KEY STATS =====
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
@@ -202,7 +252,8 @@ function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, config: Hand
   const stats = [
     { label: 'Total Automations:', value: `${vm.summary.totalZaps}` },
     { label: 'Active:', value: `${vm.summary.activeZaps} of ${vm.summary.totalZaps}` },
-    { label: 'Connected Apps:', value: vm.summary.connectedApps.join(', ') },
+    { label: 'Connected Apps:', value: vm.summary.connectedApps.length > 0 ? vm.summary.connectedApps.join(', ') : 'None identified in export metadata'
+},
   ];
 
   stats.forEach(stat => {
@@ -213,6 +264,7 @@ function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, config: Hand
     const labelWidth = pdf.getTextWidth(stat.label + ' ');
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.text(stat.label + ' ', PAGE_MARGIN, yPos);
     pdf.text(stat.value, PAGE_MARGIN + labelWidth, yPos);
 
     yPos += 7;
@@ -225,8 +277,20 @@ function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, config: Hand
 
   // Vypočítaj risk level
   const allInactive = vm.summary.activeZaps === 0;
-  const riskLevel = allInactive ? 'Low' : 'Low';
-  const riskColor = COLORS.GREEN_SUCCESS;
+
+  let riskLevel: 'Low' | 'Moderate' | 'High';
+  let riskColor: { r: number; g: number; b: number };
+
+  if (vm.summary.activeZaps === 0) {
+    riskLevel = 'Low';
+    riskColor = COLORS.GREEN_SUCCESS;
+  } else if (vm.summary.activeZaps < vm.summary.totalZaps) {
+    riskLevel = 'Moderate';
+    riskColor = COLORS.ORANGE_WARNING;
+  } else {
+    riskLevel = 'High';
+    riskColor = COLORS.RED;
+  }
 
   const firstAction = allInactive
     ? 'Verify connections, then reactivate workflows one by one'
@@ -404,9 +468,10 @@ function generatePerZapBreakdown(pdf: jsPDF, vm: HandoffViewModel, _config: Hand
     pdf.text('Apps:', PAGE_MARGIN + 4, yPos);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-    const appsText = zap.connectedApps.length > 0 
-      ? zap.connectedApps.join(' -> ') 
-      : 'Not identified in export metadata';
+    const appsText =
+      zap.connectedApps && zap.connectedApps.length > 0
+        ? zap.connectedApps.join(' → ')
+        : 'Not identified in export metadata';
     pdf.text(appsText, PAGE_MARGIN + 4 + pdf.getTextWidth('Apps: '), yPos);
     yPos += 6;
 
@@ -476,10 +541,8 @@ vm.dependencies.forEach((dep, index) => {
   pdf.setTextColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
-  pdf.setCharSpace(1);
   pdf.text('WORKFLOW ARCHITECTURE', PAGE_MARGIN + cardOffset + 6, yPos + 6);
-  pdf.setCharSpace(0);
-
+  
   // Zap name (right side of header)
   
 
@@ -575,7 +638,10 @@ vm.dependencies.forEach((dep, index) => {
   pdf.text(actionApp.charAt(0).toUpperCase(), action3X + boxWidth / 2, yPos + 8, { align: 'center' });
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFontSize(6);
-  pdf.text(actionApp.toUpperCase().substring(0, 10), action3X + boxWidth / 2, yPos + 14, { align: 'center' });
+
+  const actionLabel = actionApp.toUpperCase();
+  const safeActionLabel = actionLabel.length > 12 ? actionLabel.substring(0, 12) + '…' : actionLabel;
+  pdf.text(safeActionLabel, action3X + boxWidth / 2, yPos + 14, { align: 'center' });
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setFontSize(5);
   pdf.text('ACTION', action3X + boxWidth / 2, yPos + 18, { align: 'center' });
@@ -593,10 +659,16 @@ vm.dependencies.forEach((dep, index) => {
  * Common failure modes per Zap + how to fix them.
  * Rule-based: derived from flag types and app connections (no AI needed).
  */
-function generateTroubleshootingSection(pdf: jsPDF, vm: HandoffViewModel, _config: HandoffConfig): void {
+function generateTroubleshootingSection(
+  pdf: jsPDF,
+  vm: HandoffViewModel,
+  _config: HandoffConfig
+): void {
   const { PAGE_MARGIN, TOP_MARGIN, CONTENT_WIDTH } = LAYOUT;
+  const pageHeight = pdf.internal.pageSize.getHeight();
   let yPos = TOP_MARGIN;
 
+  // ===== HEADER =====
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
@@ -616,25 +688,64 @@ function generateTroubleshootingSection(pdf: jsPDF, vm: HandoffViewModel, _confi
     return;
   }
 
-  vm.troubleshooting.forEach(entry => {
+  // ===== TROUBLESHOOTING ENTRIES =====
+  for (let i = 0; i < vm.troubleshooting.length; i++) {
+    const entry = vm.troubleshooting[i];
+
+    // Estimate required space (rough but safe)
+    const issueLines = pdf.splitTextToSize(
+      `Issue: ${entry.commonIssue}`,
+      CONTENT_WIDTH - 5
+    );
+    const fixLines = pdf.splitTextToSize(
+      `Fix: ${entry.resolution}`,
+      CONTENT_WIDTH - 5
+    );
+
+    const estimatedHeight =
+      7 +                               // zap name
+      issueLines.length * 5 + 4 +        // issue
+      fixLines.length * 5 + 10 +         // fix
+      10;                                // spacing buffer
+
+    // Page break protection
+    if (!safeRender(yPos, pageHeight, estimatedHeight)) {
+      pdf.addPage();
+      yPos = TOP_MARGIN;
+    }
+
+    // Zap name
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
     pdf.text(entry.zapName, PAGE_MARGIN, yPos);
     yPos += 7;
 
+    // Issue
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
-    const issueLines = pdf.splitTextToSize(`Issue: ${entry.commonIssue}`, CONTENT_WIDTH - 5);
     pdf.text(issueLines, PAGE_MARGIN + 5, yPos);
     yPos += issueLines.length * 5 + 4;
 
+    // Fix
     pdf.setTextColor(COLORS.GREEN_SUCCESS.r, COLORS.GREEN_SUCCESS.g, COLORS.GREEN_SUCCESS.b);
-    const fixLines = pdf.splitTextToSize(`Fix: ${entry.resolution}`, CONTENT_WIDTH - 5);
     pdf.text(fixLines, PAGE_MARGIN + 5, yPos);
     yPos += fixLines.length * 5 + 10;
-  });
 
+    // Divider between entries (except last)
+    if (i < vm.troubleshooting.length - 1) {
+      pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+      pdf.setLineWidth(0.2);
+      pdf.line(
+        PAGE_MARGIN,
+        yPos - 4,
+        PAGE_MARGIN + CONTENT_WIDTH,
+        yPos - 4
+      );
+    }
+  }
+
+  // Final divider
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
   pdf.setLineWidth(0.3);
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
@@ -645,10 +756,16 @@ function generateTroubleshootingSection(pdf: jsPDF, vm: HandoffViewModel, _confi
  * Step-by-step for the new owner to verify everything works.
  * Categories: ACCESS, TEST, VERIFY, DOCUMENT
  */
-function generateHandoffChecklist(pdf: jsPDF, vm: HandoffViewModel, _config: HandoffConfig): void {
+function generateHandoffChecklist(
+  pdf: jsPDF,
+  vm: HandoffViewModel,
+  _config: HandoffConfig
+): void {
   const { PAGE_MARGIN, TOP_MARGIN, CONTENT_WIDTH } = LAYOUT;
+  const pageHeight = pdf.internal.pageSize.getHeight();
   let yPos = TOP_MARGIN;
 
+  // ===== HEADER =====
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
@@ -672,29 +789,66 @@ function generateHandoffChecklist(pdf: jsPDF, vm: HandoffViewModel, _config: Han
     return;
   }
 
-  const categories: Array<'ACCESS' | 'TEST' | 'VERIFY' | 'DOCUMENT'> = ['ACCESS', 'TEST', 'VERIFY', 'DOCUMENT'];
-  
+  const categories: Array<'ACCESS' | 'TEST' | 'VERIFY' | 'DOCUMENT'> = [
+    'ACCESS',
+    'TEST',
+    'VERIFY',
+    'DOCUMENT'
+  ];
+
   let categoryNumber = 0;
-  categories.forEach(cat => {
-  const items = vm.checklist.filter(c => c.category === cat);
-  if (items.length === 0) return;
 
-  categoryNumber++;
-  const categoryLabel = {
-    ACCESS: 'Access & Credentials',
-    TEST: 'Test Runs',
-    VERIFY: 'Verify Outputs',
-    DOCUMENT: 'Documentation',
-  }[cat];
+  for (let c = 0; c < categories.length; c++) {
+    const cat = categories[c];
+    const items = vm.checklist.filter(i => i.category === cat);
+    if (items.length === 0) continue;
 
-  pdf.setFontSize(12);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-  pdf.text(`${categoryNumber}. ${categoryLabel}`, PAGE_MARGIN, yPos);
-  yPos += 8;
+    categoryNumber++;
+
+    const categoryLabel = {
+      ACCESS: 'Access & Credentials',
+      TEST: 'Test Runs',
+      VERIFY: 'Verify Outputs',
+      DOCUMENT: 'Documentation',
+    }[cat];
+
+    // ===== ESTIMATE CATEGORY BLOCK HEIGHT =====
+    let estimatedHeight = 8; // title spacing
 
     items.forEach(item => {
-      // Checkbox (printable)
+      const itemLines = pdf.splitTextToSize(item.step, CONTENT_WIDTH - 12);
+      estimatedHeight += itemLines.length * 5 + 6;
+    });
+
+    estimatedHeight += 10; // buffer
+
+    // 🔐 PAGE BREAK BEFORE CATEGORY
+    if (!safeRender(yPos, pageHeight, estimatedHeight)) {
+      pdf.addPage();
+      yPos = TOP_MARGIN;
+    }
+
+    // ===== CATEGORY TITLE =====
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+    pdf.text(`${categoryNumber}. ${categoryLabel}`, PAGE_MARGIN, yPos);
+    yPos += 8;
+
+    // ===== ITEMS =====
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const itemLines = pdf.splitTextToSize(item.step, CONTENT_WIDTH - 12);
+
+      const itemHeight = itemLines.length * 5 + 6;
+
+      // 🔐 PAGE BREAK INSIDE CATEGORY
+      if (!safeRender(yPos, pageHeight, itemHeight)) {
+        pdf.addPage();
+        yPos = TOP_MARGIN;
+      }
+
+      // Checkbox
       pdf.setDrawColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
       pdf.setLineWidth(0.3);
       pdf.rect(PAGE_MARGIN + 2, yPos - 3.5, 4, 4);
@@ -702,14 +856,15 @@ function generateHandoffChecklist(pdf: jsPDF, vm: HandoffViewModel, _config: Han
       pdf.setFontSize(11);
       pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-      const itemLines = pdf.splitTextToSize(item.step, CONTENT_WIDTH - 12);
       pdf.text(itemLines, PAGE_MARGIN + 10, yPos);
-      yPos += itemLines.length * 5 + 4;
-    });
 
-    yPos += 6;
-  });
+      yPos += itemHeight;
+    }
 
+    yPos += 8;
+  }
+
+  // ===== FINAL DIVIDER =====
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
   pdf.setLineWidth(0.3);
   pdf.line(PAGE_MARGIN, yPos, PAGE_MARGIN + CONTENT_WIDTH, yPos);
