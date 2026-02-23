@@ -99,7 +99,7 @@ function deriveTriggerDescription(zapName: string): string {
 }
 
   // Fallback
-  return 'When the trigger condition is met in the source application';
+  return 'Trigger details unavailable in export metadata';
 }
 
 /**
@@ -153,7 +153,7 @@ function deriveActionDescription(zapName: string): string {
     return 'Create a new record in the destination app';
   }
 
-  return 'Perform the configured action in the destination application';
+  return 'Action details unavailable in export metadata';
 }
 
 /**
@@ -183,7 +183,8 @@ function extractConnectedApps(zapName: string): string[] {
     zapName.toLowerCase().includes(app.toLowerCase())
   );
 
-  return found.length > 0 ? found : ['Zapier'];
+  const filtered = found.filter(app => app.toLowerCase() !== 'zapier');
+  return filtered.length > 0 ? filtered : [];
 }
 
 /**
@@ -317,7 +318,7 @@ function generateTroubleshootingEntry(zap: PerZapFinding): TroubleshootingEntry 
   if (zap.flags.length > 0) {
     return {
       zapName: zap.zap_name,
-      commonIssue: 'Automation has structural inefficiencies that may cause intermittent failures',
+      commonIssue: 'Automation structure may require review if unexpected interruptions occur',
       resolution: 'Review the Zap steps in Zapier and check the task history for recent errors.',
     };
   }
@@ -367,9 +368,8 @@ function generateStackPurpose(zaps: PerZapFinding[]): string {
   const total = zaps.length;
   const active = activeZaps.length;
 
-  if (total === 0) return 'No automations were found in this account.';
+  if (total === 0) return 'No automation workflows were identified in this account.';
 
-  // Detect dominant app categories
   const allNames = zaps.map(z => z.zap_name.toLowerCase()).join(' ');
 
   const hasCRM = /hubspot|salesforce|pipedrive|crm/.test(allNames);
@@ -377,19 +377,31 @@ function generateStackPurpose(zaps: PerZapFinding[]): string {
   const hasData = /sheet|airtable|notion|database|log/.test(allNames);
   const hasPayments = /stripe|payment|invoice|shopify/.test(allNames);
   const hasForms = /typeform|jotform|form|calendly|booking/.test(allNames);
+  const hasContent = /wordpress|reddit|twitter|linkedin|rss/.test(allNames);
 
   const purposes: string[] = [];
-  if (hasCRM) purposes.push('managing contacts and deals in the CRM');
-  if (hasNotifications) purposes.push('sending team notifications and alerts');
-  if (hasData) purposes.push('logging and syncing data across tools');
-  if (hasPayments) purposes.push('processing payments and order events');
-  if (hasForms) purposes.push('handling form submissions and bookings');
+  if (hasContent) purposes.push('content publishing and distribution workflows');
+  if (hasCRM) purposes.push('CRM contact and deal management');
+  if (hasNotifications) purposes.push('team notification and alerting pipelines');
+  if (hasData) purposes.push('data synchronization across business tools');
+  if (hasPayments) purposes.push('payment and transaction processing');
+  if (hasForms) purposes.push('form submission and lead capture handling');
 
   const purposeStr = purposes.length > 0
     ? purposes.join(', ')
-    : 'connecting and automating various business tools';
+    : 'cross-platform business process automation';
 
-  return `This account runs ${total} automation${total !== 1 ? 's' : ''} (${active} currently active), primarily focused on ${purposeStr}. These automations reduce manual work by automatically moving data and triggering actions between connected apps.`;
+  const statusNote = active === 0
+    ? ' All workflows are currently inactive and can be safely reactivated once ownership transfer is complete.'
+    : active === total
+      ? ' All workflows are operational.'
+      : ` ${active} of ${total} workflows are currently operational.`;
+
+  const primaryFunction = purposes.length > 0
+    ? `Primary Function: ${purposes[0].charAt(0).toUpperCase() + purposes[0].slice(1)}.`
+    : '';
+
+  return `${primaryFunction ? primaryFunction + ' ' : ''}This automation environment contains ${total} configured workflow${total !== 1 ? 's' : ''}.${statusNote}`;
 }
 
 // ========================================
@@ -492,6 +504,8 @@ function getAllConnectedApps(zaps: PerZapFinding[]): string[] {
   zaps.forEach(zap => {
     extractConnectedApps(zap.zap_name).forEach(app => apps.add(app));
   });
+   // Filtrovať Zapier — je platforma, nie dependency
+  apps.delete('Zapier');
   return Array.from(apps).sort();
 }
 
@@ -529,11 +543,14 @@ export function mapAuditToHandoffViewModel(
     action: deriveActionDescription(zap.zap_name),
     frequency: deriveFrequency(zap.metrics.monthly_tasks, zap.status),
     connectedApps: extractConnectedApps(zap.zap_name),
+    stepCount: zap.metrics.steps,
     notes: zap.is_zombie
       ? 'This automation is currently inactive — it is turned on but has not executed recently.'
       : zap.warnings.length > 0
-        ? zap.warnings[0].message   // surface first warning as note
-        : undefined,
+        ? zap.warnings[0].message
+        : !extractConnectedApps(zap.zap_name).length  // ← PRIDAJ
+          ? 'Limited detail available due to export constraints. Review this workflow directly in Zapier.'
+          : undefined,
   }));
 
   // ── DEPENDENCY MAP ───────────────────────

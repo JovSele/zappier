@@ -33,6 +33,7 @@ export interface ZapDescription {
   action: string;             // plain English: "...do Y"
   frequency: string;          // e.g. "Runs ~50x/month"
   connectedApps: string[];    // e.g. ["Gmail", "Notion", "Slack"]
+  stepCount?: number;
   owner?: string;             // who is responsible
   notes?: string;             // edge cases, quirks
 }
@@ -91,6 +92,13 @@ const COLORS = {
   BOX_BORDER_LIGHT: { r: 226, g: 232, b: 240 },
   BOX_BORDER_STRONG: { r: 203, g: 213, b: 225 },
   SLATE_400: { r: 148, g: 163, b: 184 },
+  ORANGE_WARNING: { r: 217, g: 119, b: 6 },
+  BLUE: { r: 59, g: 130, b: 246 },
+  SLATE_200: { r: 226, g: 232, b: 240 },
+  SLATE_700: { r: 51, g: 65, b: 85 },
+  SLATE_900: { r: 15, g: 23, b: 42 },
+  RED: { r: 239, g: 68, b: 68 },
+  GREEN: { r: 34, g: 197, b: 94 },
 };
 
 const LAYOUT = {
@@ -148,7 +156,7 @@ function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, config: Hand
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('AUTOMATION HANDOFF REPORT', PAGE_MARGIN, yPos);
+  pdf.text('Infrastructure Deployment & Handoff Kit', PAGE_MARGIN, yPos);
 
   yPos += 8;
 
@@ -211,6 +219,72 @@ function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, config: Hand
   });
 
   yPos += 8;
+
+  // ===== OWNERSHIP SUMMARY BOX =====
+  yPos += 10;
+
+  // Vypočítaj risk level
+  const allInactive = vm.summary.activeZaps === 0;
+  const riskLevel = allInactive ? 'Low' : 'Low';
+  const riskColor = COLORS.GREEN_SUCCESS;
+
+  const firstAction = allInactive
+    ? 'Verify connections, then reactivate workflows one by one'
+    : 'Review active workflows and confirm outputs are correct';
+
+  // Box
+  pdf.setFillColor(COLORS.BOX_BACKGROUND.r, COLORS.BOX_BACKGROUND.g, COLORS.BOX_BACKGROUND.b);
+  pdf.setDrawColor(COLORS.BOX_BORDER_STRONG.r, COLORS.BOX_BORDER_STRONG.g, COLORS.BOX_BORDER_STRONG.b);
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(PAGE_MARGIN, yPos, CONTENT_WIDTH, 38, 2, 2, 'FD');
+
+  // Box header
+  yPos += 7;
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+  pdf.text('OWNERSHIP TRANSFER SUMMARY', PAGE_MARGIN + 4, yPos);
+  yPos += 7;
+
+  // 4 kolumny
+  const col = CONTENT_WIDTH / 4;
+
+  
+  const summaryItems = [
+    { label: 'Total Workflows', value: `${vm.summary.totalZaps}` },
+    { label: 'Currently Active', value: `${vm.summary.activeZaps} of ${vm.summary.totalZaps}` },
+    { label: 'Immediate Risk', value: riskLevel },
+    { label: 'System State', value: allInactive ? 'Inactive' : 'Operational' },
+  ];
+
+  summaryItems.forEach((item, i) => {
+      const x = PAGE_MARGIN + 4 + i * col;
+
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+
+      if (item.label === 'Immediate Risk') {
+        pdf.setTextColor(riskColor.r, riskColor.g, riskColor.b);
+      } else {
+        pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+      }
+      pdf.text(item.value, x, yPos);
+
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+      pdf.text(item.label, x, yPos + 5);
+    });
+
+  yPos += 16;
+
+  // Recommended first action
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'italic');
+  pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+  pdf.text(`Recommended First Action: ${firstAction}`, PAGE_MARGIN + 4, yPos);
+
+  yPos += 10;
 
   // ===== FINAL DIVIDER =====
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
@@ -330,7 +404,10 @@ function generatePerZapBreakdown(pdf: jsPDF, vm: HandoffViewModel, _config: Hand
     pdf.text('Apps:', PAGE_MARGIN + 4, yPos);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-    pdf.text(zap.connectedApps.join(' -> '), PAGE_MARGIN + 4 + pdf.getTextWidth('Apps: '), yPos);
+    const appsText = zap.connectedApps.length > 0 
+      ? zap.connectedApps.join(' -> ') 
+      : 'Not identified in export metadata';
+    pdf.text(appsText, PAGE_MARGIN + 4 + pdf.getTextWidth('Apps: '), yPos);
     yPos += 6;
 
     // NOTES (optional, gray italic)
@@ -377,27 +454,134 @@ function generateDependencyMap(pdf: jsPDF, vm: HandoffViewModel, _config: Handof
     return;
   }
 
-  vm.dependencies.forEach(dep => {
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
-    pdf.text(dep.zapName, PAGE_MARGIN, yPos);
-    yPos += 7;
+vm.dependencies.forEach((dep, index) => {
+  const zapDesc = vm.zaps.find(z => z.zapName === dep.zapName);
+  const steps = zapDesc?.stepCount ?? 2;
 
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(COLORS.TEXT_SECONDARY.r, COLORS.TEXT_SECONDARY.g, COLORS.TEXT_SECONDARY.b);
+  const cardHeight = 50;
+  const cardOffset = 1;
 
-    if (dep.dependsOn.length > 0) {
-      pdf.text(`Depends on: ${dep.dependsOn.join(', ')}`, PAGE_MARGIN + 5, yPos);
-      yPos += 6;
-    }
-    if (dep.feedsInto.length > 0) {
-      pdf.text(`Feeds into: ${dep.feedsInto.join(', ')}`, PAGE_MARGIN + 5, yPos);
-      yPos += 6;
-    }
+  // Shadow
+  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.roundedRect(PAGE_MARGIN, yPos, CONTENT_WIDTH - cardOffset, cardHeight, 3, 3, 'FD');
 
-    yPos += 6;
-  });
+  // Main box
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.setLineWidth(0.1);
+  pdf.roundedRect(PAGE_MARGIN + cardOffset, yPos, CONTENT_WIDTH - cardOffset, cardHeight, 3, 3, 'FD');
+
+  // Header
+  pdf.setTextColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setCharSpace(1);
+  pdf.text('WORKFLOW ARCHITECTURE', PAGE_MARGIN + cardOffset + 6, yPos + 6);
+  pdf.setCharSpace(0);
+
+  // Zap name (right side of header)
+  
+
+  // Complexity
+  const complexity = steps > 8 ? 'HIGH' : steps > 4 ? 'MEDIUM' : 'LOW';
+  const complexityColor = steps > 8 ? COLORS.RED : steps > 4 ? COLORS.ORANGE_WARNING : COLORS.GREEN;
+  const stepsText = `${steps} STEPS • `;
+  const complexityText = `${complexity} COMPLEXITY`;
+  const totalBadgeWidth = pdf.getTextWidth(stepsText + complexityText);
+  const rightX = PAGE_MARGIN + CONTENT_WIDTH - cardOffset - 6 - totalBadgeWidth;
+
+  yPos += 14;
+
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.text(stepsText, rightX, yPos - 8);
+  pdf.setTextColor(complexityColor.r, complexityColor.g, complexityColor.b);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(complexityText, rightX + pdf.getTextWidth(stepsText), yPos - 8);
+
+  // 3 boxy: Trigger → Logic → Action
+  const boxWidth = 35;
+  const boxHeight = 20;
+  const boxGap = 10;
+  const startX = PAGE_MARGIN + cardOffset + (CONTENT_WIDTH - cardOffset - (3 * boxWidth + 2 * boxGap)) / 2;
+
+  const triggerApp = dep.dependsOn[0] || 'Source';
+  const actionApp = dep.feedsInto[0] || 'Destination';
+
+  // TRIGGER box
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(startX, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  pdf.setFillColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
+  pdf.roundedRect(startX + boxWidth / 2 - 4, yPos + 2, 8, 8, 2, 2, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(triggerApp.charAt(0).toUpperCase(), startX + boxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(6);
+  pdf.text(triggerApp.toUpperCase().substring(0, 10), startX + boxWidth / 2, yPos + 14, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(5);
+  pdf.text('TRIGGER', startX + boxWidth / 2, yPos + 18, { align: 'center' });
+
+  // Arrow 1
+  const arrowY = yPos + boxHeight / 2;
+  pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setLineWidth(0.5);
+  pdf.line(startX + boxWidth + 2, arrowY, startX + boxWidth + boxGap - 2, arrowY);
+  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.triangle(startX + boxWidth + boxGap - 4, arrowY - 1, startX + boxWidth + boxGap - 2, arrowY, startX + boxWidth + boxGap - 4, arrowY + 1, 'F');
+
+  // LOGIC box
+  const logic2X = startX + boxWidth + boxGap;
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.roundedRect(logic2X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  const logicSteps = Math.max(steps - 2, 0);
+  pdf.setFillColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
+  pdf.roundedRect(logic2X + boxWidth / 2 - 7, yPos + 2, 14, 6, 3, 3, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(6);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`+${logicSteps}`, logic2X + boxWidth / 2, yPos + 6, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(6);
+  pdf.text('LOGIC LAYER', logic2X + boxWidth / 2, yPos + 13, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(5);
+  pdf.text('FILTERS & FORMATTING', logic2X + boxWidth / 2, yPos + 17, { align: 'center' });
+
+  // Arrow 2
+  const arrow2X = logic2X + boxWidth + 2;
+  pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.line(arrow2X, arrowY, arrow2X + boxGap - 4, arrowY);
+  pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.triangle(arrow2X + boxGap - 4, arrowY - 1, arrow2X + boxGap - 2, arrowY, arrow2X + boxGap - 4, arrowY + 1, 'F');
+
+  // ACTION box
+  const action3X = logic2X + boxWidth + boxGap;
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
+  pdf.roundedRect(action3X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  pdf.setFillColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
+  pdf.roundedRect(action3X + boxWidth / 2 - 4, yPos + 2, 8, 8, 2, 2, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(8);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(actionApp.charAt(0).toUpperCase(), action3X + boxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
+  pdf.setFontSize(6);
+  pdf.text(actionApp.toUpperCase().substring(0, 10), action3X + boxWidth / 2, yPos + 14, { align: 'center' });
+  pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
+  pdf.setFontSize(5);
+  pdf.text('ACTION', action3X + boxWidth / 2, yPos + 18, { align: 'center' });
+
+  yPos += boxHeight + 14;
+});
 
   pdf.setDrawColor(COLORS.DIVIDER.r, COLORS.DIVIDER.g, COLORS.DIVIDER.b);
   pdf.setLineWidth(0.3);
@@ -489,22 +673,25 @@ function generateHandoffChecklist(pdf: jsPDF, vm: HandoffViewModel, _config: Han
   }
 
   const categories: Array<'ACCESS' | 'TEST' | 'VERIFY' | 'DOCUMENT'> = ['ACCESS', 'TEST', 'VERIFY', 'DOCUMENT'];
-  const categoryLabels: Record<string, string> = {
-    ACCESS: '1. Access & Credentials',
-    TEST: '2. Test Runs',
-    VERIFY: '3. Verify Outputs',
-    DOCUMENT: '4. Documentation',
-  };
-
+  
+  let categoryNumber = 0;
   categories.forEach(cat => {
-    const items = vm.checklist.filter(c => c.category === cat);
-    if (items.length === 0) return;
+  const items = vm.checklist.filter(c => c.category === cat);
+  if (items.length === 0) return;
 
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
-    pdf.text(categoryLabels[cat], PAGE_MARGIN, yPos);
-    yPos += 8;
+  categoryNumber++;
+  const categoryLabel = {
+    ACCESS: 'Access & Credentials',
+    TEST: 'Test Runs',
+    VERIFY: 'Verify Outputs',
+    DOCUMENT: 'Documentation',
+  }[cat];
+
+  pdf.setFontSize(12);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
+  pdf.text(`${categoryNumber}. ${categoryLabel}`, PAGE_MARGIN, yPos);
+  yPos += 8;
 
     items.forEach(item => {
       // Checkbox (printable)
