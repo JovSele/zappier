@@ -519,6 +519,11 @@ function setReportType(type: 'audit' | 'continuity') {
   const continuityBtn = document.getElementById('report-type-continuity')
   const hint = document.getElementById('report-type-hint')
   
+  const calibrationPanel = document.getElementById('cost-calibration-panel')
+  if (calibrationPanel) {
+    calibrationPanel.style.display = type === 'audit' ? 'block' : 'none'
+  }
+  
   if (type === 'audit') {
     auditBtn?.setAttribute('class', 'flex-1 px-4 py-3 bg-blue-600 text-white font-black rounded-lg text-sm transition-all')
     continuityBtn?.setAttribute('class', 'flex-1 px-4 py-3 bg-white text-zinc-700 font-black rounded-lg text-sm border-2 border-zinc-200 transition-all')
@@ -805,6 +810,9 @@ async function handleAnalyzeSelected() {
       console.warn(`Expected ${selectedIds.length} Zaps, got ${auditResult.global_metrics.total_zaps}`)
     }
 
+    // Store result globally for unlock flow
+    ;(window as any).__lastAuditResult = auditResult
+    
     // Display results (WASM already filtered by selected IDs)
     displayDeveloperEditionResults(auditResult)
     
@@ -869,19 +877,96 @@ async function handleDownloadHandoff(auditResult: AuditResult, btn: HTMLElement)
   }
 }
 
+// Unlock code verification functions
+function verifyUnlockCode() {
+  const input = document.getElementById('unlock-code-input') as HTMLInputElement
+  const error = document.getElementById('unlock-error')
+  const code = input?.value.trim().toUpperCase()
+  
+  // TODO: Replace with real verification against backend
+  if (!code || code.length < 6) {
+    error?.classList.remove('hidden')
+    return
+  }
+  
+  error?.classList.add('hidden')
+  // Placeholder: accept any code for now
+  generateHandoffAfterUnlock()
+}
+
+function generateHandoffAfterUnlock() {
+  const btn = document.getElementById('unlock-code-btn')
+  if (btn && (window as any).__lastAuditResult) {
+    handleDownloadHandoff((window as any).__lastAuditResult as AuditResult, btn)
+  }
+}
+
 // Display Developer Edition results
 function displayDeveloperEditionResults(auditResult: AuditResult) {
+  updateStatus('success', `Analysis complete for ${auditResult.global_metrics.total_zaps} Zap${auditResult.global_metrics.total_zaps === 1 ? '' : 's'}`)
+  
+  const resultsEl = document.getElementById('results')
+  if (!resultsEl) return
+  
+  // Show different UI based on selected report type
+  if (selectedReportType === 'continuity') {
+    // Continuity report - show unlock/payment gate
+    resultsEl.innerHTML = `
+      <div class="mt-10">
+        <div class="flex items-center justify-between mb-6">
+          <button onclick="backToSelector()" class="inline-flex items-center gap-2 px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white text-sm font-bold rounded-lg">
+            ← Back to Selection
+          </button>
+        </div>
+        <div class="rounded-3xl border-2 border-zinc-200 bg-white p-10 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 class="text-2xl font-black text-zinc-900 mb-3">Analysis Complete</h3>
+          <p class="text-zinc-600 mb-2">Your Zapier data has been analyzed locally.</p>
+          <p class="text-zinc-600 mb-8">To generate the Continuity Report, complete payment and enter your unlock code.</p>
+          
+          <div class="flex flex-col sm:flex-row gap-4 justify-center mb-6">
+            <a href="YOUR_STRIPE_LINK" target="_blank" 
+               class="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white text-lg font-black rounded-xl transition-all hover:scale-[1.02]">
+              Pay $97 → Get Unlock Code
+            </a>
+          </div>
+          
+          <div class="max-w-sm mx-auto">
+            <p class="text-sm font-bold text-zinc-700 mb-2">Already have a code?</p>
+            <div class="flex gap-2">
+              <input 
+                type="text" 
+                id="unlock-code-input"
+                placeholder="Enter unlock code"
+                class="flex-1 px-4 py-3 border-2 border-zinc-200 rounded-xl focus:border-zinc-900 outline-none font-mono text-center tracking-widest"
+              />
+              <button 
+                id="unlock-code-btn"
+                onclick="verifyUnlockCode()"
+                class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl transition-all"
+              >
+                Unlock
+              </button>
+            </div>
+            <p id="unlock-error" class="text-xs text-rose-600 mt-2 hidden">Invalid code. Please try again.</p>
+          </div>
+        </div>
+      </div>
+    `
+    return
+  }
+  
+  // Audit report - show full results
   const avgScore = auditResult.per_zap_findings.length > 0
     ? auditResult.per_zap_findings.reduce((sum, zap) => {
         const zapScore = 100 - (zap.flags.length * 10);
         return sum + Math.max(0, zapScore);
       }, 0) / auditResult.per_zap_findings.length
     : 100;
-  
-  updateStatus('success', `Analysis complete for ${auditResult.global_metrics.total_zaps} Zap${auditResult.global_metrics.total_zaps === 1 ? '' : 's'}`)
-  
-  const resultsEl = document.getElementById('results')
-  if (!resultsEl) return
   
   resultsEl.innerHTML = `
     <div class="mt-10">
@@ -1089,6 +1174,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
 ;(window as any).selectAllActive = selectAllActive
 ;(window as any).deselectAll = deselectAll
 ;(window as any).handleAnalyzeSelected = handleAnalyzeSelected
+;(window as any).verifyUnlockCode = verifyUnlockCode
 
 // NEW: Render only table content (optimized for filtering)
 function renderZapTable(filteredZaps: ZapSummary[]) {
@@ -1306,7 +1392,7 @@ function displayZapSelector(zaps: ZapSummary[]) {
   resultsEl.innerHTML = `
     <div class="mt-10">
       <!-- Cost Calibration Panel (LIVE UPDATE) -->
-      <div class="mb-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl shadow-sm">
+      <div id="cost-calibration-panel" class="mb-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl shadow-sm" style="display:none">
         <div class="flex items-center gap-3 mb-4">
           <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1527,6 +1613,9 @@ function displayZapSelector(zaps: ZapSummary[]) {
     updatePreviewCard()
     updateSliderMax()
   }, 100)
+  
+  // Initialize report type UI state (including Cost Calibration panel visibility)
+  setReportType(selectedReportType)
 }
 
 // NEW: Test v1.0.0 API with analyze_zaps()
