@@ -24,3 +24,8 @@ Dalsi krok:
 
 
     git commit -m "feat: dynamic Quick Wins, sequential report IDs, fully dynamic HTML template"
+
+comitnuntie:
+    git add package.json
+    git commit -m "fix: add wasm32 target for Vercel"
+    git push
