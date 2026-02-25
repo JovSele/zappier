@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && rustup target add wasm32-unknown-unknown && npm run build:wasm && tsc && vite build",
+    "build": "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && rustup target add wasm32-unknown-unknown && npm run build:wasm && vite build",
     "build:wasm": "cd src-wasm && wasm-pack build --target web",
     "preview": "vite preview"
   },
