@@ -1,13 +1,13 @@
 //vite.config.ts
 import { defineConfig } from 'vite'
-
 export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
       input: {
         main: 'index.html',
-        app: 'app.html'
+        app: 'app.html',
+        legal: 'legal.html'
       }
     }
   },
