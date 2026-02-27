@@ -41,4 +41,4 @@ git push vercel main
 Tým pushneš tvoj kód do repo ktoré Vercel sleduje. Odteraz budeš pushovať do oboch:
 
 git push origin main   
-git push vercel main   
+ 
