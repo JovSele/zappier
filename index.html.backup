@@ -1,741 +1,782 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Zapier Lighthouse - Stop Leaking Money on Inefficient Zaps</title>
-  <link rel="stylesheet" href="/src/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-H6S19G1N29"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-H6S19G1N29');
+  </script>
+
+  <title>Relay — Zapier Risk Audit + Continuity Report (100% Private)</title>
+
+  <!-- Your existing Tailwind build -->
+  <link rel="stylesheet" href="/src/style.css" />
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-    
-    body {
-      font-family: 'Inter', sans-serif;
-    }
-    
+
+    body { font-family: 'Inter', sans-serif; }
+
     .gradient-text {
       background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    
+
     .hero-gradient {
       background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     }
-    
-    .feature-card {
-      transition: all 0.3s ease;
-    }
-    
-    .feature-card:hover {
+
+    .card-hover { transition: all 0.25s ease; }
+    .card-hover:hover {
       transform: translateY(-4px);
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.10), 0 10px 10px -5px rgba(0,0,0,0.04);
     }
-    
-    .stat-number {
-      font-variant-numeric: tabular-nums;
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.875rem;
     }
-    
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-20px); }
+
+    /* FAQ */
+    .faq-item { border-bottom: 1px solid #e4e4e7; }
+    .faq-item:last-child { border-bottom: none; }
+    .faq-question {
+      width: 100%;
+      text-align: left;
+      padding: 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #18181b;
+      gap: 16px;
+      line-height: 1.4;
     }
-    
-    .float-animation {
-      animation: float 6s ease-in-out infinite;
+    .faq-question:hover { color: #2563eb; }
+    .faq-question-text { flex: 1; }
+    .faq-icon {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #f4f4f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      color: #71717a;
+      font-weight: 900;
     }
-    
-    .privacy-icon {
-      transition: all 0.3s ease;
+    .faq-question[aria-expanded="true"] .faq-icon {
+      background: #2563eb;
+      color: white;
+      transform: rotate(45deg);
     }
-    
-    .privacy-card:hover .privacy-icon {
-      transform: scale(1.1);
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease;
+    }
+    .faq-answer.open { max-height: 650px; }
+    .faq-answer-inner {
+      padding-bottom: 20px;
+      color: #52525b;
+      font-size: 0.95rem;
+      line-height: 1.8;
+    }
+    .faq-answer-inner code {
+      background: #f4f4f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      color: #3f3f46;
+    }
+    .faq-category-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 14px;
     }
   </style>
 </head>
+
 <body class="bg-[#fafafa]">
 
   <!-- Navigation -->
   <nav class="bg-white border-b border-zinc-200 sticky top-0 z-50 backdrop-blur-sm bg-white/90">
     <div class="container mx-auto px-6 py-4">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between gap-6">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </div>
-          <span class="text-2xl font-black text-zinc-900" style="letter-spacing: -0.02em;">Zapier Lighthouse</span>
+          <div class="leading-tight">
+            <div class="text-xl md:text-2xl font-black text-zinc-900" style="letter-spacing:-0.02em;">Relay</div>
+            <div class="text-xs md:text-sm text-zinc-500 font-semibold">Automation Risk & Continuity Reports</div>
+          </div>
         </div>
-        <div class="flex items-center gap-4">
-          <span class="px-4 py-2 bg-emerald-50 text-emerald-700 font-semibold rounded-full text-sm border border-emerald-200">
-            🎉 Free for Alpha Testers
+
+        <div class="flex items-center gap-3 flex-wrap justify-end">
+          <span class="hidden md:inline-flex px-4 py-2 bg-emerald-50 text-emerald-700 font-semibold rounded-full text-sm border border-emerald-200">
+            100% Private • Runs in your browser
           </span>
-          <a href="/app.html" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all hover:scale-105">
-            Start Free Audit
+
+          <a href="#choose" class="px-4 py-2.5 bg-white hover:bg-zinc-50 text-zinc-900 font-bold rounded-lg border border-zinc-200 transition-all">
+            Choose Report
+          </a>
+
+          <a href="/app.html#audit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-lg transition-all hover:scale-[1.02]">
+            Run Risk Audit (Free)
+          </a>
+          <a href="/app.html#handoff" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-lg transition-all hover:scale-[1.02]">
+            Generate Continuity Report ($97)
           </a>
         </div>
       </div>
     </div>
   </nav>
 
-  <!-- Hero Section -->
-  <section class="hero-gradient py-20 md:py-32 relative overflow-hidden">
-    <!-- Decorative elements -->
+  <!-- Hero -->
+  <section class="hero-gradient py-18 md:py-28 relative overflow-hidden">
     <div class="absolute inset-0 opacity-10">
-      <div class="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full filter blur-3xl"></div>
-      <div class="absolute bottom-20 right-10 w-96 h-96 bg-purple-500 rounded-full filter blur-3xl"></div>
+      <div class="absolute top-16 left-10 w-72 h-72 bg-blue-500 rounded-full filter blur-3xl"></div>
+      <div class="absolute bottom-16 right-10 w-96 h-96 bg-purple-500 rounded-full filter blur-3xl"></div>
     </div>
-    
+
     <div class="container mx-auto px-6 relative z-10">
-      <div class="max-w-4xl mx-auto text-center">
+      <div class="max-w-5xl mx-auto text-center">
         <div class="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full mb-8 backdrop-blur-sm">
           <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-          <span class="text-emerald-300 font-semibold text-sm">100% Private • WASM-Powered • No Cloud Upload</span>
+          <span class="text-emerald-300 font-semibold text-sm">No upload • No tracking • WASM-powered</span>
         </div>
-        
-        <h1 class="text-5xl md:text-7xl font-black text-white mb-6" style="letter-spacing: -0.03em; line-height: 1.1;">
-          Stop Leaking Money on<br>
-          <span class="gradient-text">Inefficient Zaps</span>
+
+        <h1 class="text-5xl md:text-7xl font-black text-white mb-6" style="letter-spacing:-0.03em; line-height:1.08;">
+          Your automations are a risk.<br />
+          <span class="gradient-text">You just can’t see it yet.</span>
         </h1>
-        
-        <p class="text-xl md:text-2xl text-slate-300 mb-12 max-w-3xl mx-auto font-medium">
-          Upload your Zapier export and get a professional audit PDF in seconds.<br>
-          <span class="text-blue-400">100% Private.</span> Processed in your browser.
+
+        <p class="text-xl md:text-2xl text-slate-300 mb-10 max-w-4xl mx-auto font-medium leading-relaxed">
+          One expired credential, one URL change, one person leaving — and your workflows quietly break.<br />
+          Relay turns your Zapier export into a <span class="text-white font-black">Risk Audit</span> or a
+          <span class="text-blue-300 font-black">Continuity Report</span> you can hand to a client, a team, or an auditor.
         </p>
-        
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-          <a href="/app.html" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold rounded-xl shadow-xl shadow-blue-500/30 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/40 inline-flex items-center gap-3">
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
+          <a href="/app.html#audit" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-black rounded-xl shadow-xl shadow-blue-500/30 transition-all hover:scale-[1.03] inline-flex items-center gap-3">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            Start Free Audit
+            Run Risk Audit (Free)
           </a>
-          <a href="#how-it-works" class="px-8 py-4 bg-white/10 hover:bg-white/20 text-white text-lg font-bold rounded-xl backdrop-blur-sm border border-white/20 transition-all hover:scale-105 inline-flex items-center gap-3">
+
+          <a href="/app.html#handoff" class="px-8 py-4 bg-white/10 hover:bg-white/20 text-white text-lg font-black rounded-xl backdrop-blur-sm border border-white/20 transition-all hover:scale-[1.03] inline-flex items-center gap-3">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
-            How It Works
+            Generate Continuity Report ($97)
           </a>
         </div>
-        
-        <!-- Stats -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
-          <div class="text-center">
-            <div class="text-4xl md:text-5xl font-black text-white mb-2 stat-number">5,000+</div>
-            <div class="text-slate-400 font-semibold">Zaps Analyzed</div>
+
+        <div class="flex flex-wrap justify-center gap-3 mb-10">
+          <span class="pill bg-emerald-500/10 text-emerald-200 border border-emerald-500/20">✅ No signup required</span>
+          <span class="pill bg-blue-500/10 text-blue-200 border border-blue-500/20">✅ Processed locally</span>
+          <span class="pill bg-white/10 text-slate-200 border border-white/15">✅ PDF in seconds</span>
+        </div>
+
+        <!-- White labeling-->
+        <!-- 
+        <div class="text-slate-300/80 text-sm font-semibold mb-10">
+          Optional: add your logo + brand cover page (white-label ready).
+        </div>
+        -->
+
+        <div class="max-w-4xl mx-auto grid md:grid-cols-3 gap-4 text-left">
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+            <div class="text-white font-black mb-1">Hidden breakpoints</div>
+            <div class="text-slate-300">Find fragile connections, owner-dependency, and “it works until it doesn’t.”</div>
           </div>
-          <div class="text-center">
-            <div class="text-4xl md:text-5xl font-black text-white mb-2 stat-number">$50k+</div>
-            <div class="text-slate-400 font-semibold">Estimated Savings</div>
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+            <div class="text-white font-black mb-1">Waste & task burn</div>
+            <div class="text-slate-300">Spot redundant steps and filter placement that silently inflates cost.</div>
           </div>
-          <div class="text-center">
-            <div class="text-4xl md:text-5xl font-black text-white mb-2 stat-number">340+</div>
-            <div class="text-slate-400 font-semibold">Teams Optimized</div>
-          </div>
-          <div class="text-center">
-            <div class="text-4xl md:text-5xl font-black text-white mb-2 stat-number">23%</div>
-            <div class="text-slate-400 font-semibold">Avg. Cost Reduction</div>
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+            <div class="text-white font-black mb-1">Transfer-ready docs</div>
+            <div class="text-slate-300">Deliver a clean handoff package your next owner can actually use.</div>
           </div>
         </div>
+
       </div>
     </div>
   </section>
 
-  <!-- How to Export Section -->
-  <section id="how-it-works" class="py-16 bg-white border-y border-zinc-200">
+  <!-- Problem -->
+  <section class="py-18 bg-white border-b border-zinc-200">
     <div class="container mx-auto px-6">
-      <div class="max-w-3xl mx-auto text-center mb-12">
-        <h2 class="text-3xl md:text-4xl font-black text-zinc-900 mb-4" style="letter-spacing: -0.02em;">
-          How to Get Your Zapier Export
-        </h2>
-        <p class="text-lg text-zinc-500">It takes less than 30 seconds to export your data</p>
-      </div>
-      
-      <div class="max-w-4xl mx-auto grid md:grid-cols-3 gap-8">
-<div class="text-center bg-white rounded-2xl p-6 border border-zinc-200 shadow-md hover:shadow-lg transition-all">  <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl font-black mx-auto mb-4 border border-blue-200 shadow-md">
-    1
-  </div>
-  <h3 class="text-xl font-bold text-zinc-900 mb-2">Go to Zapier Settings</h3>
-  <p class="text-zinc-600">Navigate to your Zapier dashboard and click Settings</p>
-</div>
-        
-        <div class="text-center bg-white rounded-2xl p-6 border border-zinc-200 shadow-md hover:shadow-lg transition-all">
-          <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl font-black mx-auto mb-4 border border-blue-200 shadow-md">
-            2
-          </div>
-          <h3 class="text-xl font-bold text-zinc-900 mb-2">Click Data Management</h3>
-          <p class="text-zinc-600">Find the Data Management section in settings</p>
-        </div>
-        
-        <div class="text-center bg-white rounded-2xl p-6 border border-zinc-200 shadow-md hover:shadow-lg transition-all">
-          <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl font-black mx-auto mb-4 border border-blue-200 shadow-md">
-            3
-          </div>
-          <h3 class="text-xl font-bold text-zinc-900 mb-2">Export Zaps</h3>
-          <p class="text-zinc-600">Select "Export Zaps" to download your .zip file</p>
-        </div>
-      </div>
-    </div>
-  </section>
+      <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-10 items-start">
+        <div>
+          <h2 class="text-3xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing:-0.02em;">
+            Most Zapier stacks fail for boring reasons.
+          </h2>
+          <p class="text-lg md:text-xl text-zinc-600 leading-relaxed">
+            Not because the automation is “hard.”<br/>
+            Because ownership is unclear, dependencies are undocumented, and fixes happen after the break.
+          </p>
 
-<!-- PDF Preview Section -->
-  <section class="py-20 bg-gradient-to-br from-slate-50 to-blue-50">
-    <div class="container mx-auto px-6">
-      <div class="max-w-7xl mx-auto">
-        
-        <div class="grid lg:grid-cols-2 gap-12 items-center">
-          
-          <!-- Left Side - Text Content -->
-          <div>
-            <h2 class="text-4xl md:text-5xl font-black text-zinc-900 mb-6" style="letter-spacing: -0.02em;">
-              A Professional Report<br>
-              <span class="gradient-text">That Pays for Itself</span>
-            </h2>
-            <p class="text-xl text-zinc-600 mb-8 leading-relaxed">
-              Get actionable insights that identify exactly where your Zapier spend is being wasted.
-            </p>
-            
-            <!-- Feature List -->
-            <div class="space-y-4 mb-8">
-              <div class="flex items-start gap-3">
-                <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Error Trends & Loops Detection</h3>
-                  <p class="text-zinc-600 text-sm">Identify Zaps stuck in retry loops that silently drain your task quota</p>
-                </div>
-              </div>
-              
-              <div class="flex items-start gap-3">
-                <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Efficiency Scoring (0-100)</h3>
-                  <p class="text-zinc-600 text-sm">Get a clear score based on redundant steps, unnecessary triggers, and bloat</p>
-                </div>
-              </div>
-              
-              <div class="flex items-start gap-3">
-                <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Monthly Savings Estimate</h3>
-                  <p class="text-zinc-600 text-sm">See exactly how much you could save by optimizing inefficient workflows</p>
-                </div>
-              </div>
-              
-              <div class="flex items-start gap-3">
-                <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Filter Optimization Advice</h3>
-                  <p class="text-zinc-600 text-sm">Learn where to place filters to save up to 100% of tasks on rejected items</p>
-                </div>
-              </div>
+          <div class="mt-6 space-y-3 text-zinc-700 font-semibold">
+            <div class="flex gap-3">
+              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black">!</div>
+              <div>Workflows tied to personal emails / old credentials</div>
             </div>
-            
-            <a href="/app.html" class="inline-flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-105">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Get Your Free Audit
+            <div class="flex gap-3">
+              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black">!</div>
+              <div>No one can explain “what this zap does” during an incident</div>
+            </div>
+            <div class="flex gap-3">
+              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black">!</div>
+              <div>Redundant steps burn tasks for no business value</div>
+            </div>
+            <div class="flex gap-3">
+              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black">!</div>
+              <div>Handovers are “here’s a Loom” — and then panic</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-3xl border border-zinc-200 bg-zinc-50 p-8">
+          <div class="text-sm font-black text-zinc-500 uppercase tracking-widest">What Relay gives you</div>
+          <div class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">Clarity + a plan</div>
+          <p class="text-zinc-600 mt-3 text-lg leading-relaxed">
+            Use the free audit to identify risk and waste, then generate a continuity report you can share with a client,
+            a new owner, or an auditor.
+          </p>
+
+          <div class="mt-6 grid gap-3">
+            <div class="rounded-2xl bg-white border border-zinc-200 p-5">
+              <div class="font-black text-zinc-900">Risk Audit (Free)</div>
+              <div class="text-zinc-600">Executive score + top fixes by ROI, effort, and impact.</div>
+            </div>
+            <div class="rounded-2xl bg-white border border-zinc-200 p-5">
+              <div class="font-black text-zinc-900">Continuity Report ($97)</div>
+              <div class="text-zinc-600">Plain-English docs + dependency map + troubleshooting + checklist.</div>
+            </div>
+          </div>
+
+          <div class="mt-7 flex flex-col sm:flex-row gap-3">
+            <a href="/app.html#audit" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-center">
+              Run Audit
+            </a>
+            <a href="/app.html#handoff" class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl text-center">
+              Generate Report
             </a>
           </div>
-          
-          <!-- Right Side - PDF Preview Card with 3D Effect -->
-<div class="relative" style="perspective: 1500px;">
-  <div class="bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 hover:shadow-blue-500/20" 
-       style="transform: rotateY(-8deg) rotateX(2deg); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3), -20px 0 40px -15px rgba(59, 130, 246, 0.2);">
-    
-    <!-- PDF Header -->
-    <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-8 py-6">
-      <div class="flex items-center justify-between">
-        <h3 class="text-xl font-black">Lighthouse Audit Report</h3>
-        <span class="text-slate-400 text-sm">Generated Jan 2026</span>
-      </div>
-    </div>
-    
-    <!-- PDF Content -->
-    <div class="p-8 bg-gradient-to-br from-white to-slate-50">
-      
-      <!-- Efficiency Score - Hero -->
-      <div class="text-center mb-8 pb-8 border-b-2 border-slate-200">
-        <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Efficiency Score</div>
-        <div class="text-7xl font-black mb-2">
-          <span class="text-rose-600">0</span>
-          <span class="text-slate-400"> / </span>
-          <span class="text-slate-700">100</span>
-        </div>
-      </div>
-      
-      <!-- Metrics Grid -->
-      <div class="grid grid-cols-2 gap-6 mb-8">
-        <div>
-          <div class="text-xs text-slate-500 uppercase tracking-wide mb-2">Zaps Analyzed</div>
-          <div class="text-4xl font-black text-slate-900">5</div>
-        </div>
-        <div>
-          <div class="text-xs text-emerald-600 uppercase tracking-wide mb-2">Est. Annual Savings</div>
-          <div class="text-4xl font-black text-emerald-600">$11</div>
-        </div>
-      </div>
-      
-      <!-- Reliability Concerns -->
-      <div class="bg-rose-50 border-l-4 border-rose-500 rounded-r-xl p-6 mb-6">
-        <div class="flex items-start gap-3 mb-4">
-          <span class="text-2xl">⚠️</span>
-          <div>
-            <h4 class="text-lg font-black text-rose-700 mb-1">[!] RELIABILITY CONCERNS</h4>
-            <p class="text-sm text-rose-600">3 Zaps with high error rates</p>
-          </div>
-        </div>
-        
-        <div class="bg-white rounded-lg p-4 border border-rose-200">
-          <div class="font-bold text-slate-900 mb-2">1. Wordpress to Reddit</div>
-          <div class="text-rose-600 font-semibold text-sm mb-2">High error rate detected: 30.0%</div>
-          <div class="text-xs text-slate-600 mb-3">Est. savings: $0.06/month</div>
-        </div>
-      </div>
-      
-      <!-- PDF Ready Badge -->
-      <div class="text-center pt-6 border-t border-slate-200">
-        <div class="inline-flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-700 rounded-full font-semibold text-sm border border-slate-200">
-          <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          PDF Ready in ~5 seconds
-        </div>
-      </div>
-      
-    </div>
-  </div>
-  
-  <!-- Shadow Enhancement -->
-  <div class="absolute inset-0 bg-gradient-to-b from-transparent via-blue-900/5 to-slate-900/10 rounded-3xl transform translate-y-3 translate-x-2 -z-10 blur-sm"></div>
-</div>
-          
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Features Section -->
-  <section class="py-20 bg-white">
+  <!-- Choose Report -->
+  <section id="choose" class="py-18 bg-white border-b border-zinc-200">
     <div class="container mx-auto px-6">
-      <div class="max-w-6xl mx-auto">
-        <div class="grid md:grid-cols-2 gap-8">
-          
-          <!-- Feature 1 -->
-          <div class="feature-card bg-gradient-to-br from-rose-50 to-rose-100 border-2 border-rose-200 rounded-2xl p-8">
-            <div class="w-14 h-14 bg-rose-500 rounded-xl flex items-center justify-center mb-4">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+      <div class="max-w-4xl mx-auto text-center mb-12">
+        <h2 class="text-3xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing:-0.02em;">
+          Choose the outcome you need today
+        </h2>
+        <p class="text-lg md:text-xl text-zinc-600">
+          Same export. Two reports. One less “tribal knowledge” disaster.
+        </p>
+      </div>
+
+      <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-8">
+        <!-- Audit Card -->
+        <div class="card-hover rounded-3xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-8">
+          <div class="flex items-start justify-between gap-6">
+            <div>
+              <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-full text-xs font-black uppercase tracking-wider">
+                Risk Audit
+              </div>
+              <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-4">Relay Audit Report</h3>
+              <p class="text-zinc-600 mt-3 text-lg leading-relaxed">
+                Identify waste, fragile dependencies, and execution patterns that inflate task burn.
+                Get the highest-ROI fixes first.
+              </p>
             </div>
-            <h3 class="text-2xl font-black text-zinc-900 mb-3">Error Trends & Loops</h3>
-            <p class="text-zinc-700 text-lg">
-              Identify Zaps stuck in retry loops that silently drain your task quota
-            </p>
-          </div>
-          
-          <!-- Feature 2 -->
-          <div class="feature-card bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-8">
-            <div class="w-14 h-14 bg-blue-500 rounded-xl flex items-center justify-center mb-4">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+            <div class="text-right">
+              <div class="text-sm font-bold text-zinc-500">Price</div>
+              <div class="text-3xl font-black text-blue-700">Free</div>
+              <div class="text-xs text-zinc-500 font-semibold mt-1">alpha access</div>
             </div>
-            <h3 class="text-2xl font-black text-zinc-900 mb-3">Efficiency Score</h3>
-            <p class="text-zinc-700 text-lg">
-              Get a 0-100 score based on redundant steps, unnecessary triggers, and bloat
-            </p>
           </div>
-          
-          <!-- Feature 3 -->
-          <div class="feature-card bg-gradient-to-br from-emerald-50 to-emerald-100 border-2 border-emerald-200 rounded-2xl p-8">
-            <div class="w-14 h-14 bg-emerald-500 rounded-xl flex items-center justify-center mb-4">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+
+          <div class="mt-6 space-y-3">
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-black text-zinc-900">Health Score (0–100)</div>
+                <div class="text-zinc-600 text-sm">Executive-level signal for stack quality and risk posture.</div>
+              </div>
             </div>
-            <h3 class="text-2xl font-black text-zinc-900 mb-3">Monthly Savings Estimate</h3>
-            <p class="text-zinc-700 text-lg">
-              See exactly how much you could save by optimizing inefficient workflows
-            </p>
-          </div>
-          
-          <!-- Feature 4 -->
-          <div class="feature-card bg-gradient-to-br from-amber-50 to-amber-100 border-2 border-amber-200 rounded-2xl p-8">
-            <div class="w-14 h-14 bg-amber-500 rounded-xl flex items-center justify-center mb-4">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
+
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-black text-zinc-900">Top Priority Actions</div>
+                <div class="text-zinc-600 text-sm">High ROI fixes with effort estimates.</div>
+              </div>
             </div>
-            <h3 class="text-2xl font-black text-zinc-900 mb-3">Unused Zap Detection</h3>
-            <p class="text-zinc-700 text-lg">
-              Find Zaps that haven't run in months but still count against your plan
-            </p>
+
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-black text-zinc-900">Plan Fit Verdict</div>
+                <div class="text-zinc-600 text-sm">Signals under/over-utilization and downgrade opportunities.</div>
+              </div>
+            </div>
           </div>
-          
+
+          <div class="mt-8 flex flex-col sm:flex-row gap-3">
+            <a href="/app.html#audit" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all hover:scale-[1.02]">
+              Run Free Audit
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </a>
+            <a href="#how-it-works" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-zinc-50 text-zinc-900 font-black rounded-xl border border-zinc-200 transition-all">
+              How it works
+            </a>
+          </div>
+        </div>
+
+        <!-- Continuity Card -->
+        <div class="card-hover rounded-3xl border-2 border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-8">
+          <div class="flex items-start justify-between gap-6">
+            <div>
+              <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-900 text-white rounded-full text-xs font-black uppercase tracking-wider">
+                Continuity Report
+              </div>
+              <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-4">Relay Continuity Report</h3>
+              <p class="text-zinc-600 mt-3 text-lg leading-relaxed">
+                Client-ready documentation: what each automation does, what it depends on, what breaks, and what to verify after transfer.
+              </p>
+            </div>
+            <div class="text-right">
+              <div class="text-sm font-bold text-zinc-500">Price</div>
+              <div class="text-3xl font-black text-zinc-900">$97</div>
+              <div class="text-xs text-zinc-500 font-semibold mt-1">one-time</div>
+            </div>
+          </div>
+
+          <div class="mt-6 space-y-3">
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-zinc-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-zinc-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-black text-zinc-900">Plain-English per Zap</div>
+                <div class="text-zinc-600 text-sm">“When X happens → do Y” without technical noise.</div>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-zinc-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-zinc-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-black text-zinc-900">Dependency Map</div>
+                <div class="text-zinc-600 text-sm">What connects to what — apps, sources, downstream systems.</div>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-zinc-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-zinc-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-black text-zinc-900">Troubleshooting + Checklist</div>
+                <div class="text-zinc-600 text-sm">What breaks, why, and a sign-off process.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-8 flex flex-col sm:flex-row gap-3">
+            <a href="/app.html#handoff" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl transition-all hover:scale-[1.02]">
+              Generate Report ($97)
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </a>
+            <a href="#faq" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-zinc-50 text-zinc-900 font-black rounded-xl border border-zinc-200 transition-all">
+              Read FAQ
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="max-w-6xl mx-auto mt-10">
+        <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 md:p-7 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <div class="font-black text-zinc-900 text-lg">Recommended combo</div>
+            <div class="text-zinc-600">
+              Run the <span class="font-black text-blue-700">free Audit</span> to surface risk, then deliver the
+              <span class="font-black text-zinc-900">Continuity Report</span> as the client-facing handoff bundle.
+              <!-- <span class="text-zinc-500">Brandable cover page included.</span> -->
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <a href="/app.html#audit" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl">Run Audit</a>
+            <a href="/app.html#handoff" class="px-5 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl">Generate Report</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how-it-works" class="py-18 bg-white">
+    <div class="container mx-auto px-6">
+      <div class="max-w-4xl mx-auto text-center mb-12">
+        <h2 class="text-3xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing:-0.02em;">
+          One export. Two outcomes.
+        </h2>
+        <p class="text-lg text-zinc-600">~30 seconds. No upload. Processed locally.</p>
+      </div>
+
+      <div class="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
+        <div class="text-center bg-white rounded-2xl p-7 border border-zinc-200 shadow-sm card-hover">
+          <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl font-black mx-auto mb-4 border border-blue-200">1</div>
+          <h3 class="text-xl font-black text-zinc-900 mb-2">Export from Zapier</h3>
+          <p class="text-zinc-600">Settings → Data Management → Export. Download the file.</p>
+        </div>
+
+        <div class="text-center bg-white rounded-2xl p-7 border border-zinc-200 shadow-sm card-hover">
+          <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl font-black mx-auto mb-4 border border-blue-200">2</div>
+          <h3 class="text-xl font-black text-zinc-900 mb-2">Open Relay</h3>
+          <p class="text-zinc-600">Drop the export into the tool. Nothing leaves your browser.</p>
+        </div>
+
+        <div class="text-center bg-white rounded-2xl p-7 border border-zinc-200 shadow-sm card-hover">
+          <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl font-black mx-auto mb-4 border border-blue-200">3</div>
+          <h3 class="text-xl font-black text-zinc-900 mb-2">Download your PDF</h3>
+          <p class="text-zinc-600">Choose Audit or Continuity. Get a clean report in seconds.</p>
+        </div>
+      </div>
+
+      <div class="max-w-5xl mx-auto mt-10 text-center">
+        <a href="/app.html#audit" class="inline-flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg transition-all hover:scale-[1.02]">
+          Start with the Free Audit
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Who it's for / not for -->
+  <section class="py-18 bg-white border-t border-zinc-200">
+    <div class="container mx-auto px-6">
+      <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-8">
+        <div class="rounded-3xl border border-zinc-200 p-8 bg-white">
+          <div class="text-sm font-black text-zinc-500 uppercase tracking-widest">Not for you if</div>
+          <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">You have 2–3 simple Zaps and never hand anything off.</h3>
+          <ul class="mt-5 space-y-3 text-zinc-700 font-semibold">
+            <li class="flex gap-3"><span class="text-zinc-400">•</span> You don’t deliver automation projects to clients</li>
+            <li class="flex gap-3"><span class="text-zinc-400">•</span> You don’t care about ownership or continuity</li>
+            <li class="flex gap-3"><span class="text-zinc-400">•</span> You’re fine with “it breaks sometimes”</li>
+          </ul>
+        </div>
+
+        <div class="rounded-3xl border border-blue-200 p-8 bg-gradient-to-br from-blue-50 to-white">
+          <div class="text-sm font-black text-blue-700 uppercase tracking-widest">Perfect for</div>
+          <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">Agencies, consultants, and teams managing real workflow risk.</h3>
+          <ul class="mt-5 space-y-3 text-zinc-700 font-semibold">
+            <li class="flex gap-3"><span class="text-blue-600">•</span> You manage 10+ workflows and want clarity</li>
+            <li class="flex gap-3"><span class="text-blue-600">•</span> You do handoffs, transfers, or client documentation</li>
+            <li class="flex gap-3"><span class="text-blue-600">•</span> You need audit-ready visibility (due diligence, compliance, ops)</li>
+          </ul>
+
+          <div class="mt-7 flex flex-col sm:flex-row gap-3">
+            <a href="/app.html#audit" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-center">Run Audit</a>
+            <a href="/app.html#handoff" class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl text-center">Generate Report</a>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Privacy Section -->
+  <!-- Privacy -->
   <section class="py-20 bg-gradient-to-br from-slate-900 to-slate-800">
     <div class="container mx-auto px-6">
       <div class="max-w-6xl mx-auto">
-        <div class="text-center mb-16">
-          <h2 class="text-4xl md:text-5xl font-black text-white mb-4" style="letter-spacing: -0.02em;">
-            Privacy First Architecture
+        <div class="text-center mb-14">
+          <h2 class="text-4xl md:text-5xl font-black text-white mb-4" style="letter-spacing:-0.02em;">
+            Privacy-first by design
           </h2>
-          <p class="text-xl text-slate-300 max-w-3xl mx-auto">
-            Your Data Never Leaves Your Browser
-          </p>
+          <p class="text-xl text-slate-300 max-w-3xl mx-auto">Your Zapier export never leaves your machine.</p>
           <p class="text-lg text-slate-400 max-w-2xl mx-auto mt-4">
-            We built Lighthouse with privacy as the foundation, not an afterthought. Your workflow data stays exactly where it should — on your machine.
+            Relay runs locally using WebAssembly. No uploads. No storage. No way for us to see your data.
           </p>
         </div>
-        
-        <div class="grid md:grid-cols-3 gap-8 mb-16">
-          
-          <!-- Privacy Feature 1 -->
-          <div class="privacy-card bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/10 transition-all">
-            <div class="privacy-icon w-20 h-20 mx-auto mb-6 bg-blue-500/20 rounded-2xl flex items-center justify-center">
+
+        <div class="grid md:grid-cols-3 gap-8 mb-14">
+          <div class="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/10 transition-all">
+            <div class="w-20 h-20 mx-auto mb-6 bg-blue-500/20 rounded-2xl flex items-center justify-center">
               <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-white mb-3">WASM-Powered Engine</h3>
-            <p class="text-slate-300">
-              Our analysis engine runs entirely in your browser using WebAssembly. Zero server calls.
-            </p>
+            <h3 class="text-xl font-black text-white mb-3">Local engine (WASM)</h3>
+            <p class="text-slate-300">Analysis runs in your browser. Zero server calls.</p>
           </div>
-          
-          <!-- Privacy Feature 2 -->
-          <div class="privacy-card bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/10 transition-all">
-            <div class="privacy-icon w-20 h-20 mx-auto mb-6 bg-emerald-500/20 rounded-2xl flex items-center justify-center">
+
+          <div class="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/10 transition-all">
+            <div class="w-20 h-20 mx-auto mb-6 bg-emerald-500/20 rounded-2xl flex items-center justify-center">
               <svg class="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-white mb-3">No Cloud Upload</h3>
-            <p class="text-slate-300">
-              Your .json file never leaves your computer. We physically cannot access your data.
-            </p>
+            <h3 class="text-xl font-black text-white mb-3">No upload</h3>
+            <p class="text-slate-300">Your export stays on your device. We can’t access it.</p>
           </div>
-          
-          <!-- Privacy Feature 3 -->
-          <div class="privacy-card bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/10 transition-all">
-            <div class="privacy-icon w-20 h-20 mx-auto mb-6 bg-purple-500/20 rounded-2xl flex items-center justify-center">
+
+          <div class="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/10 transition-all">
+            <div class="w-20 h-20 mx-auto mb-6 bg-purple-500/20 rounded-2xl flex items-center justify-center">
               <svg class="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-white mb-3">No Tracking</h3>
-            <p class="text-slate-300">
-              We don't store Zap names, credentials, or any identifiable workflow information.
-            </p>
-          </div>
-          
-        </div>
-        
-        <!-- Architecture Diagram -->
-        <div class="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-12">
-          <div class="grid md:grid-cols-3 gap-8 items-center">
-            <div class="text-center">
-              <div class="w-24 h-24 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg class="w-12 h-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div class="text-white font-bold text-lg mb-2">Your Computer</div>
-              <div class="text-emerald-400 text-sm font-semibold">✓ Data stays here</div>
-              <div class="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                <div class="text-blue-300 text-xs font-mono">lighthouse.app</div>
-                <div class="text-slate-400 text-xs mt-1">WASM</div>
-              </div>
-            </div>
-            
-            <div class="text-center">
-              <div class="text-6xl text-slate-600 mb-4">→</div>
-              <div class="text-slate-500 font-semibold">No Data Transfer</div>
-            </div>
-            
-            <div class="text-center opacity-40">
-              <div class="w-24 h-24 bg-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg class="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                </svg>
-              </div>
-              <div class="text-slate-500 font-bold text-lg mb-2">Cloud Servers</div>
-              <div class="text-rose-400 text-sm font-semibold">✗ Not Used</div>
-            </div>
+            <h3 class="text-xl font-black text-white mb-3">No tracking</h3>
+            <p class="text-slate-300">No analytics events containing Zap names or credentials.</p>
           </div>
         </div>
-        
-        <div class="text-center mt-12">
+
+        <div class="text-center">
           <div class="inline-flex items-center gap-3 px-6 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
             <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            <span class="text-emerald-300 font-bold">SOC 2 Compliant by Design</span>
+            <span class="text-emerald-300 font-black">Client-safe by architecture</span>
           </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="py-18 bg-white">
+    <div class="container mx-auto px-6">
+      <div class="max-w-4xl mx-auto text-center mb-12">
+        <h2 class="text-3xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing:-0.02em;">
+          FAQ
+        </h2>
+        <p class="text-lg text-zinc-600">Short answers before you try it.</p>
+      </div>
+
+      <div class="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-2xl p-8">
+        <div class="divide-y">
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
+              <span class="faq-question-text">Do you upload my Zapier export?</span>
+              <span class="faq-icon">+</span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                No. Relay processes the file <strong>locally in your browser</strong>. There is no upload step and no server-side storage.
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
+              <span class="faq-question-text">When should I use the Audit vs the Continuity Report?</span>
+              <span class="faq-icon">+</span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                <div class="faq-category-badge bg-blue-50 text-blue-700 border border-blue-200">AUDIT</div>
+                Use the Audit when you want risk + waste visibility (executive score, priority actions, plan fit).<br /><br />
+                <div class="faq-category-badge bg-zinc-50 text-zinc-800 border border-zinc-200">CONTINUITY</div>
+                Use the Continuity Report when you’re delivering a project, transferring ownership, documenting for ops, or preparing for due diligence.
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
+              <span class="faq-question-text">Why is the Continuity Report paid?</span>
+              <span class="faq-icon">+</span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                It’s a client-facing documentation bundle: plain-English per Zap, dependency map, troubleshooting guidance, and a checklist.
+                Agencies typically include it as a “Professional Documentation” deliverable.
+              </div>
+            </div>
+          </div>
+
+          <!-- White labeling-->
+          <!-- 
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
+              <span class="faq-question-text">Can I brand the reports for clients?</span>
+              <span class="faq-icon">+</span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                Yes — you can add a logo and a brandable cover page so the PDF looks like a polished client deliverable.
+                (Optional — you can also keep it unbranded.)
+              </div>
+            </div>
+          </div>
+          -->
+
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
+              <span class="faq-question-text">Will this include credentials or sensitive values?</span>
+              <span class="faq-icon">+</span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                Relay uses only what exists in the export and is designed to produce <strong>safe-to-share</strong> documentation.
+                (Still: review before sending externally, as you would with any export.)
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
+              <span class="faq-question-text">Can I run both reports from the same export?</span>
+              <span class="faq-icon">+</span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                Yes — that’s the whole point: one export generates either report. Many teams run the free Audit first, then generate the Continuity Report for the final handoff bundle.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="max-w-4xl mx-auto mt-10 text-center">
+        <div class="text-zinc-600 mb-4 font-semibold">Ready?</div>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a href="/app.html#audit" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-black rounded-xl shadow-lg transition-all hover:scale-[1.02]">
+            Run Free Audit
+          </a>
+          <a href="/app.html#handoff" class="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white text-lg font-black rounded-xl shadow-lg transition-all hover:scale-[1.02]">
+            Generate Continuity Report ($97)
+          </a>
         </div>
       </div>
     </div>
   </section>
 
-
-   <!-- ══════════════════════════════════════════════════
-       FAQ SECTION
-  ══════════════════════════════════════════════════ -->
-  <section id="faq" class="py-20 bg-white">
+  <!-- Final CTA -->
+  <section class="py-18 bg-gradient-to-br from-blue-600 to-blue-700">
     <div class="container mx-auto px-6">
-      <div class="max-w-3xl mx-auto">
+      <div class="max-w-4xl mx-auto text-center">
+        <h2 class="text-4xl md:text-5xl font-black text-white mb-5" style="letter-spacing:-0.02em;">
+          Don’t wait for the break.
+        </h2>
+        <p class="text-xl text-blue-100 mb-8">
+          Run the Audit today. Generate continuity docs when you need to transfer ownership.
+        </p>
 
-        <!-- Header -->
-        <div class="text-center mb-14">
-          <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 border border-blue-100 rounded-full mb-6">
-            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <p class="text-sm text-slate-700 font-mono mb-8 bg-slate-100 px-4 py-2 rounded-lg inline-block">
+          🔒 All processing happens locally in your browser
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="/app.html#audit" class="px-8 py-4 bg-white hover:bg-blue-50 text-blue-700 text-lg font-black rounded-xl shadow-xl shadow-blue-900/20 transition-all hover:scale-[1.02] border-2 border-blue-600 inline-flex items-center gap-3">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span class="text-blue-600 font-bold text-sm">FAQ</span>
-          </div>
-          <h2 class="text-4xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing: -0.02em;">
-            Frequently Asked<br>Questions
-          </h2>
-          <p class="text-lg text-zinc-500">Everything you need to know before running your first audit.</p>
-        </div>
+            Run Free Audit
+          </a>
 
-        <!-- Category: Privacy & Security -->
-        <div class="mb-10">
-          <div class="faq-category-badge bg-blue-50 text-blue-600 border border-blue-100">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          <a href="/app.html#handoff" class="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white text-lg font-black rounded-xl shadow-xl transition-all hover:scale-[1.02] inline-flex items-center gap-3">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
-            Privacy &amp; Security
-          </div>
-          <div class="bg-zinc-50 rounded-2xl border border-zinc-200 px-8 divide-y divide-zinc-200">
-
-            <div class="faq-item">
-              <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
-                Does my Zapier data ever leave my computer?
-                <span class="faq-icon">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-                </span>
-              </button>
-              <div class="faq-answer">
-                <div class="faq-answer-inner">
-                  No — never. Lighthouse runs entirely in your browser using WebAssembly (WASM). Your <code>.zip</code> export is parsed locally in memory. We don't have a server that receives your files, because there's no upload step at all.
-                </div>
-              </div>
-            </div>
-
-            <div class="faq-item">
-              <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
-                Do you store my Zap names or workflow details?
-                <span class="faq-icon">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-                </span>
-              </button>
-              <div class="faq-answer">
-                <div class="faq-answer-inner">
-                  No. We don't collect Zap names, step configurations, credentials, or any identifiable workflow data. The only analytics we may collect are anonymous aggregate metrics (e.g. "audit completed") — never the contents of your automations.
-                </div>
-              </div>
-            </div>
-
-            <div class="faq-item">
-              <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
-                Is Lighthouse safe to use with sensitive business automations?
-                <span class="faq-icon">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-                </span>
-              </button>
-              <div class="faq-answer">
-                <div class="faq-answer-inner">
-                  Yes. Because all processing happens client-side, there's no data transmission risk. It's architecturally equivalent to opening a spreadsheet in Excel — the file never leaves your machine. This makes it safe even for SOC 2 or GDPR-sensitive environments.
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Category: How It Works -->
-        <div class="mb-10">
-          <div class="faq-category-badge bg-emerald-50 text-emerald-700 border border-emerald-100">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            How It Works
-          </div>
-          <div class="bg-zinc-50 rounded-2xl border border-zinc-200 px-8 divide-y divide-zinc-200">
-
-            <div class="faq-item">
-              <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
-                What file do I need to upload?
-                <span class="faq-icon">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-                </span>
-              </button>
-              <div class="faq-answer">
-                <div class="faq-answer-inner">
-                  You need the <code>.zip</code> export from Zapier's Data Management settings. It takes about 30 seconds to generate. Go to <strong>Zapier Settings → Data Management → Export Zaps</strong>. The file contains your Zap configurations in JSON — no sensitive credentials are included by Zapier in this export.
-                </div>
-              </div>
-            </div>
-
-            <div class="faq-item">
-              <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
-                How long does the audit take?
-                <span class="faq-icon">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-                </span>
-              </button>
-              <div class="faq-answer">
-                <div class="faq-answer-inner">
-                  Usually under 5 seconds for accounts with up to 50 Zaps. Larger accounts (100+ Zaps) may take 10–15 seconds. The WASM engine is highly optimised for speed — it's typically faster than a page reload.
-                </div>
-              </div>
-            </div>
-
-            <div class="faq-item">
-              <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
-                What exactly does the efficiency score measure?
-                <span class="faq-icon">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-                </span>
-              </button>
-              <div class="faq-answer">
-                <div class="faq-answer-inner">
-                  The score (0–100) is a weighted composite of several signals: error rate across your active Zaps, presence of filter steps placed late in workflows, number of unused/dormant Zaps, redundant multi-step patterns that could be collapsed, and overall task-to-output ratio. A score of 80+ is considered healthy; below 50 typically means quick wins are available.
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Category: Pricing -->
-        <div class="mb-10">
-          <div class="faq-category-badge bg-amber-50 text-amber-700 border border-amber-100">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Pricing
-          </div>
-          <div class="bg-zinc-50 rounded-2xl border border-zinc-200 px-8 divide-y divide-zinc-200">
-
-            <div class="faq-item">
-              <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
-                Is Lighthouse really free?
-                <span class="faq-icon">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-                </span>
-              </button>
-              <div class="faq-answer">
-                <div class="faq-answer-inner">
-                  Yes — completely free during the alpha phase. We're collecting feedback to shape the product. In the future we plan to offer a paid tier with executive-grade PDF reports, historical re-audit tracking, and team collaboration features. The core audit will remain free.
-                </div>
-              </div>
-            </div>
-
-            <div class="faq-item">
-              <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
-                What will the paid plan include?
-                <span class="faq-icon">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-                </span>
-              </button>
-              <div class="faq-answer">
-                <div class="faq-answer-inner">
-                  The paid tier will include white-label PDF reports suitable for sending to clients or management, longitudinal re-audit comparison (track improvement over time), priority support, and agency-focused bulk audit features. Pricing is planned to start at <strong>$79 per executive report</strong>.
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Bottom nudge -->
-        <div class="text-center mt-8 p-8 bg-blue-50 rounded-2xl border border-blue-100">
-          <p class="text-zinc-700 font-semibold mb-1">Still have questions?</p>
-          <p class="text-zinc-500 text-sm mb-5">Run a free audit first — most questions answer themselves once you see the report.</p>
-          <a href="/app.html" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all hover:scale-105 text-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-            Try It Free
+            Generate Continuity Report ($97)
           </a>
         </div>
 
+        <div class="mt-8 flex items-center justify-center gap-4 text-sm text-white flex-wrap">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>No signup required</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Client-safe PDFs</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Results in seconds</span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
-
-<!-- CTA Section -->
-<section id="app" class="py-20 bg-gradient-to-br from-blue-600 to-blue-700">
-  <div class="container mx-auto px-6">
-    <div class="max-w-4xl mx-auto text-center">
-      <h2 class="text-4xl md:text-5xl font-black text-white mb-6" style="letter-spacing: -0.02em;">
-        Ready to Stop Wasting Money?
-      </h2>
-      <p class="text-xl text-blue-100 mb-8">
-        Get your free audit report in less than 60 seconds
-      </p>
-      
-      <p class="text-sm text-slate-700 font-mono mb-8 bg-slate-100 px-4 py-2 rounded-lg inline-block">
-        🔒 All processing happens locally in your browser
-      </p>
-
-      <p class="mb-8">
-        <a href="/app.html" class="px-8 py-4 bg-white hover:bg-blue-50 text-blue-600 text-lg font-bold rounded-xl shadow-xl shadow-blue-900/20 transition-all hover:scale-105 hover:shadow-2xl border-2 border-blue-600 inline-flex items-center gap-3">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          Start Free Audit
-        </a>
-      </p>
-      
-      <div class="flex items-center justify-center gap-4 text-sm text-white flex-wrap">
-        <div class="flex items-center gap-2">
-          <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <span>No signup required</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Free forever</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Results in 5 seconds</span>
-        </div>
-      </div>
-      
-    </div>
-  </div>
-</section>
 
   <!-- Footer -->
   <footer class="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
@@ -745,22 +786,19 @@
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
             <div>
-              <div class="text-white font-bold text-lg">Zapier Lighthouse</div>
-              <div class="text-sm">Privacy-First Audit • Built with Rust & WASM</div>
+              <div class="text-white font-black text-lg">Relay</div>
+              <div class="text-sm">Automation Risk & Continuity Reports • Built with WASM</div>
             </div>
           </div>
-          
+
           <div class="text-center md:text-right">
-            <div class="text-sm">
-              © 2026 Zapier Lighthouse. All rights reserved.
-            </div>
-            <div class="text-xs mt-1">
-              Made with ❤️ for Zapier power users
-            </div>
+            <div class="text-sm">© 2026 Relay. All rights reserved.</div>
+            <div class="text-xs mt-1">Made for automation builders • <a href="/legal.html">Privacy & Refunds</a></div>
           </div>
         </div>
       </div>
@@ -770,17 +808,19 @@
   <script>
     function toggleFaq(btn) {
       const isOpen = btn.getAttribute('aria-expanded') === 'true';
-      // Close siblings in same group
-      btn.closest('.divide-y').querySelectorAll('.faq-question').forEach(b => {
+      const group = btn.closest('.divide-y');
+      group.querySelectorAll('.faq-question').forEach(function(b) {
         b.setAttribute('aria-expanded', 'false');
-        b.nextElementSibling.classList.remove('open');
+        var ans = b.parentElement.querySelector('.faq-answer');
+        if (ans) ans.classList.remove('open');
       });
-      // Open this one if it was closed
       if (!isOpen) {
         btn.setAttribute('aria-expanded', 'true');
-        btn.nextElementSibling.classList.add('open');
+        var ans = btn.parentElement.querySelector('.faq-answer');
+        if (ans) ans.classList.add('open');
       }
     }
   </script>
+
 </body>
 </html>
