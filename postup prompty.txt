@@ -42,3 +42,7 @@ Tým pushneš tvoj kód do repo ktoré Vercel sleduje. Odteraz budeš pushovať 
 
 git push origin main   
  
+
+git add index.html
+git commit -m "feat: add sample reports section"
+git push
