@@ -943,7 +943,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
 
           <!-- Post-payment instructions -->
           <p class="text-xs text-zinc-400 mt-1 mb-6">
-            After payment: check your email for the unlock code, then paste it below.
+            After payment you'll receive a license key via email — paste it below to generate your report.
           </p>
           
           <div class="max-w-sm mx-auto">
