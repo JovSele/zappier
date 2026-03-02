@@ -940,6 +940,11 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
               Pay $97 → Get Unlock Code
             </a>
           </div>
+
+          <!-- Post-payment instructions -->
+          <p class="text-xs text-zinc-400 mt-1 mb-6">
+            After payment: check your email for the unlock code, then paste it below.
+          </p>
           
           <div class="max-w-sm mx-auto">
             <p class="text-sm font-bold text-zinc-700 mb-2">Already have a code?</p>
