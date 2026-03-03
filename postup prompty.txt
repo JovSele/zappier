@@ -46,3 +46,8 @@ git push origin main
 git add main.ts
 git commit -m "feat: add Post-payment instructions"
 git push
+
+vsetko:
+git add .
+git commit -m "fix: rename Lighthouse → Relay Reports branding, fix TS errors"
+git push
