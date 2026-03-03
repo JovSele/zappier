@@ -240,7 +240,7 @@ function renderPage1_ExecutiveSummary(
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Lighthouse Audit Report', PAGE_MARGIN, yPos);
+  pdf.text('Relay Reports Audit Report', PAGE_MARGIN, yPos);
   
   yPos += 8;
 
@@ -1211,7 +1211,7 @@ function embedReAuditMetadata(pdfDoc: jsPDF, metadata: ReAuditMetadata) {
   
   pdfDoc.setProperties({
     keywords: keywords,
-    subject: 'Zapier Lighthouse Audit Report - Re-Audit Enabled'
+    subject: 'Relay Reports Audit Report - Re-Audit Enabled'
   });
 }
 

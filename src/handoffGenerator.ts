@@ -162,7 +162,7 @@ function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, config: Hand
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Lighthouse Handoff Report', PAGE_MARGIN, yPos);
+  pdf.text('Relay Reports Handoff Report', PAGE_MARGIN, yPos);
 
   yPos += 8;
 
@@ -895,7 +895,7 @@ export async function generateHandoffPDF(
 ): Promise<void> {
   const pdf = new jsPDF('p', 'mm', 'a4');
   const clientName = config.clientName || 'Client';
-  const preparedBy = config.preparedBy || 'Z-Lighthouse';
+  const preparedBy = config.preparedBy || 'Relay Reports';
 
   // --- PAGES ---
   generateExecutiveSummary(pdf, viewModel, config);

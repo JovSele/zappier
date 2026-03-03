@@ -79,7 +79,7 @@ function getNextReportId(): number {
 
 /**
  * Generate formatted report code with date hash
- * Format: LHA-2026-026-00007
+ * Format: RR-2026-026-00007
  * Where: year-dayOfYear-counter
  */
 function generateReportCode(reportId: number): string {
@@ -93,7 +93,7 @@ function generateReportCode(reportId: number): string {
   const dayOfYear = Math.floor(diff / oneDay).toString().padStart(3, '0')
   
   const paddedId = reportId.toString().padStart(5, '0')
-  return `LHA-${year}-${dayOfYear}-${paddedId}`
+  return `RR-${year}-${dayOfYear}-${paddedId}`
 }
 
 
