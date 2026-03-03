@@ -154,7 +154,7 @@ function drawPageFooter(pdf: jsPDF, clientName: string, preparedBy: string): voi
  * Page 1: Executive Summary
  * High-level: what the stack does, how many zaps, which apps, health snapshot
  */
-function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, config: HandoffConfig): void {
+function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, _config: HandoffConfig): void {
   const { PAGE_MARGIN, TOP_MARGIN, CONTENT_WIDTH } = LAYOUT;
   let yPos = TOP_MARGIN;
 
@@ -513,7 +513,7 @@ function generateDependencyMap(pdf: jsPDF, vm: HandoffViewModel, _config: Handof
     return;
   }
 
-vm.dependencies.forEach((dep, index) => {
+vm.dependencies.forEach((dep, _index) => {
   const zapDesc = vm.zaps.find(z => z.zapName === dep.zapName);
   const steps = zapDesc?.stepCount ?? 2;
 

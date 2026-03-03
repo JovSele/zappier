@@ -387,9 +387,7 @@ function buildDependencyEntries(zaps: PerZapFinding[]): DependencyEntry[] {
  * Rule-based: counts apps, detects dominant patterns.
  */
 function generateStackPurpose(zaps: PerZapFinding[]): string {
-  const activeZaps = zaps.filter(z => z.status === 'on' && !z.is_zombie);
   const total = zaps.length;
-  const active = activeZaps.length;
 
   if (total === 0) return 'No automation workflows were identified in this account.';
 
@@ -409,20 +407,6 @@ function generateStackPurpose(zaps: PerZapFinding[]): string {
   if (hasData) purposes.push('data synchronization across business tools');
   if (hasPayments) purposes.push('payment and transaction processing');
   if (hasForms) purposes.push('form submission and lead capture handling');
-
-  const purposeStr = purposes.length > 0
-    ? purposes.join(', ')
-    : 'cross-platform business process automation';
-
-  const statusNote = active === 0
-    ? ' All workflows are currently inactive and can be safely reactivated once ownership transfer is complete.'
-    : active === total
-      ? ' All workflows are operational.'
-      : ` ${active} of ${total} workflows are currently operational.`;
-
-  const primaryFunction = purposes.length > 0
-    ? `Primary Function: ${purposes[0].charAt(0).toUpperCase() + purposes[0].slice(1)}.`
-    : '';
 
   if (purposes.length > 0) {
     const mainPurpose = purposes[0];
