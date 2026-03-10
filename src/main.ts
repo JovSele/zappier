@@ -1782,7 +1782,9 @@ function renderUI() {
           <input type="file" id="file-input" accept=".zip" class="hidden" />
         </div>
 
-        /*
+
+        <!-- false OR true -->
+        ${false ? `
         <!-- OR Divider -->
         <div class="relative my-8">
           <div class="absolute inset-0 flex items-center">
@@ -1810,7 +1812,7 @@ function renderUI() {
             💡 This will restore your previous settings and Zap selection
           </p>
         </div>
-        */
+        ` : ''}
         
         <!-- Status -->
         <div id="status" class="mt-6 p-4 rounded-xl text-sm font-medium bg-slate-100 text-slate-600 border border-slate-200 shadow-sm">
