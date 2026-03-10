@@ -519,28 +519,34 @@ vm.dependencies.forEach((dep, _index) => {
 
   const cardHeight = 50;
   const cardOffset = 1;
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  // PAGE BREAK CHECK
+  if (!safeRender(yPos, pageHeight, cardHeight + 20)) {
+    pdf.addPage();
+    yPos = TOP_MARGIN;
+  }
+
+  const cardY = yPos; // ← fixed reference point
 
   // Shadow
   pdf.setFillColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.roundedRect(PAGE_MARGIN, yPos, CONTENT_WIDTH - cardOffset, cardHeight, 3, 3, 'FD');
+  pdf.roundedRect(PAGE_MARGIN, cardY, CONTENT_WIDTH - cardOffset, cardHeight, 3, 3, 'FD');
 
   // Main box
   pdf.setFillColor(255, 255, 255);
   pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
   pdf.setLineWidth(0.1);
-  pdf.roundedRect(PAGE_MARGIN + cardOffset, yPos, CONTENT_WIDTH - cardOffset, cardHeight, 3, 3, 'FD');
+  pdf.roundedRect(PAGE_MARGIN + cardOffset, cardY, CONTENT_WIDTH - cardOffset, cardHeight, 3, 3, 'FD');
 
   // Header
   pdf.setTextColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('WORKFLOW ARCHITECTURE', PAGE_MARGIN + cardOffset + 6, yPos + 6);
-  
-  // Zap name (right side of header)
-  
+  pdf.text('WORKFLOW ARCHITECTURE', PAGE_MARGIN + cardOffset + 6, cardY + 6);
 
-  // Complexity
+  // Complexity badge
   const complexity = steps > 8 ? 'HIGH' : steps > 4 ? 'MEDIUM' : 'LOW';
   const complexityColor = steps > 8 ? COLORS.RED : steps > 4 ? COLORS.ORANGE_WARNING : COLORS.GREEN;
   const stepsText = `${steps} STEPS • `;
@@ -548,17 +554,16 @@ vm.dependencies.forEach((dep, _index) => {
   const totalBadgeWidth = pdf.getTextWidth(stepsText + complexityText);
   const rightX = PAGE_MARGIN + CONTENT_WIDTH - cardOffset - 6 - totalBadgeWidth;
 
-  yPos += 14;
-
   pdf.setFontSize(7);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
-  pdf.text(stepsText, rightX, yPos - 8);
+  pdf.text(stepsText, rightX, cardY + 6);
   pdf.setTextColor(complexityColor.r, complexityColor.g, complexityColor.b);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(complexityText, rightX + pdf.getTextWidth(stepsText), yPos - 8);
+  pdf.text(complexityText, rightX + pdf.getTextWidth(stepsText), cardY + 6);
 
   // 3 boxy: Trigger → Logic → Action
+  const boxY = cardY + 14;
   const boxWidth = 35;
   const boxHeight = 20;
   const boxGap = 10;
@@ -571,22 +576,22 @@ vm.dependencies.forEach((dep, _index) => {
   pdf.setFillColor(255, 255, 255);
   pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
   pdf.setLineWidth(0.3);
-  pdf.roundedRect(startX, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  pdf.roundedRect(startX, boxY, boxWidth, boxHeight, 2, 2, 'FD');
   pdf.setFillColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
-  pdf.roundedRect(startX + boxWidth / 2 - 4, yPos + 2, 8, 8, 2, 2, 'F');
+  pdf.roundedRect(startX + boxWidth / 2 - 4, boxY + 2, 8, 8, 2, 2, 'F');
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(triggerApp.charAt(0).toUpperCase(), startX + boxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.text(triggerApp.charAt(0).toUpperCase(), startX + boxWidth / 2, boxY + 8, { align: 'center' });
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFontSize(6);
-  pdf.text(triggerApp.toUpperCase().substring(0, 10), startX + boxWidth / 2, yPos + 14, { align: 'center' });
+  pdf.text(triggerApp.toUpperCase().substring(0, 10), startX + boxWidth / 2, boxY + 14, { align: 'center' });
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setFontSize(5);
-  pdf.text('TRIGGER', startX + boxWidth / 2, yPos + 18, { align: 'center' });
+  pdf.text('TRIGGER', startX + boxWidth / 2, boxY + 18, { align: 'center' });
 
   // Arrow 1
-  const arrowY = yPos + boxHeight / 2;
+  const arrowY = boxY + boxHeight / 2;
   pdf.setDrawColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setLineWidth(0.5);
   pdf.line(startX + boxWidth + 2, arrowY, startX + boxWidth + boxGap - 2, arrowY);
@@ -597,22 +602,22 @@ vm.dependencies.forEach((dep, _index) => {
   const logic2X = startX + boxWidth + boxGap;
   pdf.setFillColor(255, 255, 255);
   pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
-  pdf.roundedRect(logic2X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  pdf.roundedRect(logic2X, boxY, boxWidth, boxHeight, 2, 2, 'FD');
   const logicSteps = Math.max(steps - 2, 0);
   pdf.setFillColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
-  pdf.roundedRect(logic2X + boxWidth / 2 - 7, yPos + 2, 14, 6, 3, 3, 'F');
+  pdf.roundedRect(logic2X + boxWidth / 2 - 7, boxY + 2, 14, 6, 3, 3, 'F');
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(6);
   pdf.setFont('helvetica', 'bold');
   const logicLabel = logicSteps === 0 ? 'Direct' : `+${logicSteps}`;
-  pdf.text(logicLabel, logic2X + boxWidth / 2, yPos + 6, { align: 'center' });
+  pdf.text(logicLabel, logic2X + boxWidth / 2, boxY + 6, { align: 'center' });
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFontSize(6);
-  pdf.text('LOGIC LAYER', logic2X + boxWidth / 2, yPos + 13, { align: 'center' });
+  pdf.text('LOGIC LAYER', logic2X + boxWidth / 2, boxY + 13, { align: 'center' });
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setFontSize(5);
   const logicSubLabel = logicSteps === 0 ? 'NO INTERMEDIATE STEPS' : 'FILTERS & FORMATTING';
-  pdf.text(logicSubLabel, logic2X + boxWidth / 2, yPos + 17, { align: 'center' });
+  pdf.text(logicSubLabel, logic2X + boxWidth / 2, boxY + 17, { align: 'center' });
 
   // Arrow 2
   const arrow2X = logic2X + boxWidth + 2;
@@ -625,24 +630,24 @@ vm.dependencies.forEach((dep, _index) => {
   const action3X = logic2X + boxWidth + boxGap;
   pdf.setFillColor(255, 255, 255);
   pdf.setDrawColor(COLORS.SLATE_200.r, COLORS.SLATE_200.g, COLORS.SLATE_200.b);
-  pdf.roundedRect(action3X, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+  pdf.roundedRect(action3X, boxY, boxWidth, boxHeight, 2, 2, 'FD');
   pdf.setFillColor(COLORS.PRIMARY_BLUE.r, COLORS.PRIMARY_BLUE.g, COLORS.PRIMARY_BLUE.b);
-  pdf.roundedRect(action3X + boxWidth / 2 - 4, yPos + 2, 8, 8, 2, 2, 'F');
+  pdf.roundedRect(action3X + boxWidth / 2 - 4, boxY + 2, 8, 8, 2, 2, 'F');
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(actionApp.charAt(0).toUpperCase(), action3X + boxWidth / 2, yPos + 8, { align: 'center' });
+  pdf.text(actionApp.charAt(0).toUpperCase(), action3X + boxWidth / 2, boxY + 8, { align: 'center' });
   pdf.setTextColor(COLORS.SLATE_900.r, COLORS.SLATE_900.g, COLORS.SLATE_900.b);
   pdf.setFontSize(6);
-
   const actionLabel = actionApp.toUpperCase();
   const safeActionLabel = actionLabel.length > 12 ? actionLabel.substring(0, 12) + '…' : actionLabel;
-  pdf.text(safeActionLabel, action3X + boxWidth / 2, yPos + 14, { align: 'center' });
+  pdf.text(safeActionLabel, action3X + boxWidth / 2, boxY + 14, { align: 'center' });
   pdf.setTextColor(COLORS.SLATE_400.r, COLORS.SLATE_400.g, COLORS.SLATE_400.b);
   pdf.setFontSize(5);
-  pdf.text('ACTION', action3X + boxWidth / 2, yPos + 18, { align: 'center' });
+  pdf.text('ACTION', action3X + boxWidth / 2, boxY + 18, { align: 'center' });
 
-  yPos += boxHeight + 14;
+  // Move yPos past the card
+  yPos = cardY + cardHeight + 12;
 });
   
   yPos += 10;
