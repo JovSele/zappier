@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-H6S19G1N29"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-H6S19G1N29');
+  </script>
+
   <title>Relay — Zapier Risk Audit + Continuity Report (100% Private)</title>
 
   <!-- Your existing Tailwind build -->
@@ -124,7 +134,7 @@
       margin-bottom: 14px;
     }
   </style>
-  <link rel="stylesheet" crossorigin href="/assets/style-DcQSk6jK.css">
+  <link rel="stylesheet" crossorigin href="/assets/style-BlaKy5aR.css">
 </head>
 
 <body class="bg-[#fafafa]">
@@ -151,15 +161,11 @@
             100% Private • Runs in your browser
           </span>
 
-          <a href="#choose" class="px-4 py-2.5 bg-white hover:bg-zinc-50 text-zinc-900 font-bold rounded-lg border border-zinc-200 transition-all">
-            Choose Report
-          </a>
-
           <a href="/app.html#audit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-lg transition-all hover:scale-[1.02]">
-            Run Risk Audit (Free)
+            Check My Zapier Risk
           </a>
-          <a href="/app.html#handoff" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-lg transition-all hover:scale-[1.02]">
-            Generate Continuity Report ($97)
+          <a href="/app.html#handoff" class="px-4 py-2.5 bg-white hover:bg-zinc-50 text-zinc-600 font-semibold rounded-lg border border-zinc-200 transition-all text-sm">
+            Continuity Report ($97)
           </a>
         </div>
       </div>
@@ -177,34 +183,29 @@
       <div class="max-w-5xl mx-auto text-center">
         <div class="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full mb-8 backdrop-blur-sm">
           <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-          <span class="text-emerald-300 font-semibold text-sm">No upload • No tracking • WASM-powered</span>
+          <!-- CHANGED: badge copy -->
+          <span class="text-emerald-300 font-semibold text-sm">No upload · No account · Runs in your browser</span>
         </div>
 
         <h1 class="text-5xl md:text-7xl font-black text-white mb-6" style="letter-spacing:-0.03em; line-height:1.08;">
-          Your automations are a risk.<br />
-          <span class="gradient-text">You just can’t see it yet.</span>
+          Stop Being a Hostage<br />
+          <span class="gradient-text">to Your Own Automations.</span>
         </h1>
 
         <p class="text-xl md:text-2xl text-slate-300 mb-10 max-w-4xl mx-auto font-medium leading-relaxed">
-          One expired credential, one URL change, one person leaving — and your workflows quietly break.<br />
-          Relay turns your Zapier export into a <span class="text-white font-black">Risk Audit</span> or a
-          <span class="text-blue-300 font-black">Continuity Report</span> you can hand to a client, a team, or an auditor.
+          Relay turns your Zapier chaos into a professional handoff document — so you're no longer the only person who knows how things work when something breaks.
         </p>
 
+        <!-- Single primary CTA -->
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
-          <a href="/app.html#audit" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-black rounded-xl shadow-xl shadow-blue-500/30 transition-all hover:scale-[1.03] inline-flex items-center gap-3">
+          <a href="/app.html#audit" class="px-10 py-5 bg-blue-600 hover:bg-blue-700 text-white text-xl font-black rounded-xl shadow-xl shadow-blue-500/30 transition-all hover:scale-[1.03] inline-flex items-center gap-3">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            Run Risk Audit (Free)
+            Check My Zapier Risk
           </a>
-
-          <a href="/app.html#handoff" class="px-8 py-4 bg-white/10 hover:bg-white/20 text-white text-lg font-black rounded-xl backdrop-blur-sm border border-white/20 transition-all hover:scale-[1.03] inline-flex items-center gap-3">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Generate Continuity Report ($97)
+          <a href="#continuity" class="px-6 py-4 bg-white/10 hover:bg-white/20 text-white/70 text-base font-semibold rounded-xl backdrop-blur-sm border border-white/10 transition-all hover:scale-[1.01]">
+            See what's in the Continuity Report →
           </a>
         </div>
 
@@ -214,25 +215,22 @@
           <span class="pill bg-white/10 text-slate-200 border border-white/15">✅ PDF in seconds</span>
         </div>
 
-        <!-- White labeling-->
-        <!-- 
-        <div class="text-slate-300/80 text-sm font-semibold mb-10">
-          Optional: add your logo + brand cover page (white-label ready).
-        </div>
-        -->
-
+        <!-- The Pain — 3 fear points -->
         <div class="max-w-4xl mx-auto grid md:grid-cols-3 gap-4 text-left">
           <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
-            <div class="text-white font-black mb-1">Hidden breakpoints</div>
-            <div class="text-slate-300">Find fragile connections, owner-dependency, and “it works until it doesn’t.”</div>
+            <div class="text-red-400 font-black text-xs uppercase tracking-widest mb-2">The Bus Factor</div>
+            <div class="text-white font-black mb-1">What if you didn't show up tomorrow?</div>
+            <div class="text-slate-300">Does anyone else know where to click when the sales process stops?</div>
           </div>
           <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
-            <div class="text-white font-black mb-1">Waste & task burn</div>
-            <div class="text-slate-300">Spot redundant steps and filter placement that silently inflates cost.</div>
+            <div class="text-amber-400 font-black text-xs uppercase tracking-widest mb-2">The Silent Leak</div>
+            <div class="text-white font-black mb-1">You're paying hundreds for Zapier.</div>
+            <div class="text-slate-300">You don't actually know where the tasks go.</div>
           </div>
           <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
-            <div class="text-white font-black mb-1">Transfer-ready docs</div>
-            <div class="text-slate-300">Deliver a clean handoff package your next owner can actually use.</div>
+            <div class="text-blue-400 font-black text-xs uppercase tracking-widest mb-2">The Documentation Debt</div>
+            <div class="text-white font-black mb-1">That doc you promised to write.</div>
+            <div class="text-slate-300">A year ago. Relay generates it in 30 seconds.</div>
           </div>
         </div>
 
@@ -240,64 +238,64 @@
     </div>
   </section>
 
-  <!-- Problem -->
+  <!-- Problem — chaos ako dôkaz -->
   <section class="py-18 bg-white border-b border-zinc-200">
     <div class="container mx-auto px-6">
       <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-10 items-start">
         <div>
           <h2 class="text-3xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing:-0.02em;">
-            Most Zapier stacks fail for boring reasons.
+            You can't fix what you can't see.
           </h2>
           <p class="text-lg md:text-xl text-zinc-600 leading-relaxed">
-            Not because the automation is “hard.”<br/>
-            Because ownership is unclear, dependencies are undocumented, and fixes happen after the break.
+            Most Zapier stacks fail for boring reasons.<br/>
+            Not because the automation is "hard" — because nobody documented it, nobody owns it, and the fix happens after the break.
           </p>
 
           <div class="mt-6 space-y-3 text-zinc-700 font-semibold">
             <div class="flex gap-3">
-              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black">!</div>
-              <div>Workflows tied to personal emails / old credentials</div>
+              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black flex-shrink-0">!</div>
+              <div>Workflows tied to personal emails and credentials nobody remembers</div>
             </div>
             <div class="flex gap-3">
-              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black">!</div>
-              <div>No one can explain “what this zap does” during an incident</div>
+              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black flex-shrink-0">!</div>
+              <div>No one can explain what a Zap does during an incident</div>
             </div>
             <div class="flex gap-3">
-              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black">!</div>
+              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black flex-shrink-0">!</div>
               <div>Redundant steps burn tasks for no business value</div>
             </div>
             <div class="flex gap-3">
-              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black">!</div>
-              <div>Handovers are “here’s a Loom” — and then panic</div>
+              <div class="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 font-black flex-shrink-0">!</div>
+              <div>If you left tomorrow — could anyone take over?</div>
             </div>
           </div>
         </div>
 
         <div class="rounded-3xl border border-zinc-200 bg-zinc-50 p-8">
           <div class="text-sm font-black text-zinc-500 uppercase tracking-widest">What Relay gives you</div>
-          <div class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">Clarity + a plan</div>
+          <div class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">Clarity. A plan. Proof of control.</div>
           <p class="text-zinc-600 mt-3 text-lg leading-relaxed">
-            Use the free audit to identify risk and waste, then generate a continuity report you can share with a client,
-            a new owner, or an auditor.
+            Run the free Audit to see what's fragile and what's costing you money.
+            Generate the Continuity Report when you need something you can hand off — to a manager, a new owner, or an auditor.
           </p>
 
           <div class="mt-6 grid gap-3">
             <div class="rounded-2xl bg-white border border-zinc-200 p-5">
-              <div class="font-black text-zinc-900">Risk Audit (Free)</div>
-              <div class="text-zinc-600">Executive score + top fixes by ROI, effort, and impact.</div>
+              <div class="font-black text-zinc-900">Risk Audit <span class="text-blue-600">(Free)</span></div>
+              <div class="text-zinc-600">Health score + top priority fixes + plan waste. In seconds.</div>
             </div>
-            <div class="rounded-2xl bg-white border border-zinc-200 p-5">
-              <div class="font-black text-zinc-900">Continuity Report ($97)</div>
-              <div class="text-zinc-600">Plain-English docs + dependency map + troubleshooting + checklist.</div>
+            <div id="continuity" class="rounded-2xl bg-white border border-zinc-200 p-5">
+              <div class="font-black text-zinc-900">Continuity Report <span class="text-zinc-500">($97)</span></div>
+              <div class="text-zinc-600">Plain-English docs + dependency map + troubleshooting + handoff checklist.</div>
             </div>
           </div>
 
           <div class="mt-7 flex flex-col sm:flex-row gap-3">
             <a href="/app.html#audit" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-center">
-              Run Audit
+              Check My Zapier Risk
             </a>
             <a href="/app.html#handoff" class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl text-center">
-              Generate Report
+              Generate Report ($97)
             </a>
           </div>
         </div>
@@ -305,30 +303,122 @@
     </div>
   </section>
 
-  <!-- Choose Report -->
+  <!-- Payable Output — PDF ako aktívum -->
+  <section class="py-18 bg-zinc-50 border-b border-zinc-200">
+    <div class="container mx-auto px-6">
+      <div class="max-w-4xl mx-auto text-center mb-12">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 text-zinc-100 rounded-full text-xs font-black uppercase tracking-wider mb-4">
+          Continuity Report
+        </div>
+        <h2 class="text-3xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing:-0.02em;">
+          This is not a report.<br/>It's operational insurance.
+        </h2>
+        <p class="text-lg md:text-xl text-zinc-600 max-w-3xl mx-auto">
+          Something you can send to your manager, hand to a new hire, or file before an audit.
+          Not a Loom. Not a Notion doc you wrote at midnight. A document.
+        </p>
+      </div>
+
+      <div class="max-w-5xl mx-auto grid md:grid-cols-3 gap-6">
+        <div class="rounded-2xl bg-white border border-zinc-200 p-7 card-hover">
+          <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div class="font-black text-zinc-900 text-lg mb-2">Fix Today Guide</div>
+          <div class="text-zinc-600">Exact steps for a colleague to resolve an error in under 15 minutes — without calling you.</div>
+        </div>
+
+        <div class="rounded-2xl bg-white border border-zinc-200 p-7 card-hover">
+          <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+          </div>
+          <div class="font-black text-zinc-900 text-lg mb-2">Maintenance Checklist</div>
+          <div class="text-zinc-600">What to verify once a month so the system doesn't quietly rot between reviews.</div>
+        </div>
+
+        <div class="rounded-2xl bg-white border border-zinc-200 p-7 card-hover">
+          <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+          </div>
+          <div class="font-black text-zinc-900 text-lg mb-2">Dependency Map</div>
+          <div class="text-zinc-600">A map showing how your apps connect — no more guessing what breaks when something changes.</div>
+        </div>
+      </div>
+
+      <div class="max-w-5xl mx-auto mt-10 text-center">
+        <a href="/app.html#handoff" class="inline-flex items-center gap-2 px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl shadow-lg transition-all hover:scale-[1.02]">
+          Generate Continuity Report ($97)
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </a>
+        <p class="text-sm text-zinc-500 mt-3">Run the free Audit first — then decide.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fear amplifier — odchod kolegu -->
+  <section class="py-16 bg-amber-50 border-y border-amber-200">
+    <div class="container mx-auto px-6">
+      <div class="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-8">
+        <div class="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center flex-shrink-0 text-3xl">
+          ⚠️
+        </div>
+        <div>
+          <div class="text-sm font-black text-amber-700 uppercase tracking-widest mb-2">The scenario nobody plans for</div>
+          <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mb-2">What happens when you leave?</h3>
+          <p class="text-zinc-600 text-lg leading-relaxed">
+            Or when the person who built all of this leaves? Most Zapier setups exist only in one person's head.
+            The Continuity Report changes that — plain-English docs your next owner can actually use, without calling you.
+          </p>
+        </div>
+        <div class="flex-shrink-0">
+          <a href="/app.html#handoff" class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl whitespace-nowrap">
+            Generate Report ($97)
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Choose Report — Audit primary, Continuity secondary/upsell -->
   <section id="choose" class="py-18 bg-white border-b border-zinc-200">
     <div class="container mx-auto px-6">
       <div class="max-w-4xl mx-auto text-center mb-12">
+        <!-- CHANGED: headline — strach → akcia -->
         <h2 class="text-3xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing:-0.02em;">
-          Choose the outcome you need today
+          Start with the Audit. Add docs when you need them.
         </h2>
         <p class="text-lg md:text-xl text-zinc-600">
-          Same export. Two reports. One less “tribal knowledge” disaster.
+          Same export. Two reports. One less thing to worry about.
         </p>
       </div>
 
       <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-8">
-        <!-- Audit Card -->
-        <div class="card-hover rounded-3xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-8">
-          <div class="flex items-start justify-between gap-6">
+        <!-- Audit Card — PRIMARY -->
+        <div class="card-hover rounded-3xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-8 relative">
+          <!-- CHANGED: "Start here" badge -->
+          <div class="absolute -top-4 left-8">
+            <span class="px-4 py-1.5 bg-blue-600 text-white text-xs font-black rounded-full uppercase tracking-wider shadow-lg">
+              Start here
+            </span>
+          </div>
+          <div class="flex items-start justify-between gap-6 mt-2">
             <div>
-              <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-full text-xs font-black uppercase tracking-wider">
+              <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-black uppercase tracking-wider">
                 Risk Audit
               </div>
               <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-4">Relay Audit Report</h3>
+              <!-- CHANGED: popis — pokoj, nie features -->
               <p class="text-zinc-600 mt-3 text-lg leading-relaxed">
-                Identify waste, fragile dependencies, and execution patterns that inflate task burn.
-                Get the highest-ROI fixes first.
+                See what's fragile, what's wasting money, and what to fix first.
+                In seconds. Without touching a spreadsheet.
               </p>
             </div>
             <div class="text-right">
@@ -347,7 +437,7 @@
               </div>
               <div>
                 <div class="font-black text-zinc-900">Health Score (0–100)</div>
-                <div class="text-zinc-600 text-sm">Executive-level signal for stack quality and risk posture.</div>
+                <div class="text-zinc-600 text-sm">One number your manager will understand.</div>
               </div>
             </div>
 
@@ -358,8 +448,9 @@
                 </svg>
               </div>
               <div>
-                <div class="font-black text-zinc-900">Top Priority Actions</div>
-                <div class="text-zinc-600 text-sm">High ROI fixes with effort estimates.</div>
+                <!-- CHANGED: "Fix today" framing -->
+                <div class="font-black text-zinc-900">Priority Actions</div>
+                <div class="text-zinc-600 text-sm">High-impact fixes with effort estimates — sorted by ROI, not noise.</div>
               </div>
             </div>
 
@@ -371,25 +462,22 @@
               </div>
               <div>
                 <div class="font-black text-zinc-900">Plan Fit Verdict</div>
-                <div class="text-zinc-600 text-sm">Signals under/over-utilization and downgrade opportunities.</div>
+                <div class="text-zinc-600 text-sm">Are you overpaying? Could you downgrade? Find out now.</div>
               </div>
             </div>
           </div>
 
-          <div class="mt-8 flex flex-col sm:flex-row gap-3">
-            <a href="/app.html#audit" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all hover:scale-[1.02]">
+          <div class="mt-8">
+            <a href="/app.html#audit" class="w-full inline-flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all hover:scale-[1.02] text-lg">
               Run Free Audit
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </a>
-            <a href="#how-it-works" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-zinc-50 text-zinc-900 font-black rounded-xl border border-zinc-200 transition-all">
-              How it works
-            </a>
           </div>
         </div>
 
-        <!-- Continuity Card -->
+        <!-- Continuity Card — UPSELL -->
         <div class="card-hover rounded-3xl border-2 border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-8">
           <div class="flex items-start justify-between gap-6">
             <div>
@@ -397,8 +485,10 @@
                 Continuity Report
               </div>
               <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-4">Relay Continuity Report</h3>
+              <!-- CHANGED: popis — zodpovednosť + handoff -->
               <p class="text-zinc-600 mt-3 text-lg leading-relaxed">
-                Client-ready documentation: what each automation does, what it depends on, what breaks, and what to verify after transfer.
+                When you need to hand this off — to a client, a new hire, or your manager —
+                this is what you send. Not a Loom. Not a Notion doc you wrote at midnight.
               </p>
             </div>
             <div class="text-right">
@@ -417,7 +507,7 @@
               </div>
               <div>
                 <div class="font-black text-zinc-900">Plain-English per Zap</div>
-                <div class="text-zinc-600 text-sm">“When X happens → do Y” without technical noise.</div>
+                <div class="text-zinc-600 text-sm">"When X happens → do Y" — no technical noise.</div>
               </div>
             </div>
 
@@ -440,8 +530,8 @@
                 </svg>
               </div>
               <div>
-                <div class="font-black text-zinc-900">Troubleshooting + Checklist</div>
-                <div class="text-zinc-600 text-sm">What breaks, why, and a sign-off process.</div>
+                <div class="font-black text-zinc-900">Troubleshooting + Handoff Checklist</div>
+                <div class="text-zinc-600 text-sm">What breaks, why, and a sign-off process your next owner can follow.</div>
               </div>
             </div>
           </div>
@@ -460,18 +550,18 @@
         </div>
       </div>
 
+      <!-- CHANGED: Combo banner — Audit first, Continuity as natural next step -->
       <div class="max-w-6xl mx-auto mt-10">
-        <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 md:p-7 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="rounded-2xl border border-blue-100 bg-blue-50 p-6 md:p-7 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <div class="font-black text-zinc-900 text-lg">Recommended combo</div>
+            <div class="font-black text-zinc-900 text-lg">Recommended flow</div>
             <div class="text-zinc-600">
-              Run the <span class="font-black text-blue-700">free Audit</span> to surface risk, then deliver the
-              <span class="font-black text-zinc-900">Continuity Report</span> as the client-facing handoff bundle.
-              <!-- <span class="text-zinc-500">Brandable cover page included.</span> -->
+              Run the <span class="font-black text-blue-700">free Audit</span> to see what's broken and what it's costing you.
+              Then generate the <span class="font-black text-zinc-900">Continuity Report</span> when you need to hand it off or document it for someone else.
             </div>
           </div>
-          <div class="flex flex-col sm:flex-row gap-3">
-            <a href="/app.html#audit" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl">Run Audit</a>
+          <div class="flex flex-col sm:flex-row gap-3 flex-shrink-0">
+            <a href="/app.html#audit" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl">Start with Audit</a>
             <a href="/app.html#handoff" class="px-5 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl">Generate Report</a>
           </div>
         </div>
@@ -499,14 +589,15 @@
 
         <div class="text-center bg-white rounded-2xl p-7 border border-zinc-200 shadow-sm card-hover">
           <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl font-black mx-auto mb-4 border border-blue-200">2</div>
-          <h3 class="text-xl font-black text-zinc-900 mb-2">Open Relay</h3>
-          <p class="text-zinc-600">Drop the export into the tool. Nothing leaves your browser.</p>
+          <h3 class="text-xl font-black text-zinc-900 mb-2">Drop it into Relay</h3>
+          <p class="text-zinc-600">Nothing leaves your browser. Everything runs locally.</p>
         </div>
 
         <div class="text-center bg-white rounded-2xl p-7 border border-zinc-200 shadow-sm card-hover">
           <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl font-black mx-auto mb-4 border border-blue-200">3</div>
           <h3 class="text-xl font-black text-zinc-900 mb-2">Download your PDF</h3>
-          <p class="text-zinc-600">Choose Audit or Continuity. Get a clean report in seconds.</p>
+          <!-- CHANGED: copy — pokoj, nie "clean report" -->
+          <p class="text-zinc-600">Audit or Continuity. A document you can send. In seconds.</p>
         </div>
       </div>
 
@@ -521,31 +612,33 @@
     </div>
   </section>
 
-  <!-- Who it's for / not for -->
+  <!-- Who it's for / not for — CHANGED: ICP rewrite -->
   <section class="py-18 bg-white border-t border-zinc-200">
     <div class="container mx-auto px-6">
       <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-8">
         <div class="rounded-3xl border border-zinc-200 p-8 bg-white">
           <div class="text-sm font-black text-zinc-500 uppercase tracking-widest">Not for you if</div>
-          <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">You have 2–3 simple Zaps and never hand anything off.</h3>
+          <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">You have 2–3 simple Zaps and it never has to work for anyone else.</h3>
           <ul class="mt-5 space-y-3 text-zinc-700 font-semibold">
-            <li class="flex gap-3"><span class="text-zinc-400">•</span> You don’t deliver automation projects to clients</li>
-            <li class="flex gap-3"><span class="text-zinc-400">•</span> You don’t care about ownership or continuity</li>
-            <li class="flex gap-3"><span class="text-zinc-400">•</span> You’re fine with “it breaks sometimes”</li>
+            <li class="flex gap-3"><span class="text-zinc-400">•</span> You don't care if it breaks occasionally</li>
+            <li class="flex gap-3"><span class="text-zinc-400">•</span> Nobody else depends on your automations</li>
+            <li class="flex gap-3"><span class="text-zinc-400">•</span> You've never had to explain a Zap to anyone</li>
           </ul>
         </div>
 
         <div class="rounded-3xl border border-blue-200 p-8 bg-gradient-to-br from-blue-50 to-white">
-          <div class="text-sm font-black text-blue-700 uppercase tracking-widest">Perfect for</div>
-          <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">Agencies, consultants, and teams managing real workflow risk.</h3>
+          <!-- CHANGED: "Perfect for" — Solo Internal Owner explicitly -->
+          <div class="text-sm font-black text-blue-700 uppercase tracking-widest">This is for you if</div>
+          <h3 class="text-2xl md:text-3xl font-black text-zinc-900 mt-3">You're the one person at the company who owns Zapier — and you feel the weight of that.</h3>
           <ul class="mt-5 space-y-3 text-zinc-700 font-semibold">
-            <li class="flex gap-3"><span class="text-blue-600">•</span> You manage 10+ workflows and want clarity</li>
-            <li class="flex gap-3"><span class="text-blue-600">•</span> You do handoffs, transfers, or client documentation</li>
-            <li class="flex gap-3"><span class="text-blue-600">•</span> You need audit-ready visibility (due diligence, compliance, ops)</li>
+            <li class="flex gap-3"><span class="text-blue-600">•</span> You manage 10+ workflows and want to know what's fragile</li>
+            <li class="flex gap-3"><span class="text-blue-600">•</span> You'd be embarrassed if it broke during something important</li>
+            <li class="flex gap-3"><span class="text-blue-600">•</span> You need something to show your manager — not just a feeling</li>
+            <li class="flex gap-3"><span class="text-blue-600">•</span> Someone is leaving, joining, or asking for documentation</li>
           </ul>
 
           <div class="mt-7 flex flex-col sm:flex-row gap-3">
-            <a href="/app.html#audit" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-center">Run Audit</a>
+            <a href="/app.html#audit" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-center">Run Free Audit</a>
             <a href="/app.html#handoff" class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl text-center">Generate Report</a>
           </div>
         </div>
@@ -586,7 +679,7 @@
               </svg>
             </div>
             <h3 class="text-xl font-black text-white mb-3">No upload</h3>
-            <p class="text-slate-300">Your export stays on your device. We can’t access it.</p>
+            <p class="text-slate-300">Your export stays on your device. We can't access it.</p>
           </div>
 
           <div class="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/10 transition-all">
@@ -609,6 +702,109 @@
             </svg>
             <span class="text-emerald-300 font-black">Client-safe by architecture</span>
           </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Sample Reports -->
+  <section id="samples" class="py-18 bg-zinc-50 border-t border-zinc-200">
+    <div class="container mx-auto px-6">
+      <div class="max-w-4xl mx-auto text-center mb-12">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-200 text-zinc-700 rounded-full text-xs font-black uppercase tracking-wider mb-4">
+          Example Output Format
+        </div>
+        <h2 class="text-3xl md:text-5xl font-black text-zinc-900 mb-4" style="letter-spacing:-0.02em;">
+          What the reports look like
+        </h2>
+        <p class="text-lg text-zinc-600">
+          Generated from a small test export to demonstrate layout and sections.<br />
+          Your report is produced from your own Zapier data — locally, in your browser.
+        </p>
+      </div>
+
+      <div class="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
+
+        <!-- Audit Sample -->
+        <div class="card-hover rounded-3xl border-2 border-blue-200 bg-white p-8 flex flex-col">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 text-white rounded-full text-xs font-black uppercase tracking-wider">
+                Risk Audit
+              </div>
+              <div class="text-xs text-zinc-500 font-semibold mt-1">Free report</div>
+            </div>
+          </div>
+
+          <h3 class="text-xl font-black text-zinc-900 mb-2">Sample Audit Report</h3>
+          <p class="text-zinc-600 text-sm mb-4 flex-1">
+            Executive health score, top priority fixes, waste analysis, and plan fit verdict — formatted for internal review or sharing with your manager.
+          </p>
+
+          <ul class="space-y-2 mb-6 text-sm text-zinc-700">
+            <li class="flex items-center gap-2"><span class="text-blue-500 font-black">✓</span> Health Score (0–100)</li>
+            <li class="flex items-center gap-2"><span class="text-blue-500 font-black">✓</span> Top Issues & Priority Actions</li>
+            <li class="flex items-center gap-2"><span class="text-blue-500 font-black">✓</span> Monthly Waste Estimate ($)</li>
+            <li class="flex items-center gap-2"><span class="text-blue-500 font-black">✓</span> Plan Fit Verdict</li>
+          </ul>
+
+          <a href="/Executive_Audit_LHA-2026-simple.pdf" target="_blank"
+            class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all hover:scale-[1.02]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            View Sample Audit PDF
+          </a>
+
+          <p class="text-xs text-zinc-400 text-center mt-3">Example format · Your data stays local</p>
+        </div>
+
+        <!-- Continuity Sample -->
+        <div class="card-hover rounded-3xl border-2 border-zinc-200 bg-white p-8 flex flex-col">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-900 text-white rounded-full text-xs font-black uppercase tracking-wider">
+                Continuity Report
+              </div>
+              <div class="text-xs text-zinc-500 font-semibold mt-1">$97 one-time</div>
+            </div>
+          </div>
+
+          <h3 class="text-xl font-black text-zinc-900 mb-2">Sample Continuity Report</h3>
+          <p class="text-zinc-600 text-sm mb-4 flex-1">
+            The document you send when someone asks "how does all this work?" — plain-English descriptions, dependency map, troubleshooting guide, and sign-off checklist.
+          </p>
+          <p class="text-xs font-semibold text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 mb-2">
+            Designed for client handoffs, ownership transfers, and audit readiness.
+          </p>
+
+          <ul class="space-y-2 mb-6 text-sm text-zinc-700">
+            <li class="flex items-center gap-2"><span class="text-zinc-500 font-black">✓</span> Plain-English per Zap</li>
+            <li class="flex items-center gap-2"><span class="text-zinc-500 font-black">✓</span> Dependency Map</li>
+            <li class="flex items-center gap-2"><span class="text-zinc-500 font-black">✓</span> Troubleshooting Guide</li>
+            <li class="flex items-center gap-2"><span class="text-zinc-500 font-black">✓</span> Handoff Checklist</li>
+          </ul>
+
+          <a href="/Handoff_Report_LHA-2026-simple.pdf" target="_blank"
+            class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl transition-all hover:scale-[1.02]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            View Sample Continuity PDF
+          </a>
+
+          <p class="text-xs text-zinc-400 text-center mt-3">Example format · Your data stays local</p>
         </div>
 
       </div>
@@ -639,6 +835,7 @@
             </div>
           </div>
 
+          <!-- CHANGED: FAQ rewrite — ICP language -->
           <div class="faq-item">
             <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
               <span class="faq-question-text">When should I use the Audit vs the Continuity Report?</span>
@@ -647,9 +844,9 @@
             <div class="faq-answer">
               <div class="faq-answer-inner">
                 <div class="faq-category-badge bg-blue-50 text-blue-700 border border-blue-200">AUDIT</div>
-                Use the Audit when you want risk + waste visibility (executive score, priority actions, plan fit).<br /><br />
-                <div class="faq-category-badge bg-zinc-50 text-zinc-800 border border-zinc-200">CONTINUITY</div>
-                Use the Continuity Report when you’re delivering a project, transferring ownership, documenting for ops, or preparing for due diligence.
+                Use the Audit when you want to know what's fragile, what's wasting money, and what to fix first. Good for internal review, sharing with your manager, or just getting peace of mind.<br /><br />
+                <div class="faq-category-badge bg-zinc-50 text-zinc-800 border border-zinc-200">CONTINUITY REPORT</div>
+                Use the Continuity Report when someone else needs to understand your automations — a new hire, a client, a manager, or anyone taking over. This is the document you send instead of a Loom.
               </div>
             </div>
           </div>
@@ -661,27 +858,10 @@
             </button>
             <div class="faq-answer">
               <div class="faq-answer-inner">
-                It’s a client-facing documentation bundle: plain-English per Zap, dependency map, troubleshooting guidance, and a checklist.
-                Agencies typically include it as a “Professional Documentation” deliverable.
+                It's a full documentation bundle — plain-English descriptions, dependency map, troubleshooting guidance, and a handoff checklist. It takes significant processing to produce and it's the kind of document that used to require a consultant or hours of manual work.
               </div>
             </div>
           </div>
-
-          <!-- White labeling-->
-          <!-- 
-          <div class="faq-item">
-            <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
-              <span class="faq-question-text">Can I brand the reports for clients?</span>
-              <span class="faq-icon">+</span>
-            </button>
-            <div class="faq-answer">
-              <div class="faq-answer-inner">
-                Yes — you can add a logo and a brandable cover page so the PDF looks like a polished client deliverable.
-                (Optional — you can also keep it unbranded.)
-              </div>
-            </div>
-          </div>
-          -->
 
           <div class="faq-item">
             <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
@@ -698,12 +878,24 @@
 
           <div class="faq-item">
             <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
+              <span class="faq-question-text">Why should I pay for this when I can write the documentation myself?</span>
+              <span class="faq-icon">+</span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                You could. Most people plan to. Almost nobody does. Relay generates it in 30 seconds, from real data, in a format you can immediately hand off.
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false" onclick="toggleFaq(this)">
               <span class="faq-question-text">Can I run both reports from the same export?</span>
               <span class="faq-icon">+</span>
             </button>
             <div class="faq-answer">
               <div class="faq-answer-inner">
-                Yes — that’s the whole point: one export generates either report. Many teams run the free Audit first, then generate the Continuity Report for the final handoff bundle.
+                Yes — that's the whole point. One export, two outputs. Most people run the free Audit first to see the risk picture, then generate the Continuity Report when they need to hand something off or document it for someone else.
               </div>
             </div>
           </div>
@@ -724,15 +916,17 @@
     </div>
   </section>
 
-  <!-- Final CTA -->
+  <!-- Final CTA — CHANGED: headline + subtext -->
   <section class="py-18 bg-gradient-to-br from-blue-600 to-blue-700">
     <div class="container mx-auto px-6">
       <div class="max-w-4xl mx-auto text-center">
+        <!-- CHANGED: headline — strach + akcia -->
         <h2 class="text-4xl md:text-5xl font-black text-white mb-5" style="letter-spacing:-0.02em;">
-          Don’t wait for the break.
+          Don't wait for the break.
         </h2>
+        <!-- CHANGED: subtext — pokoj ako outcome -->
         <p class="text-xl text-blue-100 mb-8">
-          Run the Audit today. Generate continuity docs when you need to transfer ownership.
+          Run the Audit now. Know what's fragile. Sleep better tonight.
         </p>
 
         <p class="text-sm text-slate-700 font-mono mb-8 bg-slate-100 px-4 py-2 rounded-lg inline-block">
@@ -740,20 +934,14 @@
         </p>
 
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a href="/app.html#audit" class="px-8 py-4 bg-white hover:bg-blue-50 text-blue-700 text-lg font-black rounded-xl shadow-xl shadow-blue-900/20 transition-all hover:scale-[1.02] border-2 border-blue-600 inline-flex items-center gap-3">
+          <a href="/app.html#audit" class="px-10 py-5 bg-white hover:bg-blue-50 text-blue-700 text-xl font-black rounded-xl shadow-xl shadow-blue-900/20 transition-all hover:scale-[1.02] border-2 border-blue-600 inline-flex items-center gap-3">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            Run Free Audit
+            Check My Zapier Risk
           </a>
-
-          <a href="/app.html#handoff" class="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white text-lg font-black rounded-xl shadow-xl transition-all hover:scale-[1.02] inline-flex items-center gap-3">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Generate Continuity Report ($97)
+          <a href="/app.html#handoff" class="px-6 py-4 bg-zinc-900 hover:bg-zinc-800 text-white text-base font-semibold rounded-xl shadow-xl transition-all hover:scale-[1.02]">
+            Continuity Report ($97) →
           </a>
         </div>
 
@@ -768,7 +956,7 @@
             <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            <span>Client-safe PDFs</span>
+            <span>Nothing leaves your browser</span>
           </div>
           <div class="flex items-center gap-2">
             <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -795,13 +983,15 @@
             </div>
             <div>
               <div class="text-white font-black text-lg">Relay</div>
-              <div class="text-sm">Automation Risk & Continuity Reports • Built with WASM</div>
+              <!-- CHANGED: footer tagline -->
+              <div class="text-sm">Zapier Risk & Continuity Reports • Built with WASM</div>
             </div>
           </div>
 
           <div class="text-center md:text-right">
             <div class="text-sm">© 2026 Relay. All rights reserved.</div>
-            <div class="text-xs mt-1">Made for automation builders</div>
+            <div class="text-xs mt-1">Made for the person who owns the automations • <a href="/legal.html">Privacy & Refunds</a></div>
+            <div class="text-xs mt-1 text-slate-600">Agencies typically use Relay as a handoff tool for their clients.</div>
           </div>
         </div>
       </div>

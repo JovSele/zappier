@@ -49,5 +49,5 @@ git push
 
 vsetko:
 git add .
-git commit -m "fix: rename Lighthouse → Relay Reports branding, fix TS errors"
+git commit -m "Product Status"
 git push

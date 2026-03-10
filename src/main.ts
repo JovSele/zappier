@@ -164,7 +164,6 @@ async function initWasm() {
   try {
     await init()
     wasmReady = true
-    console.log('WASM initialized successfully')
     
     // Test WASM connection
     hello_world()
@@ -270,7 +269,6 @@ async function extractReAuditMetadata(pdfFile: File): Promise<ReAuditMetadata | 
     const keywords = pdfDoc.getKeywords()
     
     if (!keywords) {
-      console.warn('No keywords found in PDF')
       return null
     }
     
@@ -278,7 +276,6 @@ async function extractReAuditMetadata(pdfFile: File): Promise<ReAuditMetadata | 
     const match = keywords.match(/REAUDIT_V1:([A-Za-z0-9+/=]+)/)
     
     if (!match) {
-      console.warn('No re-audit metadata found in PDF keywords')
       return null
     }
     
@@ -287,7 +284,6 @@ async function extractReAuditMetadata(pdfFile: File): Promise<ReAuditMetadata | 
     const metadataJson = atob(metadataBase64)
     const metadata = deserializeMetadata(metadataJson)
     
-    console.log('✅ Re-audit metadata extracted:', metadata)
     return metadata
     
   } catch (error) {
@@ -800,19 +796,10 @@ async function handleAnalyzeSelected() {
 
     // TypeScript now KNOWS it's valid AuditResult
     const auditResult: AuditResult = rawResult
-    // Audit result validated successfully
-
-    // 🔍 DEBUG: PER-ZAP STATUS
-    console.log('🚨 PER-ZAP STATUS:', auditResult.per_zap_findings.map(z => ({
-      id: z.zap_id,
-      name: z.zap_name,
-      status: z.status,
-      is_zombie: z.is_zombie,
-    })))
 
     // WASM already filtered - validate result
     if (auditResult.global_metrics.total_zaps !== selectedIds.length) {
-      console.warn(`Expected ${selectedIds.length} Zaps, got ${auditResult.global_metrics.total_zaps}`)
+      // Data mismatch detected but non-critical
     }
 
     // Store result globally for unlock flow
@@ -1654,19 +1641,12 @@ async function testV1API() {
     )
     const auditResult: AuditResult = JSON.parse(resultJson)
     
-    console.log('✅ v1.0.0 Audit Result:', auditResult)
-    
     // Validate schema version
     if (auditResult.schema_version !== '1.0.0') {
       throw new Error(`Invalid schema version: ${auditResult.schema_version}`)
     }
     
     updateStatus('success', `v1.0.0 API works! Found ${auditResult.per_zap_findings.length} Zaps with ${auditResult.global_metrics.total_monthly_tasks} monthly tasks`)
-    
-    // Log key metrics
-    console.log('📊 Global Metrics:', auditResult.global_metrics)
-    console.log('🔍 Findings:', auditResult.per_zap_findings.length)
-    console.log('💰 Opportunities:', auditResult.opportunities_ranked.length)
     
   } catch (error) {
     console.error('❌ v1.0.0 API test failed:', error)
@@ -1843,6 +1823,5 @@ initWasm()
 if (import.meta.env.DEV) {
   import('./validation').then(({ testBrokenData }) => {
     (window as any).testBrokenData = testBrokenData
-    console.log('💡 Dev tool available: testBrokenData()')
   })
 }
