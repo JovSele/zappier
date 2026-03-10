@@ -240,7 +240,7 @@ function renderPage1_ExecutiveSummary(
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Relay Reports Audit Report', PAGE_MARGIN, yPos);
+  pdf.text('Relay Audit Report', PAGE_MARGIN, yPos);
   
   yPos += 8;
 

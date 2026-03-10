@@ -162,7 +162,7 @@ function generateExecutiveSummary(pdf: jsPDF, vm: HandoffViewModel, _config: Han
   pdf.setTextColor(COLORS.TEXT_PRIMARY.r, COLORS.TEXT_PRIMARY.g, COLORS.TEXT_PRIMARY.b);
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Relay Reports Handoff Report', PAGE_MARGIN, yPos);
+  pdf.text('Relay Handoff Report', PAGE_MARGIN, yPos);
 
   yPos += 8;
 
