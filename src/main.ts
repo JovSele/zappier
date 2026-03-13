@@ -871,20 +871,49 @@ async function handleDownloadHandoff(auditResult: AuditResult, btn: HTMLElement)
 }
 
 // Unlock code verification functions
-function verifyUnlockCode() {
+async function verifyUnlockCode() {
   const input = document.getElementById('unlock-code-input') as HTMLInputElement
   const error = document.getElementById('unlock-error')
-  const code = input?.value.trim().toUpperCase()
-  
-  // TODO: Replace with real verification against backend
+  const btn = document.getElementById('unlock-code-btn') as HTMLButtonElement
+  const code = input?.value.trim()
+
   if (!code || code.length < 6) {
-    error?.classList.remove('hidden')
+    if (error) { error.textContent = 'Please enter a valid license key.'; error.classList.remove('hidden') }
     return
   }
-  
+
+  // Disable button during verification
+  btn.textContent = 'Verifying...'
+  btn.disabled = true
   error?.classList.add('hidden')
-  // Placeholder: accept any code for now
-  generateHandoffAfterUnlock()
+
+  try {
+    const response = await fetch(
+      `https://api.gumroad.com/v2/licenses/verify`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          product_permalink: 'hlfdev',
+          license_key: code
+        })
+      }
+    )
+    const data = await response.json()
+
+    if (data.success && !data.purchase.refunded && !data.purchase.chargebacked) {
+      error?.classList.add('hidden')
+      generateHandoffAfterUnlock()
+    } else {
+      if (error) { error.textContent = 'Invalid or refunded license key. Please try again.'; error.classList.remove('hidden') }
+      btn.textContent = 'Unlock'
+      btn.disabled = false
+    }
+  } catch (err) {
+    if (error) { error.textContent = 'Verification failed. Check your connection and try again.'; error.classList.remove('hidden') }
+    btn.textContent = 'Unlock'
+    btn.disabled = false
+  }
 }
 
 function generateHandoffAfterUnlock() {
@@ -922,7 +951,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
           <p class="text-zinc-600 mb-8">To generate the Continuity Report, complete payment and enter your unlock code.</p>
           
           <div class="flex flex-col sm:flex-row gap-4 justify-center mb-6">
-            <a href="https://relayreports.lemonsqueezy.com/checkout/buy/c46c342c-0437-4fd0-a8e1-4d4d5102b256" target="_blank" 
+            <a href="https://relayreports.gumroad.com/l/hlfdev" target="_blank" 
                class="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white text-lg font-black rounded-xl transition-all hover:scale-[1.02]">
               Pay $97 → Get Unlock Code
             </a>
