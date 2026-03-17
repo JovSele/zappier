@@ -889,7 +889,7 @@ async function verifyUnlockCode() {
 
   try {
     const response = await fetch(
-      `https://api.gumroad.com/v2/licenses/verify`,
+      `https://gumroad-proxy.jovsele.workers.dev/`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
