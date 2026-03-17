@@ -974,7 +974,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
               <button 
                 id="unlock-code-btn"
                 onclick="verifyUnlockCode()"
-                class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl transition-all whitespace-nowrap"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl transition-all whitespace-nowrap"
               >
                 Unlock
               </button>
