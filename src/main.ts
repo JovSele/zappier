@@ -894,7 +894,7 @@ async function verifyUnlockCode() {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          product_permalink: 'hlfdev',
+          product_id: '1dkeZdabsS-7Onu26YB7yQ==',
           license_key: code
         })
       }
