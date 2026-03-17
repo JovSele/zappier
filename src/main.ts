@@ -815,12 +815,8 @@ async function handleAnalyzeSelected() {
 }
 
 async function handleDownloadHandoff(auditResult: AuditResult, btn: HTMLElement) {
-  btn.innerHTML = `
-    <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-    Generating Handoff Report...
-  `
+  // Generating:
+  btn.innerHTML = `<svg class="w-5 h-5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span>Generating...</span>`
   btn.classList.add('opacity-75', 'cursor-wait')
   gtag('event', 'continuity_unlock_clicked')
 
@@ -836,23 +832,16 @@ async function handleDownloadHandoff(auditResult: AuditResult, btn: HTMLElement)
       preparedBy: 'Relay Automation Framework',
     })
 
-    btn.innerHTML = `
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-      </svg>
-      Downloaded!
-    `
+    // Success (downloaded):
+    btn.innerHTML = `<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>Downloaded!</span>`
+
     btn.classList.remove('opacity-75', 'cursor-wait')
     btn.classList.remove('from-emerald-600', 'to-emerald-700')
     btn.classList.add('bg-slate-600')
 
     setTimeout(() => {
-      btn.innerHTML = `
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-        Download Handoff
-      `
+      // Reset (after timeout):
+      btn.innerHTML = `<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span>Download Handoff</span>`
       btn.classList.remove('bg-slate-600')
       btn.classList.add('from-emerald-600', 'to-emerald-700')
     }, 2000)
@@ -1121,7 +1110,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
           <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          Generating ...
+          <span>Generating...</span>
         `
         pdfBtn.classList.add('opacity-75', 'cursor-wait')
         gtag('event', 'audit_pdf_download_clicked')
@@ -1158,7 +1147,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            Downloaded!
+            <span>Downloaded!</span>
           `
           pdfBtn.classList.remove('opacity-75', 'cursor-wait')
           pdfBtn.classList.remove('from-blue-600', 'to-blue-700')
