@@ -962,7 +962,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
             After payment you'll receive a license key via email — paste it below to generate your report.
           </p>
           
-          <div class="max-w-sm mx-auto">
+          <div class="max-w-md mx-auto">
             <p class="text-sm font-bold text-zinc-700 mb-2">Already have a code?</p>
             <div class="flex gap-2">
               <input 
@@ -974,7 +974,7 @@ function displayDeveloperEditionResults(auditResult: AuditResult) {
               <button 
                 id="unlock-code-btn"
                 onclick="verifyUnlockCode()"
-                class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl transition-all"
+                class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-black rounded-xl transition-all whitespace-nowrap"
               >
                 Unlock
               </button>
